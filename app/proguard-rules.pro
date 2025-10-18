@@ -1,0 +1,2 @@
+-dontwarn kotlinx.coroutines.**
+-dontwarn kotlinx.serialization.**
