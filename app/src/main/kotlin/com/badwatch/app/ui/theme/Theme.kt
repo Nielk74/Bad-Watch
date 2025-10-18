@@ -24,7 +24,6 @@ private val colorPalette = Colors(
 fun BadWatchTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colors = colorPalette,
-        typography = BadWatchTypography,
         content = content
     )
 }

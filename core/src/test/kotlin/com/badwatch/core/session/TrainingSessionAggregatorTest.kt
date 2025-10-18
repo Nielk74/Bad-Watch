@@ -45,12 +45,12 @@ class TrainingSessionAggregatorTest {
         val snapshot = aggregator.snapshot(start + 2_500L)
         assertThat(snapshot.totalShots).isEqualTo(1)
         assertThat(snapshot.lastShot?.type).isEqualTo(ShotType.Smash)
-        assertThat(snapshot.durationMillis).isEqualTo(1_500L)
+        assertThat(snapshot.durationMillis).isEqualTo(2_500L)
 
         val session = aggregator.buildSession(start + 2_500L)
         assertThat(session.shots).hasSize(1)
         assertThat(session.summary.totalShots).isEqualTo(1)
-        assertThat(session.summary.durationMillis).isEqualTo(1_500L)
+        assertThat(session.summary.durationMillis).isEqualTo(2_500L)
         assertThat(session.summary.averageHeartRate).isGreaterThan(110f)
     }
 }

@@ -117,13 +117,13 @@ private fun IdleState(
     ) {
         Text(
             text = "Ready to Train",
-            style = MaterialTheme.typography.displayMedium,
+            style = MaterialTheme.typography.title1,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "Track smashes, effort, and fatigue in real time.",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.body2,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(12.dp))
@@ -158,7 +158,7 @@ private fun RunningState(
     ) {
         Text(
             text = "Training Active",
-            style = MaterialTheme.typography.displayMedium
+            style = MaterialTheme.typography.title1
         )
         Spacer(modifier = Modifier.height(8.dp))
         LiveMetrics(snapshot = snapshot)
@@ -198,7 +198,7 @@ private fun FinishedState(
     ) {
         Text(
             text = "Session Complete",
-            style = MaterialTheme.typography.displayMedium,
+            style = MaterialTheme.typography.title1,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -228,13 +228,13 @@ private fun ErrorState(
     ) {
         Text(
             text = "Sensor Error",
-            style = MaterialTheme.typography.displayMedium,
+            style = MaterialTheme.typography.title1,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = message,
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.body2,
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(12.dp))
@@ -269,7 +269,7 @@ private fun LiveMetrics(snapshot: TrainingSessionSnapshot) {
             val durationSeconds = TimeUnit.MILLISECONDS.toSeconds(snapshot.durationMillis)
             Text(
                 text = "Duration ${durationSeconds}s",
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.body2
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -308,17 +308,17 @@ private fun ShotStreakRow(lastShot: ShotEvent?, totalShots: Int) {
     ) {
         Text(
             text = "Shots $totalShots",
-            style = MaterialTheme.typography.bodyMedium
+            style = MaterialTheme.typography.body2
         )
         if (lastShot != null) {
             Text(
                 text = "Last ${formatShotType(lastShot.type)}",
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.body2
             )
         } else {
             Text(
                 text = "No shots yet",
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.body2
             )
         }
     }
@@ -340,8 +340,8 @@ private fun InsightRow(
         CircularScore(label = "Effort", value = effort)
         CircularScore(label = "Recovery", value = recovery)
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = "Zone", style = MaterialTheme.typography.labelMedium)
-            Text(text = zone.displayName(), style = MaterialTheme.typography.bodyMedium)
+            Text(text = "Zone", style = MaterialTheme.typography.caption1)
+        Text(text = zone.displayName(), style = MaterialTheme.typography.body2)
         }
     }
 }
@@ -356,11 +356,11 @@ private fun CircularScore(label: String, value: Float) {
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = "${(value * 100).roundToInt()}%",
-            style = MaterialTheme.typography.labelMedium
+            style = MaterialTheme.typography.caption1
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.labelMedium
+            style = MaterialTheme.typography.caption1
         )
     }
 }
@@ -377,31 +377,31 @@ private fun SessionSummaryCard(
                 .padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Text(text = title, style = MaterialTheme.typography.body1)
             Text(
                 text = "Duration ${TimeUnit.MILLISECONDS.toMinutes(session.summary.durationMillis)} min",
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.body2
             )
             Text(
                 text = "Shots ${session.summary.totalShots}",
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.body2
             )
             Text(
                 text = "Avg HR ${formatBpm(session.summary.averageHeartRate)}",
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.body2
             )
             ShotDistributionRow(session.summary.shotCounts)
             Text(
                 text = "Dominant Zone ${session.summary.heartRateZoneHistogram.maxByOrNull { it.value }?.key?.displayName() ?: "Warm-up"}",
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.body2
             )
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Fatigue ${(session.summary.fatigueScore * 100).roundToInt()}%", style = MaterialTheme.typography.labelMedium)
-                Text("Effort ${(session.summary.effortScore * 100).roundToInt()}%", style = MaterialTheme.typography.labelMedium)
-                Text("Recovery ${(session.summary.recoveryScore * 100).roundToInt()}%", style = MaterialTheme.typography.labelMedium)
+                Text("Fatigue ${(session.summary.fatigueScore * 100).roundToInt()}%", style = MaterialTheme.typography.caption1)
+                Text("Effort ${(session.summary.effortScore * 100).roundToInt()}%", style = MaterialTheme.typography.caption1)
+                Text("Recovery ${(session.summary.recoveryScore * 100).roundToInt()}%", style = MaterialTheme.typography.caption1)
             }
         }
     }
@@ -410,7 +410,7 @@ private fun SessionSummaryCard(
 @Composable
 private fun ShotDistributionRow(counts: Map<ShotType, Int>) {
     Column {
-        Text("Shot Mix", style = MaterialTheme.typography.bodyMedium)
+        Text("Shot Mix", style = MaterialTheme.typography.body2)
         var total = 0
         ShotType.values().forEach { type ->
             val count = counts[type] ?: 0
@@ -418,14 +418,14 @@ private fun ShotDistributionRow(counts: Map<ShotType, Int>) {
                 total += count
                 Text(
                     text = "${formatShotType(type)} $count",
-                    style = MaterialTheme.typography.labelMedium
+                    style = MaterialTheme.typography.caption1
                 )
             }
         }
         if (total == 0) {
             Text(
                 text = "No shots captured",
-                style = MaterialTheme.typography.labelMedium
+                style = MaterialTheme.typography.caption1
             )
         }
     }
@@ -439,7 +439,7 @@ private fun HistorySection(
     if (history.isEmpty()) {
         Text(
             text = "No sessions yet. Smash start to begin!",
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.body2,
             textAlign = TextAlign.Center
         )
         return
@@ -447,7 +447,7 @@ private fun HistorySection(
 
     Text(
         text = "History",
-        style = MaterialTheme.typography.bodyLarge,
+        style = MaterialTheme.typography.body1,
         modifier = Modifier.fillMaxWidth(),
         textAlign = TextAlign.Start
     )
@@ -462,11 +462,11 @@ private fun HistorySection(
             ) {
                 Text(
                     text = "Shots ${session.summary.totalShots}",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.body2
                 )
                 Text(
                     text = "Avg HR ${formatBpm(session.summary.averageHeartRate)}",
-                    style = MaterialTheme.typography.labelMedium
+                    style = MaterialTheme.typography.caption1
                 )
             }
         }
@@ -482,8 +482,8 @@ private fun HistorySection(
 @Composable
 private fun MetricColumn(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = label, style = MaterialTheme.typography.labelMedium)
-        Text(text = value, style = MaterialTheme.typography.bodyMedium)
+        Text(text = label, style = MaterialTheme.typography.caption1)
+        Text(text = value, style = MaterialTheme.typography.body2)
     }
 }
 

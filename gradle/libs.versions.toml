@@ -1,5 +1,5 @@
 [versions]
-androidGradle = "8.3.2"
+androidGradle = "8.4.0"
 androidxCore = "1.13.1"
 androidxLifecycle = "2.8.2"
 androidxLifecycleCompose = "2.8.2"
@@ -12,7 +12,7 @@ coroutines = "1.8.1"
 coroutinesTest = "1.8.1"
 dokka = "1.9.20"
 junit = "4.13.2"
-kotlin = "1.9.22"
+kotlin = "1.9.23"
 kotlinSerialization = "1.6.3"
 robolectric = "4.11.1"
 truth = "1.4.2"
@@ -27,7 +27,7 @@ androidx-datastore = { group = "androidx.datastore", name = "datastore", version
 androidx-datastore-core = { group = "androidx.datastore", name = "datastore-core", version.ref = "androidxDatastore" }
 androidx-wear-compose-foundation = { group = "androidx.wear.compose", name = "compose-foundation", version.ref = "androidxWearCompose" }
 androidx-wear-compose-material = { group = "androidx.wear.compose", name = "compose-material", version.ref = "androidxWearCompose" }
-androidx-wear-compose-navigation = { group = "androidx.wear.compose", name = "navigation", version.ref = "androidxWearCompose" }
+androidx-wear-compose-navigation = { group = "androidx.wear.compose", name = "compose-navigation", version.ref = "androidxWearCompose" }
 androidx-wear-tiles = { group = "androidx.wear.tiles", name = "tiles", version.ref = "androidxWearTiles" }
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 compose-ui = { group = "androidx.compose.ui", name = "ui" }

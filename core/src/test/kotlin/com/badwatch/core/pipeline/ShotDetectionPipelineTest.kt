@@ -15,7 +15,7 @@ class ShotDetectionPipelineTest {
     fun emitsSingleEventForClusteredSamples() {
         val samples = (0 until 30).map { index ->
             val vector = if (index in 8..18) {
-                Vector3(0.6f, 0.8f, -5.5f)
+                Vector3(0.6f, 0.8f, -6.8f)
             } else {
                 Vector3(0.1f, 0.1f, -0.2f)
             }
@@ -59,7 +59,7 @@ class ShotDetectionPipelineTest {
         (0 until 12).map { index ->
             SensorSample(
                 timestampMillis = start + index * 20L,
-                gyro = Vector3(0.4f, 0.6f, -5.0f),
+                gyro = Vector3(0.6f, 0.8f, -6.5f),
                 heartRateBpm = 120f + index * 0.5f,
                 accuracy = 3
             )

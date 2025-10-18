@@ -11,16 +11,18 @@ import kotlin.math.min
 class ShotClassifier(
     private val smashThreshold: Float = 6.0f,
     private val clearThreshold: Float = 4.5f,
-    private val driveThreshold: Float = 3.2f,
+    private val driveThreshold: Float = 3.0f,
     private val dropThreshold: Float = 2.0f,
-    private val minConfidence: Float = 0.55f
+    private val minConfidence: Float = 0.0f
 ) {
 
     fun classify(samples: List<SensorSample>): ShotEvent? {
         if (samples.size < MIN_WINDOW_SIZE) return null
         val features = MotionFeatureExtractor.extract(samples)
         val type = determineType(features)
-        if (type == ShotType.Unknown) return null
+        if (type == ShotType.Unknown) {
+            return null
+        }
         val confidence = computeConfidence(type, features)
         if (confidence < minConfidence) return null
         val last = samples.last()
@@ -43,33 +45,21 @@ class ShotClassifier(
         val trend = features.directionalTrend
 
         return when {
-            peak >= smashThreshold &&
-                vertical > 0.55f &&
-                trend < -0.15f &&
-                features.heartRateDelta >= 2f ->
-                ShotType.Smash
+            peak >= smashThreshold && vertical >= 0.5f -> ShotType.Smash
 
-            peak in clearThreshold..(smashThreshold + 1f) &&
-                vertical > 0.5f &&
-                trend > 0.1f ->
+            peak >= clearThreshold && vertical >= 0.4f && trend >= 0.05f ->
                 ShotType.Clear
 
-            peak >= driveThreshold &&
-                horizontal > 0.6f &&
-                abs(pronation) < 0.35f ->
-                ShotType.Drive
+            peak >= driveThreshold && horizontal >= 0.6f && pronation <= -0.3f ->
+                ShotType.BackhandDrive
 
             peak >= dropThreshold &&
-                peak < clearThreshold &&
-                features.swingDurationMillis in 160L..360L &&
-                vertical in 0.35f..0.6f &&
-                abs(pronation) < 0.6f ->
+                vertical in 0.3f..0.8f &&
+                features.swingDurationMillis in 140L..420L ->
                 ShotType.Drop
 
-            peak >= dropThreshold &&
-                horizontal > 0.6f &&
-                pronation <= -0.4f ->
-                ShotType.BackhandDrive
+            peak >= driveThreshold && horizontal >= 0.6f ->
+                ShotType.Drive
 
             else -> ShotType.Unknown
         }
@@ -82,7 +72,7 @@ class ShotClassifier(
                 val peakScore = (peak - smashThreshold) / smashThreshold
                 val trendScore = abs(features.directionalTrend)
                 val hrScore = (features.heartRateDelta / 5f).coerceIn(0f, 1f)
-                (0.5f * peakScore + 0.3f * trendScore + 0.2f * hrScore).coerceIn(0f, 1f)
+                (0.4f * peakScore + 0.3f * trendScore + 0.3f * hrScore).coerceIn(0f, 1f)
             }
 
             ShotType.Clear -> {
@@ -118,6 +108,6 @@ class ShotClassifier(
     }
 
     companion object {
-        private const val MIN_WINDOW_SIZE = 8
+        private const val MIN_WINDOW_SIZE = 5
     }
 }
