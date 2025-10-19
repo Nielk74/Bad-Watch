@@ -26,7 +26,10 @@ All commands emit JSON so downstream automation can parse structured results. Se
 - Input primitives (`tap`, `swipe`, `input-text`, `keyevent`)
 - UI inspection (`screenshot`, `dump-ui --parse`)
 - Log retrieval (`logcat --clear`)
+- HTTP file server for collected artifacts (`serve-artifacts`)
 - Escape hatch for arbitrary adb sub-commands (`adb <args>`).
+
+Screenshots captured without `--output` are saved under `isolate/artifacts/screenshots/`, and emulator logs land in `isolate/artifacts/logs/` for easy inspection.
 
 ## Tips
 - `start-emulator` pipes emulator stdout/stderr to a log file in the OS temp directory for debugging boot issues.

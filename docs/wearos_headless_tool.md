@@ -43,6 +43,10 @@ Subcommands return JSON. For example, to capture a screenshot and dump the UI:
 ```
 If multiple devices are connected, prepend `--serial <device-id>` before the subcommand to target a specific emulator.
 
+Artifacts captured without explicit paths are stored under `isolate/artifacts/`:
+- Emulator boot logs → `isolate/artifacts/logs/<avd>_<timestamp>.log`
+- Screenshots → `isolate/artifacts/screenshots/<serial>_<timestamp>.png`
+
 ## Current host limitation (`/dev/kvm` missing)
 While verifying the tool the emulator failed to boot because hardware acceleration is disabled:
 ```
@@ -96,6 +100,13 @@ With `/dev/kvm` available we ran the full loop:
    ```
 
 This confirms the helper works end-to-end when hardware acceleration is enabled.
+
+## Serving artifacts via HTTP
+To browse logs or screenshots quickly, start the built-in file server (runs until you press Ctrl+C):
+```bash
+./wearos_tool.py serve-artifacts --host 0.0.0.0 --port 8080
+```
+The command prints the URL in JSON (`http://0.0.0.0:8080/`) and serves the `isolate/artifacts/` directory. Use `--directory <path>` to serve a different folder.
 
 ## Suggested verification flow (after enabling KVM)
 1. Boot the emulator with `start-emulator --wait`.

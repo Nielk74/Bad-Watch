@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import functools
 import json
 import os
 import shlex
@@ -18,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,6 +35,16 @@ class CommandResult:
     stdout: str
     stderr: str
     returncode: int
+
+
+ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifacts"
+LOG_DIR = ARTIFACTS_DIR / "logs"
+SCREENSHOT_DIR = ARTIFACTS_DIR / "screenshots"
+
+
+def ensure_artifact_dirs() -> None:
+    for path in (ARTIFACTS_DIR, LOG_DIR, SCREENSHOT_DIR):
+        path.mkdir(parents=True, exist_ok=True)
 
 
 def run_command(
@@ -103,7 +115,9 @@ def start_emulator(
         cmd.extend(["-port", str(port)])
     cmd.extend(extra)
     # Launch detached; caller controls lifecycle via adb emu kill.
-    log_path = Path(tempfile.gettempdir()) / f"{avd_name}_emulator.log"
+    ensure_artifact_dirs()
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    log_path = LOG_DIR / f"{avd_name}_{timestamp}.log"
     with open(log_path, "ab", buffering=0) as log_file:
         process = subprocess.Popen(
             cmd,
@@ -143,6 +157,7 @@ def start_activity(serial: Optional[str], component: str) -> Dict[str, Any]:
 
 
 def capture_screenshot(serial: Optional[str], output: Optional[str], as_base64: bool) -> Dict[str, Any]:
+    ensure_artifact_dirs()
     proc = subprocess.Popen(
         adb_args(serial) + ["exec-out", "screencap", "-p"],
         stdout=subprocess.PIPE,
@@ -156,8 +171,14 @@ def capture_screenshot(serial: Optional[str], output: Optional[str], as_base64: 
 
     if output:
         out_path = Path(output)
-        out_path.write_bytes(data)
-        payload["saved_to"] = str(out_path)
+    else:
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        device = serial or "device"
+        out_path = SCREENSHOT_DIR / f"{device}_{timestamp}.png"
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_bytes(data)
+    payload["saved_to"] = str(out_path)
 
     if as_base64:
         payload["base64_png"] = base64.b64encode(data).decode("ascii")
@@ -292,6 +313,35 @@ def raw_adb(serial: Optional[str], args: List[str]) -> Dict[str, Any]:
     }
 
 
+class QuietHTTPRequestHandler(SimpleHTTPRequestHandler):
+    def log_message(self, format: str, *args: object) -> None:  # noqa: A003
+        sys.stderr.write(f"[serve-artifacts] {self.address_string()} - {format % args}\n")
+
+
+def serve_artifacts(directory: Path, host: str, port: int) -> None:
+    ensure_artifact_dirs()
+    target_dir = directory.resolve()
+    handler = functools.partial(QuietHTTPRequestHandler, directory=str(target_dir))
+    httpd = ThreadingHTTPServer((host, port), handler)
+    print_json(
+        {
+            "ok": True,
+            "data": {
+                "serving": str(target_dir),
+                "host": host,
+                "port": port,
+                "url": f"http://{host}:{port}/",
+            },
+        }
+    )
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        httpd.server_close()
+
+
 def print_json(data: Dict[str, Any]) -> None:
     json.dump(data, sys.stdout, indent=2)
     sys.stdout.write("\n")
@@ -365,6 +415,11 @@ def handle_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     wait_parser = subparsers.add_parser("wait-for-boot", help="Block until device reports boot completed")
     wait_parser.add_argument("--timeout", type=float, default=180.0)
 
+    serve_parser = subparsers.add_parser("serve-artifacts", help="Expose artifacts directory via HTTP")
+    serve_parser.add_argument("--directory", default=str(ARTIFACTS_DIR), help="Directory to serve")
+    serve_parser.add_argument("--host", default="127.0.0.1")
+    serve_parser.add_argument("--port", type=int, default=8000)
+
     return parser.parse_args(argv)
 
 
@@ -415,6 +470,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         elif args.command == "wait-for-boot":
             wait_for_device(serial_override, timeout=args.timeout)
             result = {"serial": serial_override, "boot_complete": True}
+        elif args.command == "serve-artifacts":
+            serve_artifacts(Path(args.directory), args.host, args.port)
+            return 0
         else:
             raise WearToolError(f"Unhandled command {args.command}")
 
