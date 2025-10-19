@@ -288,6 +288,24 @@ private fun LiveMetrics(snapshot: TrainingSessionSnapshot) {
                     value = formatBpm(snapshot.maxHeartRate)
                 )
             }
+            // Live gyroscope XYZ in rad/s
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                MetricColumn(
+                    label = "Gyro X",
+                    value = formatAxis(snapshot.lastGyro.x)
+                )
+                MetricColumn(
+                    label = "Gyro Y",
+                    value = formatAxis(snapshot.lastGyro.y)
+                )
+                MetricColumn(
+                    label = "Gyro Z",
+                    value = formatAxis(snapshot.lastGyro.z)
+                )
+            }
             ShotStreakRow(snapshot.lastShot, snapshot.totalShots)
             InsightRow(
                 fatigue = snapshot.fatigueScore,
@@ -499,6 +517,9 @@ private fun formatShotType(type: ShotType): String =
         ShotType.BackhandDrive -> "Backhand"
         ShotType.Unknown -> "Unknown"
     }
+
+private fun formatAxis(value: Float): String =
+    if (value.isNaN()) "--" else String.format("%.2f", value)
 
 private fun HeartRateZone.displayName(): String =
     when (this) {

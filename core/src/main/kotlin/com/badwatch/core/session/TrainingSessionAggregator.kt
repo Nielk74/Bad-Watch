@@ -8,6 +8,7 @@ import com.badwatch.core.model.TrainingSession
 import com.badwatch.core.model.TrainingSessionSnapshot
 import com.badwatch.core.model.TrainingSummary
 import com.badwatch.core.model.heartRateZoneFor
+import com.badwatch.core.model.Vector3
 import java.util.UUID
 import kotlin.math.max
 
@@ -79,7 +80,8 @@ class TrainingSessionAggregator(
             fatigueScore = fatigueScore,
             effortScore = effortScore,
             recoveryScore = recoveryScore,
-            dominantZone = dominantZone
+            dominantZone = dominantZone,
+            lastGyro = lastSample?.gyro ?: Vector3(0f, 0f, 0f)
         )
     }
 

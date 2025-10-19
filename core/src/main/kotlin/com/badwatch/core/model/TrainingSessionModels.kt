@@ -36,5 +36,7 @@ data class TrainingSessionSnapshot(
     val fatigueScore: Float,
     val effortScore: Float,
     val recoveryScore: Float,
-    val dominantZone: HeartRateZone
+    val dominantZone: HeartRateZone,
+    // Most recent gyroscope sample (rad/s) along device axes
+    val lastGyro: Vector3
 )
