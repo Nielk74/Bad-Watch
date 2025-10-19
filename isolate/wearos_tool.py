@@ -165,15 +165,28 @@ def capture_screenshot(serial: Optional[str], output: Optional[str], as_base64: 
     return payload
 
 
+def normalize_ui_xml(raw_xml: str) -> str:
+    """Strip trailing log lines such as 'UI hierchary dumped to: /dev/tty'."""
+    if "<?xml" not in raw_xml:
+        return raw_xml
+    start = raw_xml.index("<?xml")
+    end_marker = "</hierarchy>"
+    end = raw_xml.find(end_marker)
+    if end == -1:
+        return raw_xml[start:]
+    end += len(end_marker)
+    return raw_xml[start:end]
+
+
 def dump_ui(serial: Optional[str], parse: bool) -> Dict[str, Any]:
     try:
         result = run_command(adb_args(serial) + ["exec-out", "uiautomator", "dump", "/dev/tty"])
-        xml_data = result.stdout
+        xml_data = normalize_ui_xml(result.stdout)
     except WearToolError:
         temp_xml = Path(tempfile.gettempdir()) / "wear_ui_dump.xml"
         run_adb(serial, "shell", "uiautomator", "dump", f"/sdcard/{temp_xml.name}")
         run_adb(serial, "pull", f"/sdcard/{temp_xml.name}", str(temp_xml))
-        xml_data = temp_xml.read_text(encoding="utf-8", errors="replace")
+        xml_data = normalize_ui_xml(temp_xml.read_text(encoding="utf-8", errors="replace"))
 
     payload: Dict[str, Any] = {"serial": serial, "xml": xml_data}
 
@@ -184,9 +197,10 @@ def dump_ui(serial: Optional[str], parse: bool) -> Dict[str, Any]:
 
 
 def parse_bounds(bounds: str) -> Tuple[int, int, int, int]:
-    # Bounds follow the pattern [x1,y1][x2,y2].
-    clean = bounds.strip().replace("[", " ").replace("]", " ")
-    parts = [int(p) for p in clean.split() if p and p != ","]
+    # Bounds follow the pattern [x1,y1][x2,y2]; pull digits to avoid locale issues.
+    import re  # Local import keeps module import list tidy.
+
+    parts = [int(p) for p in re.findall(r"-?\d+", bounds)]
     if len(parts) != 4:
         raise ValueError(f"Unrecognised bounds: {bounds}")
     return parts[0], parts[1], parts[2], parts[3]
@@ -426,4 +440,3 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

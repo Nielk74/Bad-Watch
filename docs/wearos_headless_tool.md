@@ -41,6 +41,7 @@ Subcommands return JSON. For example, to capture a screenshot and dump the UI:
 ./wearos_tool.py screenshot --output /tmp/watch.png --base64
 ./wearos_tool.py dump-ui --parse > /tmp/watch_ui.json
 ```
+If multiple devices are connected, prepend `--serial <device-id>` before the subcommand to target a specific emulator.
 
 ## Current host limitation (`/dev/kvm` missing)
 While verifying the tool the emulator failed to boot because hardware acceleration is disabled:
@@ -73,6 +74,28 @@ Once `/dev/kvm` is present the emulator should boot successfully when you rerun:
 PATH=${SDK_ROOT}/emulator:${SDK_ROOT}/platform-tools:$PATH \
 ./wearos_tool.py start-emulator --avd Pixel_Watch_API_34 --gpu swiftshader_indirect --wait
 ```
+
+## Verification after enabling KVM
+With `/dev/kvm` available we ran the full loop:
+
+1. Booted the headless emulator (command above) — it reported success and logged output to `/tmp/Pixel_Watch_API_34_emulator.log`.
+2. Confirmed the device was visible via `adb devices` (`emulator-5554	device`).
+3. Captured a screenshot:
+   ```bash
+   ./wearos_tool.py --serial emulator-5554 screenshot --output /tmp/watch.png --base64
+   ```
+   The JSON response included `bytes: 7906` and `saved_to: /tmp/watch.png`.
+4. Dumped the UI hierarchy with parsing:
+   ```bash
+   ./wearos_tool.py --serial emulator-5554 dump-ui --parse
+   ```
+   The tool normalises the XML (trims `uiautomator` footer lines) and returns a `nodes` array containing bounds/text metadata for each element.
+5. Stopped the emulator cleanly:
+   ```bash
+   ./wearos_tool.py stop-emulator --serial emulator-5554
+   ```
+
+This confirms the helper works end-to-end when hardware acceleration is enabled.
 
 ## Suggested verification flow (after enabling KVM)
 1. Boot the emulator with `start-emulator --wait`.
