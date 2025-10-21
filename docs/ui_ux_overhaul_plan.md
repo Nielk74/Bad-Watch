@@ -37,3 +37,11 @@
 1. Align on visual style guide deliverables (palette, typography, icon concepts, motion principles).
 2. Prioritize the insights/features to ship in Phase 2 and map supporting data requirements.
 3. Kick off the data collection framework to capture labeled swings for upcoming ML experiments.
+
+## Current Verification Artifacts
+- `isolate/artifacts/screenshots/baseline_gauge.png` — updated baseline gradient and gauge sizing.
+- `isolate/artifacts/screenshots/metrics_row.png` — pill styling for Now/Avg/Peak metrics.
+- `isolate/artifacts/screenshots/sparkline_card.png` — motion rhythm sparkline visual.
+- `isolate/artifacts/screenshots/status_section.png` — session status layout with duration/timestamp.
+- `isolate/artifacts/screenshots/insights_card.png` — stacked insight modules with progress bars.
+- `isolate/artifacts/screenshots/data_capture_card.png` — dataset capture controls for ML labeling runs.
