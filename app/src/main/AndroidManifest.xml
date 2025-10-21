@@ -5,16 +5,8 @@
         android:name="android.hardware.type.watch"
         android:required="true" />
     <uses-feature
-        android:name="android.hardware.sensor.heart_rate"
-        android:required="true" />
-    <uses-feature
         android:name="android.hardware.sensor.gyroscope"
         android:required="true" />
-
-    <uses-permission android:name="android.permission.BODY_SENSORS" />
-    <uses-permission android:name="android.permission.BODY_SENSORS_BACKGROUND" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:name=".BadWatchApplication"

@@ -1,7 +1,11 @@
 <resources>
-    <color name="primary">#03DAC5</color>
-    <color name="on_primary">#000000</color>
-    <color name="surface">#121212</color>
-    <color name="on_surface">#FFFFFF</color>
-    <color name="accent">#FF8A65</color>
+    <color name="primary">#39F7C2</color>
+    <color name="on_primary">#001713</color>
+    <color name="surface">#0E1A2B</color>
+    <color name="on_surface">#D6E4F6</color>
+    <color name="accent">#FF6F91</color>
+    <color name="accent_luminous">#4D6AFF</color>
+    <color name="accent_warning">#FFB967</color>
+    <color name="accent_positive">#53FFAB</color>
+    <color name="accent_critical">#FF6B6B</color>
 </resources>

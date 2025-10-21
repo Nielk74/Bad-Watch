@@ -3,8 +3,6 @@ import java.util.Locale
 plugins {
     id("com.android.application")
     kotlin("android")
-    id("org.jetbrains.kotlin.plugin.serialization")
-    id("org.jetbrains.dokka")
 }
 
 val semanticVersion: String = rootProject.file("VERSION.md")
@@ -79,7 +77,6 @@ android {
 }
 
 dependencies {
-    implementation(project(":core"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -90,11 +87,6 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.bundles.compose)
     implementation(libs.bundles.wear.compose)
-    implementation(libs.compose.runtime.livedata)
-    implementation(libs.androidx.datastore)
-    implementation(libs.androidx.datastore.core)
-    implementation(libs.kotlin.serialization.json)
-    implementation(libs.kotlinx.datetime)
 
     testImplementation(libs.junit)
     testImplementation(libs.google.truth)

@@ -1,8 +1,8 @@
 package com.badwatch.app.domain
 
-import com.badwatch.core.model.SensorSample
+import com.badwatch.app.model.GyroReading
 import kotlinx.coroutines.flow.Flow
 
 interface SensorStreamProvider {
-    fun sensorStream(): Flow<SensorSample>
+    fun sensorStream(): Flow<GyroReading>
 }

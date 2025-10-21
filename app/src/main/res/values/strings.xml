@@ -1,15 +1,3 @@
 <resources>
     <string name="app_name">Bad Watch</string>
-    <string name="session_active_title">Training Active</string>
-    <string name="session_inactive_title">Tap to Start Session</string>
-    <string name="start_session">Start Session</string>
-    <string name="stop_session">Stop Session</string>
-    <string name="resume_session">Resume Session</string>
-    <string name="shots_detected">Shots Detected</string>
-    <string name="heart_rate_label">Heart Rate</string>
-    <string name="fatigue_label">Fatigue</string>
-    <string name="effort_score_label">Effort Score</string>
-    <string name="history_title">Session History</string>
-    <string name="empty_history">No sessions yet. Smash the start button!</string>
-    <string name="loading_session">Getting ready…</string>
 </resources>
