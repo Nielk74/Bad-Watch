@@ -24,6 +24,7 @@
 ## History & Data Export
 - The latest sessions appear on the idle screen. Tap **Clear history** to wipe the stored log (up to 40 entries are kept automatically).
 - Session data is stored locally via Jetpack DataStore (`training_sessions.json`). You can export it by pulling the file with `adb` for external analysis (Future versions will add companion sync).
+ - TODO: Add a sessions list view with an **Export** button to send selected/all sessions to a configured external API (HTTPS). Export runs in the background and reports success/failure.
 
 ## Tips for Accurate Detection
 - Maintain consistent wrist orientation; extreme pronation/supination outside badminton swings may misclassify.

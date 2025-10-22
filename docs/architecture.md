@@ -78,3 +78,9 @@ bad-watch
 - ML-based classifier utilizing TinyML (TensorFlow Lite) once a labeled dataset is available.
 - Companion phone sync via Tiles/Complication or Health Services integration.
 - Cloud backup, coach sharing, and stroke quality heatmaps.
+- TODO: Sessions list + single-tap export to external API
+  - Show a chronological list of saved sessions with basic stats.
+  - Add an Export button that packages selected/all sessions and sends to a configurable HTTPS endpoint.
+  - Use a background worker with retry/backoff; include simple auth (token) and request signing if needed.
+  - Payload defaults to JSON; optional CSV transform for tabular pipelines.
+  - Confirm delivery with lightweight status UI and local audit log.
