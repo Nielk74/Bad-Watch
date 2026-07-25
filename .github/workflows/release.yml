@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64, android, m4-pro, trusted]
     env:
       # Mapped at job level so steps can test for presence — `if:` cannot read secrets.
       KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
