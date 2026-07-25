@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-25
+
 ### Added
 - **Classifier evaluation.** `ClassifierEvaluator` scores the shipped rule-based classifier
   against collected labelled swings — `./gradlew :server:evaluateClassifier`, plus a
