@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v3
+
+      - name: JVM tests (core analytics + server contract)
+        run: ./gradlew :core:test :server:test
+
+      - name: Lint
+        run: ./gradlew :app:lintDebug
+
+      - name: Assemble watch app
+        run: ./gradlew :app:assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: bad-watch-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk

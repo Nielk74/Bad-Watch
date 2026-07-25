@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bad Watch — Training Dashboard</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-0: #f4f4f2;
+    --surface-1: #fcfcfb;
+    --surface-2: #ececea;
+    --border:    #dcdcd8;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #78776f;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --series-4: #eda100;
+    --series-5: #e87ba4;
+    --series-6: #008300;
+    --status-good:     #1baf7a;
+    --status-warning:  #eda100;
+    --status-critical: #e34948;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-0: #121211;
+      --surface-1: #1a1a19;
+      --surface-2: #232322;
+      --border:    #33332f;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #8f8e85;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+      --series-5: #d55181;
+      --series-6: #008300;
+      --status-good:     #199e70;
+      --status-warning:  #c98500;
+      --status-critical: #e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --surface-2: #232322;
+    --border:    #33332f;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #8f8e85;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --status-good:     #199e70;
+    --status-warning:  #c98500;
+    --status-critical: #e66767;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--surface-0);
+    color: var(--text-primary);
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 20px 72px; }
+
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  h1 { font-size: 24px; font-weight: 650; letter-spacing: -0.01em; margin: 0; }
+  .sub { color: var(--text-secondary); font-size: 14px; }
+  .theme-toggle {
+    margin-left: auto; background: var(--surface-2); color: var(--text-secondary);
+    border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px;
+    font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .theme-toggle:hover { color: var(--text-primary); }
+
+  h2 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: -0.005em; }
+  .card-note { color: var(--text-muted); font-size: 12.5px; margin: 2px 0 0; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin: 24px 0; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+  .tile .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+  .tile .value { font-size: 30px; font-weight: 620; letter-spacing: -0.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .tile .foot { font-size: 12.5px; color: var(--text-secondary); margin-top: 2px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px 14px; min-width: 0; }
+  .card-head { margin-bottom: 14px; }
+  .chart-scroll { overflow-x: auto; }
+  svg { display: block; max-width: 100%; }
+  .axis text { fill: var(--text-muted); font-size: 11px; }
+  .axis line, .axis path { stroke: var(--border); }
+  .gridline { stroke: var(--border); stroke-dasharray: 2 4; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; font-size: 12.5px; color: var(--text-secondary); }
+  .legend .key { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+  .status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 560; }
+  .status .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-muted); font-weight: 550; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  td { font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+  td:first-child { color: var(--text-primary); }
+  tbody tr:hover td { background: var(--surface-2); }
+
+  .tooltip {
+    position: fixed; pointer-events: none; opacity: 0; transition: opacity .1s;
+    background: var(--surface-1); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 9px;
+    padding: 8px 11px; font-size: 12.5px; line-height: 1.45;
+    box-shadow: 0 6px 22px rgba(0,0,0,.16); z-index: 20; max-width: 240px;
+  }
+  .tooltip .t-title { font-weight: 600; margin-bottom: 3px; }
+  .tooltip .t-row { display: flex; justify-content: space-between; gap: 14px; color: var(--text-secondary); }
+  .tooltip .t-row b { color: var(--text-primary); font-weight: 560; font-variant-numeric: tabular-nums; }
+
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+  .empty code { background: var(--surface-2); padding: 2px 7px; border-radius: 5px; font-size: 13px; }
+  section { margin-top: 26px; }
+  .full { grid-column: 1 / -1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Bad Watch</h1>
+    <span class="sub" id="subtitle">Loading…</span>
+    <button class="theme-toggle" id="themeToggle" type="button">Theme</button>
+  </header>
+
+  <div id="content"></div>
+</div>
+
+<div class="tooltip" id="tooltip" role="status" aria-live="polite"></div>
+
+<script>
+const NS = "http://www.w3.org/2000/svg";
+const SHOT_LABELS = {
+  Smash: "Smash", Clear: "Clear", Drop: "Drop",
+  Drive: "Drive", BackhandDrive: "Backhand drive", Unknown: "Unclassified"
+};
+// Fixed slot order — a shot type keeps its hue no matter which types appear.
+const SHOT_SLOT = {
+  Smash: 1, Clear: 2, Drop: 3, Drive: 4, BackhandDrive: 5, Unknown: 6
+};
+
+const tooltip = document.getElementById("tooltip");
+function showTip(evt, html) {
+  tooltip.innerHTML = html;
+  tooltip.style.opacity = "1";
+  const pad = 14, r = tooltip.getBoundingClientRect();
+  let x = evt.clientX + pad, y = evt.clientY + pad;
+  if (x + r.width > window.innerWidth - 8) x = evt.clientX - r.width - pad;
+  if (y + r.height > window.innerHeight - 8) y = evt.clientY - r.height - pad;
+  tooltip.style.left = x + "px";
+  tooltip.style.top = y + "px";
+}
+function hideTip() { tooltip.style.opacity = "0"; }
+
+function el(tag, attrs = {}, parent = null) {
+  const node = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  if (parent) parent.appendChild(node);
+  return node;
+}
+
+const fmtInt = n => Math.round(n).toLocaleString();
+const fmt1 = n => (Math.round(n * 10) / 10).toLocaleString(undefined, { minimumFractionDigits: 1 });
+function fmtDuration(ms) {
+  const h = Math.floor(ms / 3600000), m = Math.round((ms % 3600000) / 60000);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+function fmtDate(ms) {
+  return new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+function fmtDateTime(ms) {
+  return new Date(ms).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+/* ---------- Charts ---------- */
+
+/**
+ * Vertical bars. One hue: colour is not encoding anything here, height already is.
+ */
+function barChart(host, data, opts = {}) {
+  const W = Math.max(opts.minWidth || 420, host.clientWidth || 460);
+  const H = opts.height || 210;
+  const M = { top: 12, right: 12, bottom: 34, left: 44 };
+  const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: "img" }, host);
+  const g = el("g", { transform: `translate(${M.left},${M.top})` }, svg);
+
+  const max = Math.max(1, ...data.map(d => d.value));
+  const ticks = niceTicks(max, 4);
+  const yTop = ticks[ticks.length - 1];
+  const y = v => ih - (v / yTop) * ih;
+
+  for (const t of ticks) {
+    el("line", { class: "gridline", x1: 0, x2: iw, y1: y(t), y2: y(t) }, g);
+    const label = el("text", { class: "axis", x: -8, y: y(t) + 4, "text-anchor": "end" }, g);
+    label.textContent = fmtInt(t);
+  }
+
+  // 2px surface gap between adjacent bars.
+  const slot = iw / data.length;
+  const bw = Math.max(3, Math.min(opts.maxBarWidth || 42, slot - 2));
+
+  data.forEach((d, i) => {
+    const x = i * slot + (slot - bw) / 2;
+    const h = Math.max(d.value > 0 ? 2 : 0, ih - y(d.value));
+    if (h > 0) {
+      const r = el("path", {
+        d: roundedTopBar(x, ih - h, bw, h, 4),
+        fill: opts.color || "var(--series-1)"
+      }, g);
+      r.addEventListener("mousemove", e => showTip(e,
+        `<div class="t-title">${d.label}</div>
+         <div class="t-row"><span>${opts.valueLabel || "Value"}</span><b>${d.display || fmtInt(d.value)}</b></div>`));
+      r.addEventListener("mouseleave", hideTip);
+    }
+    if (data.length <= 14 || i % Math.ceil(data.length / 10) === 0) {
+      const t = el("text", { class: "axis", x: i * slot + slot / 2, y: ih + 18, "text-anchor": "middle" }, g);
+      t.textContent = d.axisLabel ?? d.label;
+    }
+  });
+
+  el("line", { class: "axis", x1: 0, x2: iw, y1: ih, y2: ih }, g);
+}
+
+/**
+ * Horizontal bars for shot mix. Categorical hues in fixed slot order, each row
+ * directly labelled so identity never depends on colour alone.
+ */
+function shotMixChart(host, slices) {
+  const total = slices.reduce((a, s) => a + s.count, 0) || 1;
+  const rowH = 30, W = Math.max(380, host.clientWidth || 420);
+  const labelW = 118, valueW = 74;
+  const trackW = Math.max(60, W - labelW - valueW);
+  const H = slices.length * rowH + 6;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: "img" }, host);
+  const max = Math.max(...slices.map(s => s.count));
+
+  slices.forEach((s, i) => {
+    const y = i * rowH + 4;
+    const label = el("text", { class: "axis", x: 0, y: y + 15, "text-anchor": "start" }, svg);
+    label.setAttribute("fill", "var(--text-secondary)");
+    label.setAttribute("font-size", "12.5");
+    label.textContent = SHOT_LABELS[s.type] || s.type;
+
+    const w = Math.max(3, (s.count / max) * trackW);
+    const bar = el("path", {
+      d: roundedRightBar(labelW, y + 3, w, 15, 4),
+      fill: `var(--series-${SHOT_SLOT[s.type] || 6})`
+    }, svg);
+    bar.addEventListener("mousemove", e => showTip(e,
+      `<div class="t-title">${SHOT_LABELS[s.type] || s.type}</div>
+       <div class="t-row"><span>Shots</span><b>${fmtInt(s.count)}</b></div>
+       <div class="t-row"><span>Share</span><b>${Math.round(s.count / total * 100)}%</b></div>`));
+    bar.addEventListener("mouseleave", hideTip);
+
+    const val = el("text", { x: labelW + w + 8, y: y + 16, "text-anchor": "start" }, svg);
+    val.setAttribute("fill", "var(--text-primary)");
+    val.setAttribute("font-size", "12.5");
+    val.setAttribute("font-weight", "560");
+    val.textContent = `${fmtInt(s.count)} · ${Math.round(s.count / total * 100)}%`;
+  });
+}
+
+/**
+ * Acute vs chronic shoulder load. Two series, same unit, one axis — the ratio is
+ * reported separately as a tile rather than crammed onto a second scale.
+ */
+function loadChart(host, points) {
+  const W = Math.max(440, host.clientWidth || 480);
+  const H = 230;
+  const M = { top: 12, right: 14, bottom: 34, left: 46 };
+  const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: "img" }, host);
+  const g = el("g", { transform: `translate(${M.left},${M.top})` }, svg);
+
+  const max = Math.max(1, ...points.map(p => Math.max(p.acute, p.chronic)));
+  const ticks = niceTicks(max, 4);
+  const yTop = ticks[ticks.length - 1];
+  const x = i => points.length <= 1 ? iw / 2 : (i / (points.length - 1)) * iw;
+  const y = v => ih - (v / yTop) * ih;
+
+  for (const t of ticks) {
+    el("line", { class: "gridline", x1: 0, x2: iw, y1: y(t), y2: y(t) }, g);
+    const lab = el("text", { class: "axis", x: -8, y: y(t) + 4, "text-anchor": "end" }, g);
+    lab.textContent = fmtInt(t);
+  }
+
+  const line = (key, color) => {
+    const d = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p[key]).toFixed(1)}`).join(" ");
+    el("path", { d, fill: "none", stroke: color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, g);
+  };
+  line("chronic", "var(--series-3)");
+  line("acute", "var(--series-1)");
+
+  points.forEach((p, i) => {
+    if (points.length <= 20 || i % Math.ceil(points.length / 8) === 0) {
+      const t = el("text", { class: "axis", x: x(i), y: ih + 18, "text-anchor": "middle" }, g);
+      t.textContent = new Date(p.dayEpochMillis).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    }
+  });
+
+  // Invisible hit columns give a hover target far larger than the 2px line.
+  const colW = iw / Math.max(1, points.length);
+  points.forEach((p, i) => {
+    const hit = el("rect", { x: x(i) - colW / 2, y: 0, width: colW, height: ih, fill: "transparent" }, g);
+    const marker = el("circle", { cx: x(i), cy: y(p.acute), r: 0, fill: "var(--series-1)", stroke: "var(--surface-1)", "stroke-width": 2 }, g);
+    hit.addEventListener("mousemove", e => {
+      marker.setAttribute("r", 5);
+      showTip(e,
+        `<div class="t-title">${fmtDate(p.dayEpochMillis)}</div>
+         <div class="t-row"><span>7-day load</span><b>${fmt1(p.acute)}</b></div>
+         <div class="t-row"><span>28-day baseline</span><b>${fmt1(p.chronic)}</b></div>
+         <div class="t-row"><span>Ratio</span><b>${p.ratio ? fmt1(p.ratio) : "—"}</b></div>`);
+    });
+    hit.addEventListener("mouseleave", () => { marker.setAttribute("r", 0); hideTip(); });
+  });
+
+  el("line", { class: "axis", x1: 0, x2: iw, y1: ih, y2: ih }, g);
+}
+
+function roundedTopBar(x, y, w, h, r) {
+  const rr = Math.min(r, w / 2, h);
+  return `M${x},${y + h} L${x},${y + rr} Q${x},${y} ${x + rr},${y} L${x + w - rr},${y} Q${x + w},${y} ${x + w},${y + rr} L${x + w},${y + h} Z`;
+}
+function roundedRightBar(x, y, w, h, r) {
+  const rr = Math.min(r, w, h / 2);
+  return `M${x},${y} L${x + w - rr},${y} Q${x + w},${y} ${x + w},${y + rr} L${x + w},${y + h - rr} Q${x + w},${y + h} ${x + w - rr},${y + h} L${x},${y + h} Z`;
+}
+function niceTicks(max, count) {
+  const raw = max / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw || 1)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw) || mag * 10;
+  const out = [];
+  for (let v = 0; v <= max + step * 0.001; v += step) out.push(Math.round(v * 1000) / 1000);
+  if (out[out.length - 1] < max) out.push(out[out.length - 1] + step);
+  return out;
+}
+
+/* ---------- Page ---------- */
+
+function loadStatus(ratio) {
+  if (!ratio) return { label: "Not enough history", color: "var(--text-muted)" };
+  if (ratio > 1.5) return { label: "Spike — ease off", color: "var(--status-critical)" };
+  if (ratio > 1.3) return { label: "Ramping fast", color: "var(--status-warning)" };
+  if (ratio < 0.8) return { label: "Detraining", color: "var(--status-warning)" };
+  return { label: "In the sweet spot", color: "var(--status-good)" };
+}
+
+function render(data) {
+  const content = document.getElementById("content");
+  const subtitle = document.getElementById("subtitle");
+  content.innerHTML = "";
+
+  if (!data.sessionCount) {
+    subtitle.textContent = "No sessions yet";
+    content.innerHTML = `
+      <div class="empty">
+        <h2>No sessions yet</h2>
+        <p>Record a session on the watch, then point it at this server.<br>
+        Sessions upload to <code>POST /api/v1/sessions</code>.</p>
+      </div>`;
+    return;
+  }
+
+  const latest = data.sessions[0];
+  subtitle.textContent = `${data.sessionCount} session${data.sessionCount === 1 ? "" : "s"} · last played ${fmtDate(latest.startedAtMillis)}`;
+
+  const lastLoad = data.loadTrend.length ? data.loadTrend[data.loadTrend.length - 1] : null;
+  const status = loadStatus(lastLoad ? lastLoad.ratio : 0);
+
+  const tiles = document.createElement("div");
+  tiles.className = "tiles";
+  tiles.innerHTML = `
+    <div class="tile">
+      <div class="label">Shots hit</div>
+      <div class="value">${fmtInt(data.totalShots)}</div>
+      <div class="foot">across ${data.sessionCount} sessions</div>
+    </div>
+    <div class="tile">
+      <div class="label">Time on court</div>
+      <div class="value">${fmtDuration(data.totalElapsedMillis)}</div>
+      <div class="foot">${fmtDuration(data.totalPlayingMillis)} actually in rallies</div>
+    </div>
+    <div class="tile">
+      <div class="label">Average rally</div>
+      <div class="value">${fmt1(data.averageRallyShots)}</div>
+      <div class="foot">shots · longest ${data.longestRallyShots}</div>
+    </div>
+    <div class="tile">
+      <div class="label">Shoulder load</div>
+      <div class="value">${lastLoad && lastLoad.ratio ? fmt1(lastLoad.ratio) : "—"}</div>
+      <div class="foot"><span class="status"><span class="dot" style="background:${status.color}"></span>${status.label}</span></div>
+    </div>`;
+  content.appendChild(tiles);
+
+  const grid = document.createElement("div");
+  grid.className = "grid";
+  content.appendChild(grid);
+
+  // Shots per session over time.
+  const perSession = [...data.sessions].reverse().map(s => ({
+    label: fmtDateTime(s.startedAtMillis),
+    axisLabel: new Date(s.startedAtMillis).toLocaleDateString(undefined, { day: "numeric", month: "short" }),
+    value: s.totalShots
+  }));
+  grid.appendChild(card(
+    "Shots per session",
+    "Volume over time. One bar per recorded session.",
+    host => barChart(host, perSession, { valueLabel: "Shots" })
+  ));
+
+  // Rally length distribution.
+  grid.appendChild(card(
+    "Rally length",
+    "How long your points actually last, in shots.",
+    host => barChart(host, data.rallyHistogram.map(b => ({ label: `${b.label} shots`, axisLabel: b.label, value: b.count })),
+      { valueLabel: "Rallies", maxBarWidth: 64 })
+  ));
+
+  // Shot mix.
+  grid.appendChild(card(
+    "Shot mix",
+    "Detected stroke distribution across all sessions.",
+    host => shotMixChart(host, data.shotDistribution)
+  ));
+
+  // Load trend.
+  const loadCard = card(
+    "Shoulder load trend",
+    "Overhead volume weighted by swing intensity. Training-load guidance, not medical advice.",
+    host => loadChart(host, data.loadTrend)
+  );
+  const legend = document.createElement("div");
+  legend.className = "legend";
+  legend.innerHTML = `
+    <span class="key"><span class="swatch" style="background:var(--series-1)"></span>7-day load (acute)</span>
+    <span class="key"><span class="swatch" style="background:var(--series-3)"></span>28-day baseline (chronic)</span>`;
+  loadCard.appendChild(legend);
+  grid.appendChild(loadCard);
+
+  // Session table — also the accessible fallback for every chart above.
+  const tableSection = document.createElement("section");
+  const table = document.createElement("div");
+  table.className = "card full";
+  table.innerHTML = `
+    <div class="card-head"><h2>Sessions</h2>
+      <p class="card-note">Every recorded session. Work:rest is playing time against resting time.</p></div>
+    <div class="chart-scroll">
+      <table>
+        <thead><tr>
+          <th>Date</th><th>Duration</th><th>Shots</th><th>Rallies</th>
+          <th>Avg rally</th><th>Work : rest</th><th>Playing</th><th>Avg HR</th><th>Peak HR</th>
+        </tr></thead>
+        <tbody>${data.sessions.map(s => `
+          <tr>
+            <td>${fmtDateTime(s.startedAtMillis)}</td>
+            <td>${fmtDuration(s.durationMillis)}</td>
+            <td>${fmtInt(s.totalShots)}</td>
+            <td>${fmtInt(s.rallyCount)}</td>
+            <td>${fmt1(s.averageRallyShots)}</td>
+            <td>${s.restRatio > 0 ? "1:" + fmt1(s.restRatio) : "—"}</td>
+            <td>${Math.round(s.workDensity * 100)}%</td>
+            <td>${s.averageHeartRate > 0 ? fmtInt(s.averageHeartRate) : "—"}</td>
+            <td>${s.maxHeartRate > 0 ? fmtInt(s.maxHeartRate) : "—"}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+  tableSection.appendChild(table);
+  content.appendChild(tableSection);
+}
+
+function card(title, note, draw) {
+  const c = document.createElement("div");
+  c.className = "card";
+  const head = document.createElement("div");
+  head.className = "card-head";
+  head.innerHTML = `<h2>${title}</h2><p class="card-note">${note}</p>`;
+  c.appendChild(head);
+  const host = document.createElement("div");
+  host.className = "chart-scroll";
+  c.appendChild(host);
+  requestAnimationFrame(() => draw(host));
+  return c;
+}
+
+document.getElementById("themeToggle").addEventListener("click", () => {
+  const current = document.documentElement.getAttribute("data-theme");
+  const next = current === "dark" ? "light"
+    : current === "light" ? "dark"
+    : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark");
+  document.documentElement.setAttribute("data-theme", next);
+  if (window.__data) render(window.__data);
+});
+
+fetch("api/v1/dashboard")
+  .then(r => r.json())
+  .then(data => { window.__data = data; render(data); })
+  .catch(err => {
+    document.getElementById("subtitle").textContent = "Could not reach the server";
+    document.getElementById("content").innerHTML =
+      `<div class="empty"><h2>Could not load data</h2><p>${err}</p></div>`;
+  });
+</script>
+</body>
+</html>

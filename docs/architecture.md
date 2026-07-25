@@ -2,85 +2,149 @@
 
 ## Overview
 
-Bad Watch is a Wear OS 5.1 application tailored for Pixel Watch 3 badminton training. It tracks heart-rate and gyroscope streams to identify shots in real time, surfaces coaching insights, and stores rich session analytics directly on the watch. The stack uses Jetpack Compose for Wear OS, a foreground service for sensor subscriptions, and a rule-based motion classifier encapsulated in a reusable core module.
+Bad Watch records badminton sessions from a Wear OS watch worn on the racket wrist, and
+serves the analysis from a self-hosted web dashboard. Capture, classification and storage
+all happen on the watch; the server is an optional consumer of finished sessions.
 
-## Goals
+## Design commitments
 
-- Deliver reliable on-device shot detection without requiring network access.
-- Provide at-a-glance training HUD, rich post-session statistics, and optional haptic/audio cues.
-- Keep CPU/battery usage low by batching sensor reads and processing on coroutines.
-- Ship a thoroughly tested core analytics engine with clear documentation and semantically versioned releases.
+These are the decisions everything else follows from.
 
-## Feature Set
+1. **Wrist-only.** No racket sensors, no external hardware. A feature that needs extra
+   hardware does not ship.
+2. **Racket wrist only.** Shot detection reads the swing, so the non-dominant wrist has no
+   usable signal. The app states this in onboarding rather than degrading silently.
+   `WristPlacement` exists in the data model so the constraint is explicit in every
+   exported session, and so a future footwork-only mode has somewhere to live.
+3. **On-device and offline-first.** Sessions are durable on the watch the moment they end.
+   Sync is best-effort and entirely optional; there is no account.
+4. **One schema.** The sync contract is a set of `@Serializable` Kotlin types in `:core`,
+   compiled into both the watch and the server. There is no hand-maintained JSON schema.
+5. **Glanceable-first.** The live screen is designed for about half a second of attention.
+   Anything that requires reading a sentence belongs in the post-session recap.
 
-- Real-time detection of smash, drop, clear, drive, and backhand drive shots using gyroscope vectors, derived swing angles, and heart-rate deltas.
-- Live training screen showing current heart-rate zone, streak counters, and recent shot classification.
-- Session recording with automatic warm-up detection, effort scoring, rally segmentation, and REST intervals derived from heart-rate recovery.
-- Insights dashboard summarizing peak/avg heart-rate, total swings, shot distribution, rally durations, and fatigue indicators.
-- Optional Coach Mode that provides haptic feedback when form deteriorates (e.g., repeated mishits or elevated fatigue score).
-- Session history retained locally with the option to export as JSON for companion phone sync (future extension).
-
-## Module Structure
+## Modules
 
 ```
-bad-watch
-├── app/           # Wear OS Compose application, services, UI, DI
-├── core/          # Pure Kotlin analytics, motion classification, data contracts
-├── docs/          # Architecture, manuals, changelog
-└── tooling/       # Version bump scripts and static analysis configuration
+:core     Pure Kotlin/JVM. No Android dependencies, fully unit-tested.
+          model/       SensorSample, ShotEvent, Rally, TrainingSession, PlayerProfile
+          classifier/  MotionFeatureExtractor, ShotClassifier
+          pipeline/    ShotDetectionPipeline (sliding window)
+          session/     SessionRecorder, TrainingSessionAggregator, RallySegmenter
+          sync/        SessionExport, SyncEnvelope, SyncResponse — the wire contract
+
+:app      Wear OS application.
+          sensors/     FusedSensorCollector (gyro + accel + HR)
+          domain/      SessionController — owns the live session at application scope
+          service/     SessionService — foreground service, survives screen-off
+          data/        SessionStore (file-per-session), SettingsStore (DataStore prefs)
+          sync/        DashboardClient, SyncWorker
+          ui/          Compose surfaces
+          debug/       adb configuration receiver (debug builds only)
+
+:server   Ktor dashboard. Depends on :core for the contract.
+          Application.kt      routes and configuration
+          SessionRepository   file-per-session storage
+          Analytics           dashboard aggregation, including acute:chronic load
+          SyntheticSessions   fixtures and demo seeding (developer command only)
+          resources/static    the dashboard page
 ```
 
-- `core` exposes a `ShotClassifier`, session aggregators, and contracts used by both the UI and tests. It is completely platform-independent and covered with unit tests.
-- `app` depends on `core`, provides sensor integrations, Compose UI, navigation, haptics, and persistence (DataStore).
+## Recording path
 
-## Data Flow
+```
+FusedSensorCollector          100 Hz gyro + accel, ~1 Hz heart rate
+        │                     monotonic SensorEvent.timestamp → epoch, FIFO batched
+        ▼
+SessionController             application-scoped; owns state across Activity death
+        │
+        ▼
+SessionRecorder (:core)       ── ShotDetectionPipeline → ShotClassifier → ShotEvent
+        │                     ── TrainingSessionAggregator (HR, zones, effort)
+        │                     ── RallySegmenter (rallies, work:rest)
+        ▼
+SessionStore                  one JSON file per session, atomic write via temp + rename
+        │
+        ▼
+SyncWorker → DashboardClient → POST /api/v1/sessions
+```
 
-1. `SensorService` subscribes to `SensorManager` for heart-rate (`TYPE_HEART_RATE`) and gyroscope (`TYPE_GYROSCOPE`) events at a moderate sampling rate (50 Hz cap).
-2. Samples enter a `SensorPipeline` that smooths noise (windowed median filter) and aggregates into 250 ms windows.
-3. Windows feed into `ShotClassifier`, which produces `ShotEvent`s with confidence scores and fatigue metrics.
-4. `TrainingSessionController` updates live state flows consumed by the UI and persists session summaries via `SessionRepository`.
-5. Compose UI observes state and renders cards/chips optimized for round displays.
+`SessionService` is a foreground service of type `health`. It does not do the work itself —
+it keeps the process alive and publishes an ongoing notification. The state lives in
+`SessionController` at application scope, because a session must outlive the Activity: the
+watch screen sleeps within seconds of the player putting their wrist down.
 
-## Shot Classification
+## Sensing decisions
 
-- Feature extraction: angular velocity magnitude, orientation change, wrist pronation estimate, and heart-rate delta over the last 5 s.
-- Rule-based classification calibrated for badminton:
-  - **Smash:** peak ω > 6 rad/s, downward vector, HR uptick > 3 BPM.
-  - **Clear:** ω 4–6 rad/s, upward vector, wrist supination.
-  - **Drop:** ω 2–4 rad/s with rapid deceleration and minimal HR change.
-  - **Drive:** ω 3–5 rad/s primarily on horizontal plane.
-  - **Backhand Drive:** ω 2–4 rad/s with pronation inversion.
-- Confidence scoring uses weighted features with fallback to `Unknown`.
-- Fatigue score derived from HR recovery slope, variance in swing speed, and detection jitter.
+The original collector had three defects that made analysis impossible, all now fixed:
 
-## Persistence & Versioning
+| Was | Now | Why it mattered |
+| --- | --- | --- |
+| `System.currentTimeMillis()` on the delivery thread | `SensorEvent.timestamp` (monotonic nanos) anchored to epoch once | Dispatch jitter was baked into the data, making multi-sensor fusion unreliable |
+| `distinctUntilChanged()` | every sample retained | A wrist at rest produces repeated readings; discarding them destroyed rest-interval detection |
+| `SENSOR_DELAY_GAME` (~50 Hz), gyro only | 100 Hz, gyro + accel + HR, 200 ms FIFO batching | A stroke lasts 80–150 ms; 50 Hz gives only a handful of samples across the whole swing |
 
-- `SessionRepository` uses Proto DataStore to persist historical sessions (`badwatch_sessions.pb`).
-- Semantic versioning tracked via `VERSION.md`, mirrored in `app/build.gradle.kts` (`versionName`) and changelog tags.
-- Release automation script (`tooling/tag_release.sh`) validates tests and bumps version metadata.
+FIFO batching is also the single biggest battery lever in the capture path, and costs
+nothing in fidelity because timestamps come from the sensor hub rather than delivery time.
 
-## Testing Strategy
+## Shot classification
 
-- `core` module: deterministic unit tests for feature extraction, classification, fatigue scoring, and session aggregation using fixture sensor streams.
-- `app` module: Robolectric-based ViewModel tests for `TrainingSessionViewModel`; instrumentation tests stub sensor pipeline.
-- Snapshot tests for Compose surfaces executed with `WearComposeTestRule`.
-- End-to-end integration test scaffolding that replays captured sensor traces to validate session reports.
+Currently rule-based, and **uncalibrated against real play**. `MotionFeatureExtractor`
+derives peak and average angular velocity, vertical/horizontal component ratios, a pronation
+score, directional trend and a stability score; `ShotClassifier` applies thresholds and a
+weighted confidence score. Handedness mirrors the pronation axis, since the backhand
+signature inverts between left- and right-handed players.
 
-## Documentation
+This is a placeholder with the right shape, not a finished classifier. Phase 2 of the
+product plan replaces it with a TFLite model trained on labelled swings, keeping the
+rule-based path as a fallback.
 
-- README for setup, build, and deployment instructions.
-- `docs/usage.md` user guide covering training modes and exporting data.
-- CHANGELOG tracking releases.
-- API docs generated with Dokka (invoked via `./gradlew dokkaHtml`).
+## Rally segmentation
 
-## Future Extensions
+Consecutive shots less than 4 s apart belong to the same rally. Badminton rallies have a
+shot every ~0.7–1.5 s while the gap between points is rarely under 5 s, so the two
+distributions separate cleanly without a model. Rallies with a single shot are discarded as
+detector noise — a genuine one-shot rally exists, but with a heuristic classifier a lone
+detection is far more likely to be a false positive.
 
-- ML-based classifier utilizing TinyML (TensorFlow Lite) once a labeled dataset is available.
-- Companion phone sync via Tiles/Complication or Health Services integration.
-- Cloud backup, coach sharing, and stroke quality heatmaps.
-- TODO: Sessions list + single-tap export to external API
-  - Show a chronological list of saved sessions with basic stats.
-  - Add an Export button that packages selected/all sessions and sends to a configurable HTTPS endpoint.
-  - Use a background worker with retry/backoff; include simple auth (token) and request signing if needed.
-  - Payload defaults to JSON; optional CSV transform for tabular pipelines.
-  - Confirm delivery with lightweight status UI and local audit log.
+This yields the numbers that actually characterise a badminton session: rally length
+distribution, work:rest ratio, and playing-time density. Total session duration on its own
+is nearly meaningless for an interval sport.
+
+## Persistence
+
+**One JSON file per session, on both the watch and the server.** The earlier plan called for
+Room; that was over-engineered for the real access pattern. The watch only lists, reads,
+marks-synced and deletes — all aggregation happens on the server. A file per session gives
+durable storage, the export format and the sync payload in a single representation, with no
+annotation processor in the build.
+
+Writes go to a temporary file and are renamed into place, so a crash mid-write cannot leave
+a truncated session that fails to parse on next launch. Sync state lives in a sibling marker
+file rather than inside the JSON, so an uploaded payload stays byte-identical and re-uploads
+are idempotent.
+
+Revisit if on-watch trend queries over hundreds of sessions become a real feature.
+
+## Testing
+
+- `:core` — deterministic JVM tests for feature extraction, classification, rally
+  segmentation and the full `SessionRecorder` path. The entire recording pipeline is
+  testable without an emulator.
+- `:server` — `testApplication` round-trips using `:core`'s own serializers, so a
+  watch/server wire-format disagreement fails the build.
+- `:app` — currently thin. Instrumentation coverage of the service lifecycle is a gap.
+
+## Known gaps
+
+- The classifier is uncalibrated; stroke labels are provisional.
+- Heart rate uses `SensorManager` directly. Health Services `ExerciseClient` would be more
+  accurate and more power-efficient, and is the intended replacement.
+- No battery measurement harness yet, despite battery being a stated hard requirement.
+- Release-build dashboard configuration has no UI; only the debug adb receiver exists.
+- No Tiles, complications or ambient mode.
+- `ShotDetectionPipeline` allocates a fresh list per sample (`buffer.toList()`). Harmless at
+  the current volumes, but it should become a pre-allocated ring buffer before the sampling
+  rate or sensor count rises.
+
+See [`PRODUCT_PLAN.md`](PRODUCT_PLAN.md) for how these are sequenced.

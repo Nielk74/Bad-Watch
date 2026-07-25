@@ -19,3 +19,4 @@ plugins {
 rootProject.name = "bad-watch"
 include(":app")
 include(":core")
+include(":server")

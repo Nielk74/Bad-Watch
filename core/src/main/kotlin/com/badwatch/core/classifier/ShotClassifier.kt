@@ -1,5 +1,6 @@
 package com.badwatch.core.classifier
 
+import com.badwatch.core.model.Handedness
 import com.badwatch.core.model.SensorSample
 import com.badwatch.core.model.ShotEvent
 import com.badwatch.core.model.ShotType
@@ -13,12 +14,18 @@ class ShotClassifier(
     private val clearThreshold: Float = 4.5f,
     private val driveThreshold: Float = 3.0f,
     private val dropThreshold: Float = 2.0f,
-    private val minConfidence: Float = 0.0f
+    private val minConfidence: Float = 0.0f,
+    /**
+     * Racket hand. The pronation signature that distinguishes a backhand drive inverts
+     * between hands, so features are mirrored for left-handed players. Assumes the watch
+     * is worn on the racket wrist — see [com.badwatch.core.model.WristPlacement].
+     */
+    private val handedness: Handedness = Handedness.Right
 ) {
 
     fun classify(samples: List<SensorSample>): ShotEvent? {
         if (samples.size < MIN_WINDOW_SIZE) return null
-        val features = MotionFeatureExtractor.extract(samples)
+        val features = MotionFeatureExtractor.extract(samples, handedness)
         val type = determineType(features)
         if (type == ShotType.Unknown) {
             return null

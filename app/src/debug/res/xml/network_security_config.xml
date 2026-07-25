@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug builds only. A self-hosted dashboard on a LAN is almost always plain HTTP during
+  development, and Android blocks cleartext by default from API 28.
+
+  Release builds deliberately do NOT reference this file, so a shipped app keeps the secure
+  default and can only sync over HTTPS. See docs/dashboard.md for putting the server behind
+  TLS. The lint suppression is safe precisely because this resource lives in the debug
+  source set — it cannot reach a release APK.
+-->
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <base-config
+        cleartextTrafficPermitted="true"
+        tools:ignore="InsecureBaseConfiguration" />
+</network-security-config>

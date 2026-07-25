@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm")
+    `java-library`
     id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jetbrains.dokka")
 }
@@ -10,7 +11,9 @@ kotlin {
 
 dependencies {
     implementation(libs.coroutines.core)
-    implementation(libs.kotlin.serialization.json)
+    // `api`: the sync contract in `com.badwatch.core.sync` exposes kotlinx.serialization
+    // types to both the watch app and the dashboard server, so it must leak downstream.
+    api(libs.kotlin.serialization.json)
     implementation(libs.kotlinx.datetime)
 
     testImplementation(libs.junit)

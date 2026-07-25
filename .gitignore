@@ -8,3 +8,7 @@
 .externalNativeBuild/
 *.iml
 isolate/artifacts/
+
+# Dashboard server data directory (contains health data)
+/badwatch-data/
+badwatch-data/

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only additions. An exported receiver that rewrites the sync destination must never
+  ship in a release build, so it is declared here rather than in the main manifest.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application android:networkSecurityConfig="@xml/network_security_config">
+        <!--
+          Intentionally exported with no permission: `adb shell am broadcast` cannot reach a
+          protected receiver on an unrooted watch, and requiring a permission would defeat
+          the only purpose of this hook. Safe because this manifest is merged into debug
+          builds only — the release APK has no such receiver.
+        -->
+        <receiver
+            android:name=".debug.DashboardConfigReceiver"
+            android:exported="true"
+            tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="com.badwatch.app.SET_DASHBOARD" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

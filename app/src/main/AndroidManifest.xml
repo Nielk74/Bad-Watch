@@ -7,6 +7,27 @@
     <uses-feature
         android:name="android.hardware.sensor.gyroscope"
         android:required="true" />
+    <uses-feature
+        android:name="android.hardware.sensor.heartrate"
+        android:required="false" />
+
+    <!-- Heart rate. Optional at runtime: the app records fine without it. -->
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <!--
+      HIGH_SAMPLING_RATE_SENSORS is deliberately NOT requested. The platform caps motion
+      sensors at 200 Hz without it, and capture runs at 100 Hz, so the permission would
+      widen the permission surface for nothing. Add it only if sampling ever exceeds 200 Hz.
+    -->
+
+    <!-- Recording must survive the screen turning off mid-rally. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Dashboard sync. The app is fully functional with these denied. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".BadWatchApplication"
@@ -16,16 +37,22 @@
         android:roundIcon="@drawable/ic_launcher_foreground"
         android:supportsRtl="true"
         android:theme="@style/Theme.BadWatch">
+        <!-- taskAffinity is required on Wear so the app appears correctly in recents. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name">
+            android:taskAffinity="com.badwatch.badwatch.main">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".service.SessionService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
 
         <meta-data
             android:name="com.google.android.wearable.standalone"

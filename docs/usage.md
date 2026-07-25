@@ -1,37 +1,86 @@
 # Bad Watch Usage Guide
 
-## Before You Start
-- Grant the app body sensor access when prompted during the first launch.
-- Wear the Pixel Watch 3 snugly on your wrist to ensure accurate heart-rate readings.
-- Warm up with a few light swings so the classifier captures a baseline.
+## Before you start
 
-## Training Session Workflow
-1. Launch **Bad Watch** on the watch and tap **Start Session**.
-2. The live HUD shows:
-   - **Heart/Avg/Max** heart-rate values.
-   - **Fatigue/Effort/Recovery** scores (0–100%).
-   - Latest detected shot type and total shot count.
-   - Dominant heart-rate zone indicator.
-3. Continue playing; the app automatically recognises smashes, clears, drops, drives, and backhand drives using gyroscope vectors plus heart-rate deltas.
-4. Tap **Stop & Save** to end the session and store the summary, or **Stop & Discard** to finish without saving. Use **Abort** to cancel a session mid-way without generating a summary.
+- **Wear the watch on your racket hand.** This is a hard requirement, not a preference.
+  Bad Watch detects shots from the swing, so on the other wrist there is nothing to detect.
+  The app asks you to confirm this the first time it opens.
+- Set left- or right-handed in onboarding. The backhand signature mirrors between hands.
+- Wear the watch snugly. A loose strap ruins both heart rate and swing detection.
+- Grant body sensors and notifications when prompted. Both are optional — recording works
+  without either — but you lose heart rate and the ongoing session notification.
 
-## Coach Insights
-- **Fatigue** rises as your average and peak heart-rate climb relative to baseline.
-- **Effort** blends fatigue with peak intensity to show how hard you pushed the rally.
-- **Recovery** analyses recent heart-rate slope; higher is better, signalling you’re ready for the next rally.
-- A sudden jump in fatigue with falling recovery hints at overreaching—consider a rest interval.
+## Recording a session
 
-## History & Data Export
-- The latest sessions appear on the idle screen. Tap **Clear history** to wipe the stored log (up to 40 entries are kept automatically).
-- Session data is stored locally via Jetpack DataStore (`training_sessions.json`). You can export it by pulling the file with `adb` for external analysis (Future versions will add companion sync).
- - TODO: Add a sessions list view with an **Export** button to send selected/all sessions to a configured external API (HTTPS). Export runs in the background and reports success/failure.
+1. Open **Bad Watch** and tap **Start session**.
+2. Play. You can put your wrist down; recording continues with the screen off, via a
+   foreground service. A notification shows the running shot count.
+3. Glance at your wrist any time for the live screen:
+   - Shot count (the large number) and elapsed time
+   - Current heart rate, rally count, and work:rest ratio
+   - Last detected shot with its confidence
+   - Rally summary: average shots, longest rally, share of the session actually playing
+4. Tap **Stop & save** to end and store the session, or **Discard** to throw it away.
 
-## Tips for Accurate Detection
-- Maintain consistent wrist orientation; extreme pronation/supination outside badminton swings may misclassify.
-- Keep the watch firmware updated so heart-rate sampling stays reliable.
-- If swings aren’t detected, check the permissions, ensure the watch is tight, and give the classifier 2–3 swings to recalibrate.
+You can also stop from the notification without opening the app.
+
+## Reading the numbers
+
+**Rally structure is the headline.** Badminton is an interval sport: a 60-minute session
+usually contains only 20-25 minutes of actual play. Total duration on its own tells you
+almost nothing.
+
+- **Work:rest** — playing time against resting time, shown as `1:N`. Singles typically sits
+  near 1:2, doubles nearer 1:1.5. Drifting toward 1:4 means you are resting far more than
+  you think, which is usually the most surprising number in a recap.
+- **Playing time %** — the share of the session spent in rallies.
+- **Average / longest rally** — in shots. Long rallies are where fitness and error rates
+  show up.
+- **Heart rate** — average and peak across the session.
+
+**Shot types are provisional.** The classifier is currently rule-based and has not been
+calibrated against real play. Treat stroke labels as indicative; shot *counts* and *rally
+structure* are far more trustworthy than the specific stroke names. This is the main focus
+of the next phase of work.
+
+## The dashboard
+
+Sessions stay on the watch and are pushed to your dashboard server whenever the watch has
+network. Nothing is lost if the server is unreachable or you never set one up.
+
+The dashboard adds what does not fit on a watch: training volume over time, rally length
+distribution, shot mix, and a shoulder-load trend with an acute:chronic workload ratio.
+
+See [`dashboard.md`](dashboard.md) for running and configuring the server.
+
+### Getting the raw data out
+
+Every session is a JSON file on the watch:
+
+```bash
+adb shell run-as com.badwatch.badwatch ls files/sessions
+adb exec-out run-as com.badwatch.badwatch cat files/sessions/<file>.json > session.json
+```
+
+The file format is exactly the sync payload — the same `SessionExport` type the server
+receives — so anything that reads one reads the other.
 
 ## Troubleshooting
-- **No heart-rate data**: Re-grant BODY_SENSORS permission in settings or clean the watch back.
-- **Classifier lag**: reduce other intensive apps running on the watch; Bad Watch uses coroutine pipelines and should stay responsive.
-- **Unexpected crashes**: run `adb logcat | grep BadWatch` and file an issue with the captured stack trace.
+
+**No shots detected.** Confirm the watch is on your racket hand and the strap is snug. Give
+the classifier a few full swings; gentle practice motions may fall below threshold. Very
+short or very slow strokes are the most likely to be missed.
+
+**Recording stopped when the screen turned off.** It should not — that is what the
+foreground service is for. Check that the session notification is present. If the watch is
+in battery saver, Wear OS may still restrict background work.
+
+**No heart rate.** Re-grant the body sensors permission, clean the sensor window on the
+back of the watch, and tighten the strap.
+
+**Sessions not appearing on the dashboard.** The watch queues them until the server is
+reachable — nothing is lost. Confirm the watch is on the same network, that the URL is
+reachable from the watch (not just your laptop), and that the token matches. History shows
+"On watch only" until a session is acknowledged by the server.
+
+**Crashes.** `adb logcat | grep -i badwatch` and file an issue with the stack trace.

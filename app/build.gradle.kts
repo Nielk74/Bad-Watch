@@ -3,6 +3,7 @@ import java.util.Locale
 plugins {
     id("com.android.application")
     kotlin("android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 val semanticVersion: String = rootProject.file("VERSION.md")
@@ -61,9 +62,7 @@ android {
     }
     buildFeatures {
         compose = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.11"
+        buildConfig = true
     }
     packaging {
         resources {
@@ -73,12 +72,24 @@ android {
     lint {
         abortOnError = true
         warningsAsErrors = true
+        // These check whether newer dependency versions exist upstream, so they start
+        // failing the moment anything is released — turning CI red for reasons unrelated to
+        // the commit. Dependency freshness is a deliberate maintenance task, not a build gate.
+        disable += setOf(
+            "AndroidGradlePluginVersion",
+            "GradleDependency",
+            "NewerVersionAvailable"
+        )
     }
 }
 
 dependencies {
 
+    implementation(project(":core"))
+
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)

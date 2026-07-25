@@ -1,5 +1,6 @@
 package com.badwatch.core.classifier
 
+import com.badwatch.core.model.Handedness
 import com.badwatch.core.model.SensorSample
 import com.badwatch.core.model.Vector3
 import kotlin.math.abs
@@ -20,7 +21,14 @@ data class MotionFeatures(
 )
 
 object MotionFeatureExtractor {
-    fun extract(samples: List<SensorSample>): MotionFeatures {
+    /**
+     * @param handedness Racket hand. The pronation axis mirrors between hands, so the
+     *   left-handed pronation score is negated to keep a single set of thresholds valid.
+     */
+    fun extract(
+        samples: List<SensorSample>,
+        handedness: Handedness = Handedness.Right
+    ): MotionFeatures {
         if (samples.isEmpty()) {
             return MotionFeatures(
                 peakAngularVelocity = 0f,
@@ -68,7 +76,8 @@ object MotionFeatureExtractor {
         val totalComponents = verticalSum + horizontalSum
         val verticalRatio = if (totalComponents == 0f) 0f else verticalSum / totalComponents
         val horizontalRatio = if (totalComponents == 0f) 0f else horizontalSum / totalComponents
-        val pren = pronationAccumulator / max(1, count)
+        val handSign = if (handedness == Handedness.Left) -1f else 1f
+        val pren = handSign * pronationAccumulator / max(1, count)
         val heartRateDelta = samples.last().heartRateBpm - samples.first().heartRateBpm
         val directionalTrend = computeDirectionalTrend(samples)
         val stabilityScore = if (count <= 1) 1f else 1f - (stabilityAccumulator / count).coerceIn(0f, 1f)

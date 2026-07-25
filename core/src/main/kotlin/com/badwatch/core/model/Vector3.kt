@@ -24,4 +24,8 @@ data class Vector3(
         val total = abs(x) + abs(y) + abs(z)
         return if (total == 0f) 0f else (abs(x) + abs(y)) / total
     }
+
+    companion object {
+        val ZERO = Vector3(0f, 0f, 0f)
+    }
 }

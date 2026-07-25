@@ -1,3 +1,21 @@
 <resources>
     <string name="app_name">Bad Watch</string>
+
+    <string name="session_notification_channel">Training session</string>
+    <string name="session_notification_channel_description">Keeps your session recording while the screen is off.</string>
+    <string name="session_notification_title">Session in progress</string>
+    <!-- Both halves are pre-formatted plurals so translations can inflect them independently. -->
+    <string name="session_notification_body">%1$s · %2$s</string>
+    <plurals name="session_notification_shots">
+        <item quantity="one">%d shot</item>
+        <item quantity="other">%d shots</item>
+    </plurals>
+    <plurals name="session_notification_minutes">
+        <item quantity="one">%d min</item>
+        <item quantity="other">%d min</item>
+    </plurals>
+    <string name="session_notification_stop">Stop</string>
+
+    <string name="onboarding_wrist_title">Wear it on your racket hand</string>
+    <string name="onboarding_wrist_body">Bad Watch detects shots from the swing itself. Worn on your other wrist it cannot see your strokes at all.</string>
 </resources>
