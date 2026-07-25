@@ -31,4 +31,6 @@ fi
 git commit -am "chore: release $VERSION"
 git tag -a "v$VERSION" -m "Release $VERSION"
 
-echo "Tagged v$VERSION. Push with: git push origin main --tags"
+echo "Tagged v$VERSION. Push with: git push origin master --tags"
+echo "The tag push triggers .github/workflows/release.yml, which verifies, builds and"
+echo "publishes the GitHub Release with the APK attached."

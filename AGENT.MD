@@ -134,7 +134,15 @@ CLI if you want scripted verification.
 
 1. Clean tree, `./gradlew test :app:lintDebug` green.
 2. `tooling/tag_release.sh <version>` bumps `VERSION.md`, runs tests, commits and tags.
-3. `git push origin master --tags`.
+3. `git push origin master --tags` — pushing the `v*` tag triggers
+   `.github/workflows/release.yml`: it re-runs tests and lint, builds the APKs, and
+   publishes a GitHub Release with notes extracted from `CHANGELOG.md`.
 4. Release notes from `CHANGELOG.md`.
+
+The release always carries the debug-signed APK (installable via adb). To attach a
+properly signed release APK, add four repository secrets — `RELEASE_KEYSTORE_BASE64`
+(`base64 -i release.keystore | pbcopy`), `RELEASE_KEYSTORE_PASSWORD`, `RELEASE_KEY_ALIAS`,
+`RELEASE_KEY_PASSWORD` — and the workflow signs the unsigned AGP output with
+`zipalign` + `apksigner`. No keystore ever enters the repo.
 
 Keep this file current when the topology or toolchain changes.
