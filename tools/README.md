@@ -62,6 +62,18 @@ only demonstrates that ingest, feature extraction, grouping and reporting are wi
 correctly. Real strokes overlap far more, vary by player and fatigue level, and include
 mishits. Expect real first-pass numbers to be dramatically lower.
 
+## The baseline to beat
+
+Before training anything, score what already ships:
+
+```bash
+./gradlew :server:evaluateClassifier -PcaptureDir=badwatch-data/captures
+```
+
+This runs the rule-based classifier over the same labelled swings and prints per-class
+recall and a confusion matrix. A trained model that cannot beat it is not worth deploying,
+and knowing *which* strokes the heuristics miss tells you which drills to prioritise.
+
 ## Target before shipping a model
 
 - ≥ 300 clean swings per stroke type.

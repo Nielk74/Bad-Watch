@@ -32,6 +32,7 @@ These are the decisions everything else follows from.
           pipeline/    ShotDetectionPipeline (sliding window)
           capture/     SwingSegmenter (labelled training windows)
           insight/     SessionInsightEngine — session observations, evidence-backed
+          eval/        ClassifierEvaluator — scores the classifier against ground truth
           session/     SessionRecorder, TrainingSessionAggregator, RallySegmenter
           sync/        SessionExport, SyncEnvelope, SyncResponse — the wire contract
 
@@ -116,6 +117,24 @@ peak in |ω| — which holds for every stroke type equally.
 Labels come from the player's drill selection, never from inference. Windows are stored raw
 and unfiltered so feature engineering stays a decision for the training pipeline in
 `tools/` rather than something baked into the watch.
+
+### Measuring the classifier
+
+`ClassifierEvaluator` scores the shipped classifier against collected labelled swings —
+`./gradlew :server:evaluateClassifier`, and a card on the dashboard. Until this existed,
+"uncalibrated" was an honest admission that gave Phase 2 nothing to beat.
+
+It reports the full confusion matrix and **per-class** recall, not just accuracy. A
+drill-collected corpus is always unbalanced (people hit more smashes than backhand drives),
+and accuracy on an unbalanced corpus is dominated by the largest class. "Not detected" is
+counted as an explicit outcome rather than dropped, so a detector that simply never fires
+cannot score well by having nothing counted against it.
+
+The harness immediately found a real defect: `verticalComponentRatio` is built from
+`abs(z)`, so it cannot distinguish a smash's downward arc from a clear's upward one. Because
+the smash rule was tested first, every clear fast enough to pass the smash threshold was
+reported as a smash. Both overhead rules now test the *sign* of the vertical component, and a
+swing with no decisive direction falls through rather than being assigned one.
 
 ## Rally segmentation
 

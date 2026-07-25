@@ -141,6 +141,12 @@
                        font-variant-numeric: tabular-nums; }
   .insight-session { font-size: 12px; color: var(--text-muted); margin-bottom: 2px; }
 
+  .scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .score { background: var(--surface-2); border-radius: 10px; padding: 11px 13px; }
+  .score .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+  .score .v { font-size: 21px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .caveat { margin-top: 12px; font-size: 12.5px; color: var(--text-muted); }
+
   .empty { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
   .empty code { background: var(--surface-2); padding: 2px 7px; border-radius: 5px; font-size: 13px; }
   section { margin-top: 26px; }
@@ -561,9 +567,78 @@ document.getElementById("themeToggle").addEventListener("click", () => {
   if (window.__data) render(window.__data);
 });
 
+function renderClassifier(evaluation, summary) {
+  const content = document.getElementById("content");
+  const card = document.createElement("div");
+  card.className = "card full";
+
+  const swings = summary ? summary.totalSwings : 0;
+  const perLabel = (summary && summary.swingsPerLabel) || [];
+
+  if (!evaluation || !evaluation.swingCount || !evaluation.perClass.length ||
+      evaluation.swingCount < 50) {
+    card.innerHTML = `
+      <div class="card-head"><h2>Classifier accuracy</h2>
+        <p class="card-note">Scored against swings you labelled in a drill.</p></div>
+      <p style="margin:0;color:var(--text-secondary);font-size:14px">
+        ${swings} labelled swing${swings === 1 ? "" : "s"} collected so far — not enough to
+        measure anything yet. Record drills on the watch under <b>Collect data</b>.
+      </p>
+      ${perLabel.length ? `<div class="caveat">${perLabel
+        .map(l => `${SHOT_LABELS[l.label] || l.label}: ${l.swings}`).join(" · ")}</div>` : ""}`;
+    content.appendChild(card);
+    return;
+  }
+
+  const pct = v => Math.round(v * 100) + "%";
+  card.innerHTML = `
+    <div class="card-head"><h2>Classifier accuracy</h2>
+      <p class="card-note">The shipped rule-based classifier, scored against
+      ${evaluation.swingCount} swings you labelled yourself. This is the number a trained
+      model has to beat.</p></div>
+    <div class="scores">
+      <div class="score"><div class="k">Accuracy</div><div class="v">${pct(evaluation.accuracy)}</div></div>
+      <div class="score"><div class="k">Macro recall</div><div class="v">${pct(evaluation.macroRecall)}</div></div>
+      <div class="score"><div class="k">Macro precision</div><div class="v">${pct(evaluation.macroPrecision)}</div></div>
+      <div class="score"><div class="k">Detected at all</div><div class="v">${pct(
+        (evaluation.swingCount - evaluation.notDetected) / evaluation.swingCount)}</div></div>
+    </div>
+    <div class="chart-scroll" style="margin-top:16px">
+      <table>
+        <thead><tr><th>Stroke</th><th>Labelled</th><th>Recall</th><th>Precision</th><th>Missed</th></tr></thead>
+        <tbody>${evaluation.perClass
+          .slice().sort((a, b) => b.support - a.support)
+          .map(c => `<tr>
+            <td>${SHOT_LABELS[c.label] || c.label}</td>
+            <td>${c.support}</td>
+            <td>${pct(c.recall)}</td>
+            <td>${pct(c.precision)}</td>
+            <td>${c.notDetected}</td></tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+    <div class="caveat">Macro figures weight every stroke equally, so a rare stroke the
+    detector never sees cannot hide behind a common one.</div>`;
+  content.appendChild(card);
+}
+
+Promise.all([
+  fetch("api/v1/captures/evaluation").then(r => r.ok ? r.json() : null).catch(() => null),
+  fetch("api/v1/captures/summary").then(r => r.ok ? r.json() : null).catch(() => null)
+]).then(([evaluation, summary]) => {
+  window.__classifier = { evaluation, summary };
+  if (window.__data) renderClassifier(evaluation, summary);
+});
+
 fetch("api/v1/dashboard")
   .then(r => r.json())
-  .then(data => { window.__data = data; render(data); })
+  .then(data => {
+    window.__data = data;
+    render(data);
+    if (window.__classifier) {
+      renderClassifier(window.__classifier.evaluation, window.__classifier.summary);
+    }
+  })
   .catch(err => {
     document.getElementById("subtitle").textContent = "Could not reach the server";
     document.getElementById("content").innerHTML =

@@ -1,6 +1,8 @@
 package com.badwatch.server
 
 import com.badwatch.core.sync.BadWatchJson
+import com.badwatch.core.eval.ClassifierEvaluation
+import com.badwatch.core.eval.ClassifierEvaluator
 import com.badwatch.core.sync.CaptureExport
 import kotlinx.serialization.Serializable
 import java.io.File
@@ -45,6 +47,27 @@ class CaptureRepository(private val directory: File) {
             }
             ?.sortedByDescending { it.capture.startedAtMillis }
             .orEmpty()
+    }
+
+    /**
+     * Scores the shipped rule-based classifier against the collected ground truth.
+     *
+     * Evaluated per handedness, because the classifier mirrors its pronation feature and
+     * pooling both hands would blur the one stroke that discriminator exists for.
+     */
+    fun evaluateClassifier(): ClassifierEvaluation {
+        val captures = all()
+        if (captures.isEmpty()) return ClassifierEvaluation.EMPTY
+        // Group by handedness, evaluate with a matching classifier, then merge the swings
+        // that each classifier saw. Simplest correct approach: evaluate the dominant group.
+        val byHandedness = captures.groupBy { it.profile.handedness }
+        val (handedness, group) = byHandedness.maxByOrNull { (_, list) ->
+            list.sumOf { it.capture.swingCount }
+        } ?: return ClassifierEvaluation.EMPTY
+
+        return ClassifierEvaluator(
+            com.badwatch.core.classifier.ShotClassifier(handedness = handedness)
+        ).evaluate(group.map { it.capture })
     }
 
     /**

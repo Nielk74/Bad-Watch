@@ -12,6 +12,15 @@ data class MotionFeatures(
     val peakAngularVelocity: Float,
     val averageAngularVelocity: Float,
     val verticalComponentRatio: Float,
+    /**
+     * Signed vertical rotation, roughly -1..1. Negative is the downward arc of an overhead
+     * smash; positive is the upward arc of a clear or lift.
+     *
+     * [verticalComponentRatio] is built from `abs(z)` and so cannot tell a smash from a
+     * clear — they are the same magnitude in opposite directions. Every overhead rule needs
+     * this, not that.
+     */
+    val verticalDirection: Float,
     val horizontalComponentRatio: Float,
     val pronationScore: Float,
     val heartRateDelta: Float,
@@ -34,6 +43,7 @@ object MotionFeatureExtractor {
                 peakAngularVelocity = 0f,
                 averageAngularVelocity = 0f,
                 verticalComponentRatio = 0f,
+                verticalDirection = 0f,
                 horizontalComponentRatio = 0f,
                 pronationScore = 0f,
                 heartRateDelta = 0f,
@@ -46,6 +56,7 @@ object MotionFeatureExtractor {
         var peak = 0f
         var sum = 0f
         var verticalSum = 0f
+        var signedVerticalSum = 0f
         var horizontalSum = 0f
         var pronationAccumulator = 0f
         var previous: Vector3? = null
@@ -56,6 +67,7 @@ object MotionFeatureExtractor {
             peak = max(peak, magnitude)
             sum += magnitude
             verticalSum += abs(sample.gyro.z)
+            signedVerticalSum += sample.gyro.z
             horizontalSum += abs(sample.gyro.x) + abs(sample.gyro.y)
             pronationAccumulator += sample.gyro.x - sample.gyro.y
 
@@ -75,6 +87,8 @@ object MotionFeatureExtractor {
         val avg = if (count == 0) 0f else sum / count
         val totalComponents = verticalSum + horizontalSum
         val verticalRatio = if (totalComponents == 0f) 0f else verticalSum / totalComponents
+        val verticalDirection =
+            if (totalComponents == 0f) 0f else signedVerticalSum / totalComponents
         val horizontalRatio = if (totalComponents == 0f) 0f else horizontalSum / totalComponents
         val handSign = if (handedness == Handedness.Left) -1f else 1f
         val pren = handSign * pronationAccumulator / max(1, count)
@@ -93,6 +107,7 @@ object MotionFeatureExtractor {
             peakAngularVelocity = peak,
             averageAngularVelocity = avg,
             verticalComponentRatio = verticalRatio,
+            verticalDirection = verticalDirection,
             horizontalComponentRatio = horizontalRatio,
             pronationScore = pren,
             heartRateDelta = heartRateDelta,

@@ -27,6 +27,18 @@ application {
     mainClass.set("com.badwatch.server.ApplicationKt")
 }
 
+/**
+ * Scores the shipped rule-based classifier against collected labelled swings.
+ * This is the baseline any trained model has to beat.
+ */
+tasks.register<JavaExec>("evaluateClassifier") {
+    group = "verification"
+    description = "Reports classifier accuracy on labelled capture drills."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.badwatch.server.EvaluateClassifierKt")
+    args(providers.gradleProperty("captureDir").getOrElse("badwatch-data/captures"))
+}
+
 /** Fills the data directory with synthetic sessions so the dashboard can be reviewed locally. */
 tasks.register<JavaExec>("seedDemoData") {
     group = "application"

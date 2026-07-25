@@ -167,6 +167,11 @@ fun Application.badWatchModule(
             call.respond(captureRepository.summary())
         }
 
+        /** How well the shipped rule-based classifier does on the collected ground truth. */
+        get("/api/v1/captures/evaluation") {
+            call.respond(captureRepository.evaluateClassifier())
+        }
+
         get("/api/v1/dashboard") {
             call.respond(Analytics.build(repository.all()))
         }

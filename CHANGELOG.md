@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Added
+- **Classifier evaluation.** `ClassifierEvaluator` scores the shipped rule-based classifier
+  against collected labelled swings — `./gradlew :server:evaluateClassifier`, plus a
+  dashboard card. Reports per-class recall and the full confusion matrix rather than just
+  accuracy, which on an unbalanced drill corpus is dominated by the largest class, and
+  counts "not detected" as an explicit outcome so a detector that never fires cannot look
+  good by default.
 - **Session insights.** `SessionInsightEngine` produces at most three evidence-backed
   observations per session — excessive rest, rally-length decay, cardiac drift, a longest
   rally — derived **only** from rally structure and heart rate. Stroke type is deliberately
@@ -62,6 +68,12 @@
   into `Log.d`.
 
 ### Fixed
+- **Fast clears were reported as smashes.** `verticalComponentRatio` is built from `abs(z)`
+  and so cannot tell a downward smash from an upward clear; since the smash rule was tested
+  first, it swallowed every clear quick enough to pass its threshold. Both overhead rules now
+  test the sign of the vertical component, and a swing with no decisive direction falls
+  through rather than being assigned one. Found by the new evaluation harness on its first
+  run. Regression tests cover both the fast clear and the ambiguous case.
 - **Saving a session or drill no longer crashes the app.** Heart rate used `Float.NaN` as
   its "no reading" sentinel, and `kotlinx.serialization` cannot encode NaN — so persisting
   anything recorded before the optical sensor gets a lock killed the process and lost the

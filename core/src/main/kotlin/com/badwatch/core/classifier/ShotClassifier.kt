@@ -49,12 +49,16 @@ class ShotClassifier(
         val vertical = features.verticalComponentRatio
         val horizontal = features.horizontalComponentRatio
         val pronation = features.pronationScore
-        val trend = features.directionalTrend
+        val direction = features.verticalDirection
 
         return when {
-            peak >= smashThreshold && vertical >= 0.5f -> ShotType.Smash
+            // Smash and clear are the same magnitude in opposite directions, so both rules
+            // must test the *sign* of the vertical component. Matching on magnitude alone
+            // meant the smash rule — which is checked first — swallowed every fast clear.
+            peak >= smashThreshold && vertical >= 0.5f && direction <= -VERTICAL_DIRECTION_MARGIN ->
+                ShotType.Smash
 
-            peak >= clearThreshold && vertical >= 0.4f && trend >= 0.05f ->
+            peak >= clearThreshold && vertical >= 0.4f && direction >= VERTICAL_DIRECTION_MARGIN ->
                 ShotType.Clear
 
             peak >= driveThreshold && horizontal >= 0.6f && pronation <= -0.3f ->
@@ -116,5 +120,13 @@ class ShotClassifier(
 
     companion object {
         private const val MIN_WINDOW_SIZE = 5
+
+        /**
+         * How decisively vertical a swing must be before it is called an overhead stroke.
+         *
+         * A swing hovering near zero is genuinely ambiguous — it falls through to the
+         * midcourt rules or to Unknown rather than being assigned a direction it did not have.
+         */
+        private const val VERTICAL_DIRECTION_MARGIN = 0.15f
     }
 }
