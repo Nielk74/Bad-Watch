@@ -77,6 +77,19 @@ class SessionInsightEngineTest {
             .doesNotContain("cardiac-drift")
     }
 
+    @Test
+    fun staysSilentOnCardiacDriftWithSparseHeartRateCoverage() {
+        val early = rallies(count = 8, shotsEach = 8, heartRate = 130f)
+        val late = rallies(count = 8, shotsEach = 8, heartRate = 170f)
+
+        val ids = engine.generate(
+            session(heartRateCoverage = 0.2f),
+            profile(rallies = early + late)
+        ).map { it.id }
+
+        assertThat(ids).doesNotContain("cardiac-drift")
+    }
+
     // --- Firing correctly ---------------------------------------------------------------
 
     @Test
@@ -88,7 +101,7 @@ class SessionInsightEngineTest {
             .single { it.id == "rest-ratio-high" }
 
         assertThat(insight.severity).isEqualTo(InsightSeverity.Notable)
-        assertThat(insight.evidence).contains("work:rest")
+        assertThat(insight.evidence).contains("active:quiet")
     }
 
     @Test
@@ -118,7 +131,7 @@ class SessionInsightEngineTest {
         val insight = engine.generate(session(), profile)
             .single { it.id == "endurance-decay" }
 
-        assertThat(insight.severity).isEqualTo(InsightSeverity.Caution)
+        assertThat(insight.severity).isEqualTo(InsightSeverity.Notable)
     }
 
     @Test
@@ -129,7 +142,7 @@ class SessionInsightEngineTest {
         val insight = engine.generate(session(), profile(rallies = early + late))
             .single { it.id == "cardiac-drift" }
 
-        assertThat(insight.severity).isEqualTo(InsightSeverity.Caution)
+        assertThat(insight.severity).isEqualTo(InsightSeverity.Notable)
         assertThat(insight.evidence).contains("bpm")
     }
 
@@ -152,7 +165,7 @@ class SessionInsightEngineTest {
     }
 
     @Test
-    fun cautionsAreRankedAboveTrivia() {
+    fun strongestObservationsAreRankedAboveInfo() {
         val profile = profile(
             rallies = rallies(count = 6, shotsEach = 25, heartRate = 140f) +
                 rallies(count = 6, shotsEach = 20, heartRate = 150f) +
@@ -161,7 +174,7 @@ class SessionInsightEngineTest {
 
         val insights = engine.generate(session(), profile)
 
-        assertThat(insights.first().severity).isEqualTo(InsightSeverity.Caution)
+        assertThat(insights.first().severity).isEqualTo(InsightSeverity.Notable)
     }
 
     @Test
@@ -232,7 +245,10 @@ class SessionInsightEngineTest {
         )
     }
 
-    private fun session(durationMillis: Long = 60L * 60 * 1000) = TrainingSession(
+    private fun session(
+        durationMillis: Long = 60L * 60 * 1000,
+        heartRateCoverage: Float = 1f
+    ) = TrainingSession(
         id = "session",
         startedAtMillis = 0L,
         endedAtMillis = durationMillis,
@@ -245,7 +261,9 @@ class SessionInsightEngineTest {
             recoveryScore = 0.5f,
             fatigueScore = 0.5f,
             effortScore = 0.5f,
-            heartRateZoneHistogram = mapOf(HeartRateZone.Tempo to 100)
+            heartRateZoneHistogram = mapOf(HeartRateZone.Tempo to 100),
+            heartRateSampleCount = (durationMillis / 1_000L).toInt(),
+            heartRateCoverage = heartRateCoverage
         ),
         shots = emptyList()
     )

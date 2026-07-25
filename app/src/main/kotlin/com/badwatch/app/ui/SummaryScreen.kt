@@ -68,8 +68,8 @@ fun SummaryScreen(
 
         item {
             StatRow(
-                Stat("Shots", summary.totalShots.toString()),
-                Stat("Rallies", rallies.rallyCount.toString()),
+                Stat("Hits", summary.totalShots.toString()),
+                Stat("Bursts", rallies.rallyCount.toString()),
                 Stat("Time", formatDuration(summary.durationMillis))
             )
         }
@@ -77,13 +77,13 @@ fun SummaryScreen(
         items(insights.size) { index -> InsightCard(insight = insights[index]) }
 
         item {
-            InfoCard(title = "Rally structure") {
+            InfoCard(title = "Detected play") {
                 DetailRow(
-                    "Avg rally",
-                    String.format(Locale.US, "%.1f shots", rallies.averageShotsPerRally)
+                    "Avg rally burst",
+                    String.format(Locale.US, "%.1f hits", rallies.averageShotsPerRally)
                 )
-                DetailRow("Longest", "${rallies.longestRally?.shotCount ?: 0} shots")
-                DetailRow("Work : rest", formatRestRatio(rallies.restRatio))
+                DetailRow("Longest", "${rallies.longestRally?.shotCount ?: 0} hits")
+                DetailRow("Est. active : quiet", formatRestRatio(rallies.restRatio))
                 val total = rallies.totalWorkMillis + rallies.totalRestMillis
                 if (total > 0) {
                     DistributionBar(
@@ -99,11 +99,11 @@ fun SummaryScreen(
                         )
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        LegendDot(color = MaterialTheme.colorScheme.primary, label = "Work")
-                        LegendDot(color = MaterialTheme.colorScheme.secondary, label = "Rest")
+                        LegendDot(color = MaterialTheme.colorScheme.primary, label = "Detected")
+                        LegendDot(color = MaterialTheme.colorScheme.secondary, label = "Quiet")
                     }
                 }
-                DetailRow("Playing time", "${(rallies.workDensity * 100).toInt()}%")
+                DetailRow("Estimated active", "${(rallies.workDensity * 100).toInt()}%")
             }
         }
 
@@ -115,13 +115,22 @@ fun SummaryScreen(
                     formatHeartRate(summary.maxHeartRate),
                     valueColor = MaterialTheme.colorScheme.error
                 )
-                DetailRow("Peak zone", hrZoneLabel(summary.maxHeartRate))
+                DetailRow(
+                    "Peak zone",
+                    hrZoneLabel(summary.maxHeartRate, stored.profile.maxHeartRate)
+                )
+                if (summary.heartRateSampleCount > 0) {
+                    DetailRow(
+                        "Signal coverage",
+                        "${(summary.heartRateCoverage * 100).toInt()}%"
+                    )
+                }
             }
         }
 
         if (summary.shotCounts.isNotEmpty()) {
             item {
-                InfoCard(title = "Shot mix") {
+                InfoCard(title = "Provisional stroke mix") {
                     val total = summary.shotCounts.values.sum().takeIf { it > 0 } ?: 1
                     val sorted = summary.shotCounts.entries.sortedByDescending { it.value }
                     DistributionBar(

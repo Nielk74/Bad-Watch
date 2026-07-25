@@ -85,6 +85,34 @@
   }
   .theme-toggle:hover { color: var(--text-primary); }
 
+  .auth-dialog {
+    width: min(420px, calc(100vw - 32px)); padding: 0;
+    color: var(--text-primary); background: var(--surface-1);
+    border: 1px solid var(--border); border-radius: 18px;
+    box-shadow: 0 24px 80px rgba(0,0,0,.28);
+  }
+  .auth-dialog::backdrop { background: rgba(8, 8, 7, .58); backdrop-filter: blur(4px); }
+  .auth-form { padding: 24px; }
+  .auth-kicker { color: var(--series-1); font-size: 11.5px; font-weight: 700;
+                 letter-spacing: .08em; text-transform: uppercase; }
+  .auth-form h2 { margin: 5px 0 7px; font-size: 22px; letter-spacing: -.015em; }
+  .auth-form > p { margin: 0; color: var(--text-secondary); font-size: 13.5px; }
+  .auth-field { display: grid; gap: 6px; margin-top: 20px; }
+  .auth-field label { color: var(--text-secondary); font-size: 12.5px; font-weight: 600; }
+  .auth-field input {
+    width: 100%; padding: 11px 12px; color: var(--text-primary); background: var(--surface-0);
+    border: 1px solid var(--border); border-radius: 10px; font: inherit;
+  }
+  .auth-field input:focus { border-color: var(--series-1); outline: 3px solid color-mix(in srgb, var(--series-1) 20%, transparent); }
+  .auth-form .auth-error { margin-top: 8px; color: var(--status-critical); font-size: 12.5px; }
+  .auth-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 20px; }
+  .auth-actions button {
+    border: 1px solid var(--border); border-radius: 999px; padding: 8px 15px;
+    background: var(--surface-2); color: var(--text-primary); font: inherit;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .auth-actions .primary { border-color: var(--series-1); background: var(--series-1); color: white; }
+
   h2 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: -0.005em; }
   .card-note { color: var(--text-muted); font-size: 12.5px; margin: 2px 0 0; }
 
@@ -175,6 +203,25 @@
 
 <div class="tooltip" id="tooltip" role="status" aria-live="polite"></div>
 
+<dialog class="auth-dialog" id="authDialog" aria-labelledby="authTitle">
+  <form class="auth-form" id="authForm">
+    <div class="auth-kicker">Private dashboard</div>
+    <h2 id="authTitle">Enter your access token</h2>
+    <p>The server protects your session and health data. The token stays in this browser
+      tab and is sent only in an Authorization header.</p>
+    <div class="auth-field">
+      <label for="authToken">BADWATCH_TOKEN</label>
+      <input id="authToken" type="password" autocomplete="current-password"
+             spellcheck="false" required>
+    </div>
+    <p class="auth-error" id="authError" hidden>That token was not accepted. Try again.</p>
+    <div class="auth-actions">
+      <button id="authCancel" type="button">Cancel</button>
+      <button class="primary" type="submit">Unlock dashboard</button>
+    </div>
+  </form>
+</dialog>
+
 <script>
 const NS = "http://www.w3.org/2000/svg";
 const SHOT_LABELS = {
@@ -185,6 +232,108 @@ const SHOT_LABELS = {
 const SHOT_SLOT = {
   Smash: 1, Clear: 2, Drop: 3, Drive: 4, BackhandDrive: 5, Unknown: 6
 };
+
+/* ---------- Authenticated API ---------- */
+
+const TOKEN_STORAGE_KEY = "badwatch.bearerToken";
+let volatileToken = null;
+let authPromptInFlight = null;
+
+function readAccessToken() {
+  if (volatileToken) return volatileToken;
+  try { return sessionStorage.getItem(TOKEN_STORAGE_KEY); }
+  catch (_) { return null; }
+}
+
+function rememberAccessToken(token) {
+  volatileToken = token;
+  try { sessionStorage.setItem(TOKEN_STORAGE_KEY, token); }
+  catch (_) { /* Some privacy modes disable storage; memory still works for this page. */ }
+}
+
+function forgetAccessToken() {
+  volatileToken = null;
+  try { sessionStorage.removeItem(TOKEN_STORAGE_KEY); }
+  catch (_) { /* Nothing else to clear. */ }
+}
+
+function askForAccessToken(previousWasRejected) {
+  const dialog = document.getElementById("authDialog");
+  const form = document.getElementById("authForm");
+  const input = document.getElementById("authToken");
+  const cancel = document.getElementById("authCancel");
+  const error = document.getElementById("authError");
+
+  if (authPromptInFlight) {
+    if (previousWasRejected) error.hidden = false;
+    return authPromptInFlight;
+  }
+
+  error.hidden = !previousWasRejected;
+  input.value = "";
+  authPromptInFlight = new Promise(resolve => {
+    const finish = token => {
+      form.removeEventListener("submit", submit);
+      cancel.removeEventListener("click", cancelPrompt);
+      dialog.removeEventListener("cancel", cancelPrompt);
+      if (dialog.open) dialog.close();
+      authPromptInFlight = null;
+      resolve(token);
+    };
+    const submit = event => {
+      event.preventDefault();
+      const token = input.value.trim();
+      if (token) finish(token);
+    };
+    const cancelPrompt = event => {
+      event.preventDefault();
+      finish(null);
+    };
+
+    form.addEventListener("submit", submit);
+    cancel.addEventListener("click", cancelPrompt);
+    dialog.addEventListener("cancel", cancelPrompt);
+    dialog.showModal();
+    requestAnimationFrame(() => input.focus());
+  });
+  return authPromptInFlight;
+}
+
+function fetchWithAccessToken(resource, init, token) {
+  const headers = new Headers((init && init.headers) || {});
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return fetch(resource, { ...(init || {}), headers });
+}
+
+/**
+ * Fetch a same-origin API route. A tokenless local server stays one request and zero UI;
+ * a protected server asks once, keeps the secret in sessionStorage, and retries every
+ * concurrent dashboard request through the same prompt.
+ */
+async function apiFetch(resource, init = {}) {
+  let token = readAccessToken();
+  let response = await fetchWithAccessToken(resource, init, token);
+
+  while (response.status === 401) {
+    forgetAccessToken();
+    const supplied = await askForAccessToken(Boolean(token));
+    if (!supplied) return response;
+    rememberAccessToken(supplied);
+    token = supplied;
+    response = await fetchWithAccessToken(resource, init, token);
+  }
+  return response;
+}
+
+async function apiJson(resource) {
+  const response = await apiFetch(resource);
+  if (!response.ok) {
+    const error = new Error(response.status === 401 ? "Access token required" : `HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return response.json();
+}
 
 const tooltip = document.getElementById("tooltip");
 function showTip(evt, html) {
@@ -313,7 +462,7 @@ function shotMixChart(host, slices) {
     }, svg);
     bar.addEventListener("mousemove", e => showTip(e,
       `<div class="t-title">${SHOT_LABELS[s.type] || s.type}</div>
-       <div class="t-row"><span>Shots</span><b>${fmtInt(s.count)}</b></div>
+       <div class="t-row"><span>Detected hits</span><b>${fmtInt(s.count)}</b></div>
        <div class="t-row"><span>Share</span><b>${Math.round(s.count / total * 100)}%</b></div>`));
     bar.addEventListener("mouseleave", hideTip);
 
@@ -326,18 +475,24 @@ function shotMixChart(host, slices) {
 }
 
 /**
- * Acute vs chronic shoulder load. Two series, same unit, one axis — the ratio is
- * reported separately as a tile rather than crammed onto a second scale.
+ * Inferred active-time volume. Both lines are milliseconds of the same signal: a rolling
+ * seven-day sum and the weekly average across the four complete weeks before that window.
+ * Hits and elapsed court time stay in the tooltip instead of being mixed onto this axis.
  */
-function loadChart(host, points) {
+function volumeChart(host, points) {
   const W = Math.max(440, host.clientWidth || 480);
   const H = 230;
   const M = { top: 12, right: 14, bottom: 34, left: 46 };
   const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
-  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: "img" }, host);
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: "img",
+    "aria-label": "Estimated active-time volume" }, host);
   const g = el("g", { transform: `translate(${M.left},${M.top})` }, svg);
 
-  const max = Math.max(1, ...points.map(p => Math.max(p.acute, p.chronic)));
+  const minutes = ms => ms / 60000;
+  const max = Math.max(1, ...points.map(p => Math.max(
+    minutes(p.rolling7DayEstimatedActiveMillis),
+    minutes(p.previous28DayWeeklyAverageEstimatedActiveMillis || 0)
+  )));
   const ticks = niceTicks(max, 4);
   const yTop = ticks[ticks.length - 1];
   const x = i => points.length <= 1 ? iw / 2 : (i / (points.length - 1)) * iw;
@@ -346,15 +501,22 @@ function loadChart(host, points) {
   for (const t of ticks) {
     el("line", { class: "gridline", x1: 0, x2: iw, y1: y(t), y2: y(t) }, g);
     const lab = el("text", { class: "axis", x: -8, y: y(t) + 4, "text-anchor": "end" }, g);
-    lab.textContent = fmtInt(t);
+    lab.textContent = `${fmtInt(t)}m`;
   }
 
   const line = (key, color) => {
-    const d = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p[key]).toFixed(1)}`).join(" ");
+    let started = false;
+    const d = points.map((p, i) => {
+      if (p[key] == null) { started = false; return ""; }
+      const command = started ? "L" : "M";
+      started = true;
+      return `${command}${x(i).toFixed(1)},${y(minutes(p[key])).toFixed(1)}`;
+    }).filter(Boolean).join(" ");
+    if (!d) return;
     el("path", { d, fill: "none", stroke: color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, g);
   };
-  line("chronic", "var(--series-3)");
-  line("acute", "var(--series-1)");
+  line("previous28DayWeeklyAverageEstimatedActiveMillis", "var(--series-3)");
+  line("rolling7DayEstimatedActiveMillis", "var(--series-1)");
 
   points.forEach((p, i) => {
     if (points.length <= 20 || i % Math.ceil(points.length / 8) === 0) {
@@ -367,14 +529,21 @@ function loadChart(host, points) {
   const colW = iw / Math.max(1, points.length);
   points.forEach((p, i) => {
     const hit = el("rect", { x: x(i) - colW / 2, y: 0, width: colW, height: ih, fill: "transparent" }, g);
-    const marker = el("circle", { cx: x(i), cy: y(p.acute), r: 0, fill: "var(--series-1)", stroke: "var(--surface-1)", "stroke-width": 2 }, g);
+    const marker = el("circle", {
+      cx: x(i), cy: y(minutes(p.rolling7DayEstimatedActiveMillis)), r: 0,
+      fill: "var(--series-1)", stroke: "var(--surface-1)", "stroke-width": 2
+    }, g);
     hit.addEventListener("mousemove", e => {
       marker.setAttribute("r", 5);
       showTip(e,
         `<div class="t-title">${fmtDate(p.dayEpochMillis)}</div>
-         <div class="t-row"><span>7-day load</span><b>${fmt1(p.acute)}</b></div>
-         <div class="t-row"><span>28-day baseline</span><b>${fmt1(p.chronic)}</b></div>
-         <div class="t-row"><span>Ratio</span><b>${p.ratio ? fmt1(p.ratio) : "—"}</b></div>`);
+         <div class="t-row"><span>Today on court</span><b>${fmtDuration(p.dailyElapsedMillis)}</b></div>
+         <div class="t-row"><span>Today est. active</span><b>${fmtDuration(p.dailyEstimatedActiveMillis)}</b></div>
+         <div class="t-row"><span>Today detected hits</span><b>${fmtInt(p.dailyDetectedHits)}</b></div>
+         <div class="t-row"><span>Last 7 days est. active</span><b>${fmtDuration(p.rolling7DayEstimatedActiveMillis)}</b></div>
+         <div class="t-row"><span>Last 7 days detected hits</span><b>${fmtInt(p.rolling7DayDetectedHits)}</b></div>
+         <div class="t-row"><span>Prior 4-week weekly avg</span><b>${p.previous28DayWeeklyAverageEstimatedActiveMillis == null
+           ? "Building history" : fmtDuration(p.previous28DayWeeklyAverageEstimatedActiveMillis)}</b></div>`);
     });
     hit.addEventListener("mouseleave", () => { marker.setAttribute("r", 0); hideTip(); });
   });
@@ -383,9 +552,9 @@ function loadChart(host, points) {
 }
 
 /**
- * One session on a clock. Each rally is a band spanning its first to its last shot,
- * taller the more shots it held, with one tick per shot inside, coloured by type.
- * The gaps between bands are the rests — leaving them empty is the point of the chart.
+ * One session on a clock. Each inferred exchange is a band spanning its first to its last
+ * detected hit, taller the more hits it held, with one tick per hit inside, coloured by
+ * provisional type. Empty space is quiet time, not a claim about official rally boundaries.
  *
  * Note: `Rally.durationMillis` is a server-side derived getter and is not on the wire;
  * a rally's span is `startMillis`..`endMillis`, and single-shot rallies have both equal.
@@ -405,7 +574,7 @@ function rallyTimelineChart(host, exportData) {
   const M = { top: 14, right: 14, bottom: 30, left: 10 };
   const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
   const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: "img",
-    "aria-label": "Rally timeline" }, host);
+    "aria-label": "Detected exchange timeline" }, host);
   const g = el("g", { transform: `translate(${M.left},${M.top})` }, svg);
   const x = t => ((t - t0) / span) * iw;
 
@@ -430,7 +599,7 @@ function rallyTimelineChart(host, exportData) {
       stroke: "var(--series-1)", "stroke-opacity": 0.35
     }, g);
     band.addEventListener("mousemove", e => showTip(e,
-      `<div class="t-title">Rally ${r.index + 1} · ${fmtInt(r.shotCount)} shots</div>
+      `<div class="t-title">Exchange ${r.index + 1} · ${fmtInt(r.shotCount)} detected hits</div>
        <div class="t-row"><span>Starts</span><b>${fmtClock(r.startMillis - t0)}</b></div>
        <div class="t-row"><span>Lasts</span><b>${Math.round((r.endMillis - r.startMillis) / 1000)}s</b></div>`));
     band.addEventListener("mouseleave", hideTip);
@@ -475,14 +644,6 @@ function niceTicks(max, count) {
 
 /* ---------- Page ---------- */
 
-function loadStatus(ratio) {
-  if (!ratio) return { label: "Not enough history", color: "var(--text-muted)" };
-  if (ratio > 1.5) return { label: "Spike — ease off", color: "var(--status-critical)" };
-  if (ratio > 1.3) return { label: "Ramping fast", color: "var(--status-warning)" };
-  if (ratio < 0.8) return { label: "Detraining", color: "var(--status-warning)" };
-  return { label: "In the sweet spot", color: "var(--status-good)" };
-}
-
 function render(data) {
   const content = document.getElementById("content");
   const subtitle = document.getElementById("subtitle");
@@ -502,31 +663,32 @@ function render(data) {
   const latest = data.sessions[0];
   subtitle.textContent = `${data.sessionCount} session${data.sessionCount === 1 ? "" : "s"} · last played ${fmtDate(latest.startedAtMillis)}`;
 
-  const lastLoad = data.loadTrend.length ? data.loadTrend[data.loadTrend.length - 1] : null;
-  const status = loadStatus(lastLoad ? lastLoad.ratio : 0);
+  const latestHasHrLoad = latest.cardiovascularLoad != null && latest.heartRateCoverage >= 0.6;
 
   const tiles = document.createElement("div");
   tiles.className = "tiles";
   tiles.innerHTML = `
     <div class="tile">
-      <div class="label">Shots hit</div>
+      <div class="label">Detected hits</div>
       <div class="value">${fmtInt(data.totalShots)}</div>
-      <div class="foot">across ${data.sessionCount} sessions</div>
+      <div class="foot">racket-wrist contacts across ${data.sessionCount} sessions</div>
     </div>
     <div class="tile">
       <div class="label">Time on court</div>
       <div class="value">${fmtDuration(data.totalElapsedMillis)}</div>
-      <div class="foot">${fmtDuration(data.totalPlayingMillis)} actually in rallies</div>
+      <div class="foot">${fmtDuration(data.totalPlayingMillis)} estimated active</div>
     </div>
     <div class="tile">
-      <div class="label">Average rally</div>
+      <div class="label">Average exchange</div>
       <div class="value">${fmt1(data.averageRallyShots)}</div>
-      <div class="foot">shots · longest ${data.longestRallyShots}</div>
+      <div class="foot">detected hits · longest ${data.longestRallyShots}</div>
     </div>
     <div class="tile">
-      <div class="label">Shoulder load</div>
-      <div class="value">${lastLoad && lastLoad.ratio ? fmt1(lastLoad.ratio) : "—"}</div>
-      <div class="foot"><span class="status"><span class="dot" style="background:${status.color}"></span>${status.label}</span></div>
+      <div class="label">Latest HR load</div>
+      <div class="value">${latestHasHrLoad ? fmt1(latest.cardiovascularLoad) : "—"}</div>
+      <div class="foot">${latestHasHrLoad
+        ? `HRR-min · ${Math.round(latest.heartRateCoverage * 100)}% signal coverage`
+        : "requires measured optical heart rate"}</div>
     </div>`;
   content.appendChild(tiles);
 
@@ -546,8 +708,8 @@ function render(data) {
     card.className = "card";
     card.innerHTML = `
       <div class="card-head"><h2>What stood out</h2>
-        <p class="card-note">Derived from rally structure and heart rate only — not from
-        stroke labels, which are not yet calibrated.</p></div>
+        <p class="card-note">Derived from gaps between your detected racket-wrist hits and
+        measured heart rate — not from uncalibrated stroke labels.</p></div>
       <div class="insights">${recentInsights.map(({ session, insight }) => `
         <div class="insight ${insight.severity.toLowerCase()}">
           <div class="body">
@@ -564,46 +726,46 @@ function render(data) {
   grid.className = "grid";
   content.appendChild(grid);
 
-  // Shots per session over time.
+  // Detected hits per session over time.
   const perSession = [...data.sessions].reverse().map(s => ({
     label: fmtDateTime(s.startedAtMillis),
     axisLabel: new Date(s.startedAtMillis).toLocaleDateString(undefined, { day: "numeric", month: "short" }),
     value: s.totalShots
   }));
   grid.appendChild(card(
-    "Shots per session",
-    "Volume over time. One bar per recorded session.",
-    host => barChart(host, perSession, { valueLabel: "Shots" })
+    "Detected hits per session",
+    "Racket-wrist contacts over time. One bar per recorded session.",
+    host => barChart(host, perSession, { valueLabel: "Detected hits" })
   ));
 
-  // Rally length distribution.
+  // Inferred exchange length distribution.
   grid.appendChild(card(
-    "Rally length",
-    "How long your points actually last, in shots.",
-    host => barChart(host, data.rallyHistogram.map(b => ({ label: `${b.label} shots`, axisLabel: b.label, value: b.count })),
-      { valueLabel: "Rallies", maxBarWidth: 64 })
+    "Detected exchange length",
+    "Hit bursts inferred from quiet gaps; this is not the full rally score.",
+    host => barChart(host, data.rallyHistogram.map(b => ({ label: `${b.label} detected hits`, axisLabel: b.label, value: b.count })),
+      { valueLabel: "Exchanges", maxBarWidth: 64 })
   ));
 
   // Shot mix.
   grid.appendChild(card(
     "Shot mix",
-    "Detected stroke distribution across all sessions.",
+    "Provisional stroke labels across all sessions; use hit volume until calibrated.",
     host => shotMixChart(host, data.shotDistribution)
   ));
 
-  // Load trend.
-  const loadCard = card(
-    "Shoulder load trend",
-    "Overhead volume weighted by swing intensity. Training-load guidance, not medical advice.",
-    host => loadChart(host, data.loadTrend)
+  // Transparent activity-volume trend. No readiness or injury thresholds are inferred.
+  const volumeCard = card(
+    "Estimated active-time volume",
+    "Time between detected hits inside inferred exchanges. Descriptive history, not a readiness or injury score.",
+    host => volumeChart(host, data.volumeTrend)
   );
   const legend = document.createElement("div");
   legend.className = "legend";
   legend.innerHTML = `
-    <span class="key"><span class="swatch" style="background:var(--series-1)"></span>7-day load (acute)</span>
-    <span class="key"><span class="swatch" style="background:var(--series-3)"></span>28-day baseline (chronic)</span>`;
-  loadCard.appendChild(legend);
-  grid.appendChild(loadCard);
+    <span class="key"><span class="swatch" style="background:var(--series-1)"></span>Last 7 days</span>
+    <span class="key"><span class="swatch" style="background:var(--series-3)"></span>Previous 4-week weekly average</span>`;
+  volumeCard.appendChild(legend);
+  grid.appendChild(volumeCard);
 
   // Session table — also the accessible fallback for every chart above.
   const tableSection = document.createElement("section");
@@ -611,13 +773,15 @@ function render(data) {
   table.className = "card full";
   table.innerHTML = `
     <div class="card-head"><h2>Sessions</h2>
-      <p class="card-note">Every recorded session. Work:rest is playing time against resting time.
-      Open a row for the full rally timeline.</p></div>
+      <p class="card-note">Estimated active:quiet comes from gaps between your detected hits.
+      HR load is elapsed minutes x mean heart-rate reserve and appears only with measured optical HR.
+      Open a row for the full detected-exchange timeline.</p></div>
     <div class="chart-scroll">
       <table>
         <thead><tr>
-          <th>Date</th><th>Duration</th><th>Shots</th><th>Rallies</th>
-          <th>Avg rally</th><th>Work : rest</th><th>Playing</th><th>Avg HR</th><th>Peak HR</th>
+          <th>Date</th><th>Duration</th><th>Hits</th><th>Exchanges</th>
+          <th>Avg exchange</th><th>Active : quiet</th><th>Est. active</th>
+          <th>Avg HR</th><th>Peak HR</th><th>HRR-min</th>
         </tr></thead>
         <tbody>${data.sessions.map(s => `
           <tr class="rowlink" data-session-id="${escapeHtml(s.id)}" tabindex="0" role="link"
@@ -631,6 +795,8 @@ function render(data) {
             <td>${Math.round(s.workDensity * 100)}%</td>
             <td>${s.averageHeartRate > 0 ? fmtInt(s.averageHeartRate) : "—"}</td>
             <td>${s.maxHeartRate > 0 ? fmtInt(s.maxHeartRate) : "—"}</td>
+            <td>${s.cardiovascularLoad != null && s.heartRateCoverage >= 0.6
+              ? fmt1(s.cardiovascularLoad) : "—"}</td>
           </tr>`).join("")}
         </tbody>
       </table>
@@ -704,10 +870,10 @@ function renderSessionDetail(id) {
     sessionErrorHtml("Loading…", "Fetching the session from the server.");
   if (sessionInFlight.has(id)) return; // route() can fire again while a fetch is out
   sessionInFlight.add(id);
-  fetch("api/v1/sessions/" + encodeURIComponent(id))
+  apiFetch("api/v1/sessions/" + encodeURIComponent(id))
     .then(r => {
       if (r.status === 404) throw Object.assign(new Error("No such session"), { status: 404 });
-      if (!r.ok) throw new Error("HTTP " + r.status);
+      if (!r.ok) throw Object.assign(new Error("HTTP " + r.status), { status: r.status });
       return r.json();
     })
     .then(data => {
@@ -721,9 +887,13 @@ function renderSessionDetail(id) {
       if (sessionIdFromHash() !== id) return;
       subtitle.textContent = "Session detail";
       const gone = err && err.status === 404;
+      const locked = err && err.status === 401;
       document.getElementById("content").innerHTML = gone
         ? sessionErrorHtml("Session not found",
             "No session with this id — it may have been deleted from the server.")
+        : locked
+          ? sessionErrorHtml("Access required",
+              "Reload this page and enter the dashboard token to open the session.")
         : sessionErrorHtml("Could not load session",
             "The server could not be reached. Go back and try again in a moment.");
     });
@@ -740,6 +910,8 @@ function renderSession(data) {
   const longest = rallies.reduce((a, r) => Math.max(a, r.shotCount), 0);
   const avgRally = rallies.length
     ? rallies.reduce((a, r) => a + r.shotCount, 0) / rallies.length : 0;
+  const hasHrLoad = sum.cardiovascularLoad != null &&
+    sum.heartRateSampleCount > 0 && sum.heartRateCoverage >= 0.6;
 
   subtitle.textContent = `Session · ${fmtDate(session.startedAtMillis)}`;
   content.innerHTML = "";
@@ -758,19 +930,19 @@ function renderSession(data) {
   tiles.className = "tiles";
   tiles.innerHTML = `
     <div class="tile">
-      <div class="label">Shots</div>
+      <div class="label">Detected hits</div>
       <div class="value">${fmtInt(sum.totalShots)}</div>
-      <div class="foot">${rallies.length ? fmt1(avgRally) + " per rally" : "no rallies"}</div>
+      <div class="foot">${rallies.length ? fmt1(avgRally) + " per exchange" : "no exchanges"}</div>
     </div>
     <div class="tile">
-      <div class="label">Rallies</div>
+      <div class="label">Detected exchanges</div>
       <div class="value">${fmtInt(rallies.length)}</div>
-      <div class="foot">${longest ? "longest " + fmtInt(longest) + " shots" : "—"}</div>
+      <div class="foot">${longest ? "longest " + fmtInt(longest) + " hits" : "—"}</div>
     </div>
     <div class="tile">
       <div class="label">Duration</div>
       <div class="value">${fmtDuration(sum.durationMillis)}</div>
-      <div class="foot">${fmtDuration(work)} playing · ${fmtDuration(rest)} rest</div>
+      <div class="foot">${fmtDuration(work)} estimated active · ${fmtDuration(rest)} quiet</div>
     </div>
     <div class="tile">
       <div class="label">Avg heart rate</div>
@@ -783,9 +955,16 @@ function renderSession(data) {
       <div class="foot">${sum.maxHeartRate > 0 ? "bpm" : "no readings"}</div>
     </div>
     <div class="tile">
-      <div class="label">Playing time</div>
+      <div class="label">Estimated active</div>
       <div class="value">${density != null ? Math.round(density * 100) + "%" : "—"}</div>
-      <div class="foot">${work > 0 ? "1:" + fmt1(rest / work) + " work : rest" : "of elapsed time"}</div>
+      <div class="foot">${work > 0 ? "1:" + fmt1(rest / work) + " active : quiet" : "of elapsed time"}</div>
+    </div>
+    <div class="tile">
+      <div class="label">HR load</div>
+      <div class="value">${hasHrLoad ? fmt1(sum.cardiovascularLoad) : "—"}</div>
+      <div class="foot">${hasHrLoad
+        ? `HRR-min · ${Math.round(sum.heartRateCoverage * 100)}% signal coverage`
+        : "requires measured optical heart rate"}</div>
     </div>`;
   content.appendChild(tiles);
 
@@ -795,9 +974,9 @@ function renderSession(data) {
 
   if (rallies.length) {
     const timelineCard = card(
-      "Rally timeline",
-      "Each band is a rally — taller means more shots. Ticks are individual shots, " +
-        "coloured by type; the empty gaps are rest.",
+      "Detected exchange timeline",
+      "Each band is a burst inferred from your racket-wrist hits. Ticks are detected hits, " +
+        "coloured by provisional type; empty gaps are quiet time.",
       host => rallyTimelineChart(host, data)
     );
     timelineCard.classList.add("full");
@@ -806,7 +985,7 @@ function renderSession(data) {
     const legend = document.createElement("div");
     legend.className = "legend";
     legend.innerHTML =
-      `<span class="key"><span class="swatch" style="background:var(--series-1);opacity:0.4"></span>Rally band</span>` +
+      `<span class="key"><span class="swatch" style="background:var(--series-1);opacity:0.4"></span>Exchange band</span>` +
       types.map(t => `<span class="key"><span class="swatch" style="background:var(--series-${SHOT_SLOT[t] || 6})"></span>${escapeHtml(SHOT_LABELS[t] || t)}</span>`).join("");
     timelineCard.appendChild(legend);
     grid.appendChild(timelineCard);
@@ -814,9 +993,9 @@ function renderSession(data) {
     const empty = document.createElement("div");
     empty.className = "card full";
     empty.innerHTML = `
-      <div class="card-head"><h2>Rally timeline</h2></div>
+      <div class="card-head"><h2>Detected exchange timeline</h2></div>
       <p style="margin:0;color:var(--text-secondary);font-size:14px">
-        No rallies detected in this session.</p>`;
+        No multi-hit exchanges were detected in this session.</p>`;
     grid.appendChild(empty);
   }
 
@@ -828,7 +1007,7 @@ function renderSession(data) {
   if (slices.length) {
     grid.appendChild(card(
       "Shot mix",
-      "Detected stroke distribution in this session.",
+      "Provisional stroke labels in this session; use hit volume until calibrated.",
       host => shotMixChart(host, slices)
     ));
   }
@@ -858,7 +1037,7 @@ function renderClassifier(evaluation, summary) {
         <p class="card-note">Scored against swings you labelled in a drill.</p></div>
       <p style="margin:0;color:var(--text-secondary);font-size:14px">
         ${swings} labelled swing${swings === 1 ? "" : "s"} collected so far — not enough to
-        measure anything yet. Record drills on the watch under <b>Collect data</b>.
+        measure anything yet. Record drills on the watch under <b>Detection lab</b>.
       </p>
       ${perLabel.length ? `<div class="caveat">${perLabel
         .map(l => `${SHOT_LABELS[l.label] || l.label}: ${l.swings}`).join(" · ")}</div>` : ""}`;
@@ -899,24 +1078,27 @@ function renderClassifier(evaluation, summary) {
 }
 
 Promise.all([
-  fetch("api/v1/captures/evaluation").then(r => r.ok ? r.json() : null).catch(() => null),
-  fetch("api/v1/captures/summary").then(r => r.ok ? r.json() : null).catch(() => null)
+  apiFetch("api/v1/captures/evaluation").then(r => r.ok ? r.json() : null).catch(() => null),
+  apiFetch("api/v1/captures/summary").then(r => r.ok ? r.json() : null).catch(() => null)
 ]).then(([evaluation, summary]) => {
   window.__classifier = { evaluation, summary };
   if (window.__data && !sessionIdFromHash()) renderClassifier(evaluation, summary);
 });
 
-fetch("api/v1/dashboard")
-  .then(r => r.json())
+apiJson("api/v1/dashboard")
   .then(data => {
     window.__data = data;
     route();
   })
   .catch(err => {
     if (sessionIdFromHash()) return; // a deep-linked detail view has its own error state
-    document.getElementById("subtitle").textContent = "Could not reach the server";
+    const locked = err && err.status === 401;
+    document.getElementById("subtitle").textContent = locked
+      ? "Access required" : "Could not reach the server";
     document.getElementById("content").innerHTML =
-      `<div class="empty"><h2>Could not load data</h2><p>${err}</p></div>`;
+      locked
+        ? `<div class="empty"><h2>Dashboard locked</h2><p>Reload and enter your access token.</p></div>`
+        : `<div class="empty"><h2>Could not load data</h2><p>${escapeHtml(err)}</p></div>`;
   });
 
 window.addEventListener("hashchange", route);

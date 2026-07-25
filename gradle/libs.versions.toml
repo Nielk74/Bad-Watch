@@ -37,7 +37,6 @@ androidx-work-runtime = { group = "androidx.work", name = "work-runtime-ktx", ve
 ktor-server-core = { group = "io.ktor", name = "ktor-server-core-jvm", version.ref = "ktor" }
 ktor-server-netty = { group = "io.ktor", name = "ktor-server-netty-jvm", version.ref = "ktor" }
 ktor-server-content-negotiation = { group = "io.ktor", name = "ktor-server-content-negotiation-jvm", version.ref = "ktor" }
-ktor-server-cors = { group = "io.ktor", name = "ktor-server-cors-jvm", version.ref = "ktor" }
 ktor-server-status-pages = { group = "io.ktor", name = "ktor-server-status-pages-jvm", version.ref = "ktor" }
 ktor-server-call-logging = { group = "io.ktor", name = "ktor-server-call-logging-jvm", version.ref = "ktor" }
 ktor-serialization-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json-jvm", version.ref = "ktor" }
@@ -78,7 +77,6 @@ ktor-server = [
     "ktor-server-core",
     "ktor-server-netty",
     "ktor-server-content-negotiation",
-    "ktor-server-cors",
     "ktor-server-status-pages",
     "ktor-server-call-logging",
     "ktor-serialization-json",

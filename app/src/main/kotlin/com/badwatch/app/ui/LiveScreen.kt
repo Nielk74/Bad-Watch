@@ -63,7 +63,6 @@ import com.badwatch.app.ui.components.formatHeartRate
 import com.badwatch.app.ui.components.formatRestRatio
 import com.badwatch.app.ui.components.hrZoneColor
 import com.badwatch.app.ui.components.hrZoneLabel
-import com.badwatch.app.ui.theme.CourtColors
 import com.badwatch.core.model.ShotEvent
 import java.util.Locale
 
@@ -126,12 +125,13 @@ private fun HudPage(
 ) {
     val snapshot = state.snapshot
     val heartRate = snapshot.currentHeartRate
-    val zoneColor = hrZoneColor(heartRate)
+    val maxHeartRate = state.profile.maxHeartRate
+    val zoneColor = hrZoneColor(heartRate, maxHeartRate)
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Heart-rate as a ring: color is the zone, fill is effort toward redline (200 bpm).
+        // Heart-rate as a ring: both zone and fill use this player's estimated maximum.
         CircularProgressIndicator(
-            progress = { ((heartRate ?: 0f) / 200f).coerceIn(0.02f, 1f) },
+            progress = { ((heartRate ?: 0f) / maxHeartRate).coerceIn(0.02f, 1f) },
             modifier = Modifier.fillMaxSize(),
             colors = ProgressIndicatorDefaults.colors(
                 indicatorColor = zoneColor,
@@ -148,7 +148,7 @@ private fun HudPage(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "SHOTS",
+                text = "HITS",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -164,7 +164,7 @@ private fun HudPage(
                     modifier = Modifier.size(14.dp)
                 )
                 Text(
-                    text = "${formatHeartRate(heartRate)} bpm · ${hrZoneLabel(heartRate)}",
+                    text = "${formatHeartRate(heartRate)} bpm · ${hrZoneLabel(heartRate, maxHeartRate)}",
                     style = MaterialTheme.typography.labelMedium,
                     color = zoneColor
                 )
@@ -255,7 +255,7 @@ private fun AmbientHud(state: SessionState.Recording) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "SHOTS",
+            text = "HITS",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -313,11 +313,11 @@ private fun HudDetailsPage(
 
     WatchScreen {
         item {
-            InfoCard(title = "Rally") {
-                DetailRow("Rallies", rallies.rallyCount.toString())
-                DetailRow("Avg shots", String.format(Locale.US, "%.1f", rallies.averageShotsPerRally))
-                DetailRow("Longest", "${rallies.longestRally?.shotCount ?: 0} shots")
-                DetailRow("Work : rest", formatRestRatio(rallies.restRatio))
+            InfoCard(title = "Detected play") {
+                DetailRow("Rally bursts", rallies.rallyCount.toString())
+                DetailRow("Avg hits", String.format(Locale.US, "%.1f", rallies.averageShotsPerRally))
+                DetailRow("Longest", "${rallies.longestRally?.shotCount ?: 0} hits")
+                DetailRow("Est. active : quiet", formatRestRatio(rallies.restRatio))
                 val total = rallies.totalWorkMillis + rallies.totalRestMillis
                 if (total > 0) {
                     DistributionBar(
@@ -332,36 +332,35 @@ private fun HudDetailsPage(
                             )
                         )
                     )
-                    DetailRow("Playing", "${(rallies.workDensity * 100).toInt()}% of session")
+                    DetailRow("Estimated active", "${(rallies.workDensity * 100).toInt()}%")
                 }
             }
         }
 
         item {
-            InfoCard(title = "Body") {
-                MeterRow(
-                    label = "Effort",
-                    fraction = snapshot.effortScore,
-                    color = MaterialTheme.colorScheme.secondary,
-                    valueText = "${(snapshot.effortScore * 100).toInt()}%"
-                )
-                MeterRow(
-                    label = "Fatigue",
-                    fraction = snapshot.fatigueScore,
-                    color = CourtColors.Zone4,
-                    valueText = "${(snapshot.fatigueScore * 100).toInt()}%"
-                )
-                MeterRow(
-                    label = "Recovery",
-                    fraction = snapshot.recoveryScore,
-                    color = CourtColors.Zone2,
-                    valueText = "${(snapshot.recoveryScore * 100).toInt()}%"
-                )
+            InfoCard(title = "Heart rate") {
+                DetailRow("Current", "${formatHeartRate(snapshot.currentHeartRate)} bpm")
+                DetailRow("Average", "${formatHeartRate(snapshot.averageHeartRate)} bpm")
+                DetailRow("Peak", "${formatHeartRate(snapshot.maxHeartRate)} bpm")
+                snapshot.averageHeartRateReserve?.let { reserve ->
+                    MeterRow(
+                        label = "HR reserve",
+                        fraction = reserve,
+                        color = MaterialTheme.colorScheme.secondary,
+                        valueText = "${(reserve * 100).toInt()}%"
+                    )
+                }
+                if (snapshot.heartRateSampleCount > 0) {
+                    DetailRow(
+                        "Signal coverage",
+                        "${(snapshot.heartRateCoverage * 100).toInt()}%"
+                    )
+                }
             }
         }
 
         item {
-            InfoCard(title = "Last shot") {
+            InfoCard(title = "Last detected hit") {
                 val last = snapshot.lastShot
                 if (last == null) {
                     Text(

@@ -59,7 +59,7 @@ class FusedSensorCollector(
         val latestAccel = AtomicReference(Vector3.ZERO)
         // Null until the optical sensor gets a lock — never NaN. NaN cannot be encoded as
         // JSON, so a NaN carried into a sample crashes the app the moment it is persisted.
-        val latestHeartRate = AtomicReference<Float?>(null)
+        val latestHeartRate = AtomicReference<HeartRateReading?>(null)
         val latestAccuracy = AtomicInteger(SensorManager.SENSOR_STATUS_UNRELIABLE)
 
         val listener = object : SensorEventListener {
@@ -67,12 +67,14 @@ class FusedSensorCollector(
                 when (event.sensor.type) {
                     Sensor.TYPE_GYROSCOPE -> {
                         if (event.values.size < 3) return
+                        val heartRate = latestHeartRate.get()
                         val sample = SensorSample(
                             timestampMillis = bootEpochMillis + event.timestamp / 1_000_000L,
                             gyro = Vector3(event.values[0], event.values[1], event.values[2]),
-                            heartRateBpm = latestHeartRate.get(),
+                            heartRateBpm = heartRate?.beatsPerMinute,
                             accel = latestAccel.get(),
-                            accuracy = latestAccuracy.get()
+                            accuracy = latestAccuracy.get(),
+                            heartRateSampleTimestampMillis = heartRate?.timestampMillis
                         )
                         trySend(sample)
                     }
@@ -85,7 +87,14 @@ class FusedSensorCollector(
                     Sensor.TYPE_HEART_RATE -> {
                         val bpm = event.values.firstOrNull() ?: return
                         // The optical sensor reports 0 while it is still acquiring a lock.
-                        if (bpm > 0f) latestHeartRate.set(bpm)
+                        if (bpm > 0f) {
+                            latestHeartRate.set(
+                                HeartRateReading(
+                                    beatsPerMinute = bpm,
+                                    timestampMillis = bootEpochMillis + event.timestamp / 1_000_000L
+                                )
+                            )
+                        }
                     }
                 }
             }
@@ -122,6 +131,11 @@ class FusedSensorCollector(
         const val DEFAULT_MAX_REPORT_LATENCY_MICROS: Int = 200_000
     }
 }
+
+private data class HeartRateReading(
+    val beatsPerMinute: Float,
+    val timestampMillis: Long
+)
 
 /** Kept separate from the collector so tests and previews can supply synthetic streams. */
 interface SensorStream {

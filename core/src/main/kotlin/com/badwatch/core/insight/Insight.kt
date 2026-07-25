@@ -20,7 +20,7 @@ data class Insight(
     val headline: String,
     val detail: String,
     val severity: InsightSeverity,
-    /** The measurement behind the claim, e.g. "1:3.8 work:rest over 24 rallies". */
+    /** The measurement behind the claim, e.g. "1:3.8 estimated active:rest". */
     val evidence: String
 )
 

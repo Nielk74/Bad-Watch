@@ -29,7 +29,7 @@ Configuration is entirely environment variables, all optional:
 | --- | --- | --- |
 | `BADWATCH_PORT` | `8080` | Listen port |
 | `BADWATCH_DATA_DIR` | `./badwatch-data` | Where session JSON is written |
-| `BADWATCH_TOKEN` | *(unset)* | Shared bearer token. When unset, uploads are unauthenticated and the server says so at startup. |
+| `BADWATCH_TOKEN` | *(unset)* | Shared bearer token for every session, capture and dashboard data request. When unset, data APIs are unauthenticated and the server says so at startup. |
 
 ```bash
 BADWATCH_TOKEN=$(openssl rand -hex 24) \
@@ -54,9 +54,9 @@ To develop against the dashboard without a watch:
 BADWATCH_DATA_DIR=/tmp/badwatch-demo ./gradlew :server:run
 ```
 
-This writes six weeks of synthetic sessions, including a deliberate training-load spike so
-the acute:chronic chart has something to show. Synthetic sessions are only ever written by
-this explicit command — nothing generates them at runtime.
+This writes six weeks of synthetic sessions with changing session volume so the activity
+history has something to show. Synthetic sessions are only ever written by this explicit
+command — nothing generates them at runtime.
 
 ## Pointing the watch at it
 
@@ -83,13 +83,22 @@ Sync behaviour:
   what did not land.
 - Sessions the server explicitly rejects are not retried forever.
 
+When `BADWATCH_TOKEN` is set, opening the dashboard prompts for it after the static shell
+loads. The browser keeps it in `sessionStorage`, so it lasts only for the current tab, and
+sends it as an `Authorization: Bearer …` header. It is never put in the URL, browser history
+or server access-log query string. A local server without a token opens directly with no
+prompt.
+
 ## Security
 
 The threat model is "a server you run for yourself or your club", so the controls are
 deliberately light:
 
-- `BADWATCH_TOKEN` is a single shared bearer token guarding uploads and deletes. Reads are
-  open, because the dashboard itself is an unauthenticated page.
+- `BADWATCH_TOKEN` is a single shared bearer token guarding all data reads, uploads and
+  deletes. The static dashboard shell and `/api/v1/health` stay public; the shell cannot read
+  any session or capture data until the token is supplied.
+- Browser API access is same-origin. The server does not grant cross-origin reads; put a
+  separate front end behind the same reverse-proxy origin if you build one.
 - **Do not expose the server to the internet without a token**, and put it behind a TLS
   terminating proxy (Caddy, nginx, Cloudflare Tunnel). The server speaks plain HTTP.
 - Sessions contain heart-rate data. Treat the data directory as health data.
@@ -109,24 +118,37 @@ flag — see the coach-mode item in the product plan.
 | `DELETE` | `/api/v1/sessions/{id}` | Remove a session (requires the token) |
 | `GET` | `/api/v1/dashboard` | Pre-aggregated data the dashboard page renders |
 | `POST` | `/api/v1/captures` | Upload labelled training drills (`CaptureEnvelope`) |
+| `GET` | `/api/v1/captures` | Full labelled capture corpus, newest first |
 | `GET` | `/api/v1/captures/summary` | Dataset progress: swings per stroke, contributing devices |
+| `GET` | `/api/v1/captures/evaluation` | Rule-based classifier score against labelled captures |
+
+When `BADWATCH_TOKEN` is configured, every API route in this table except
+`/api/v1/health` requires `Authorization: Bearer <token>`. The `/` shell remains available
+so it can collect that token without putting credentials in a link.
 
 A schema-version mismatch is rejected with HTTP 400 rather than being parsed optimistically —
 a silently misread session is worse than an upload the watch retries after an app update.
 
 ## What the dashboard shows
 
-- **Shots hit / time on court / average rally / shoulder load** as headline tiles. Time on
-  court distinguishes elapsed time from time actually spent in rallies, which for badminton
-  is usually around a third.
-- **Shots per session** over time — training volume.
-- **Rally length distribution** — how long your points really last.
-- **Shot mix** — detected stroke distribution.
-- **Shoulder load trend** — 7-day acute load against the 28-day chronic baseline. The ratio
-  is the standard acute:chronic workload ratio; above ~1.5 is the elevated-risk band and
-  below ~0.8 suggests detraining. This is training-load information, not medical advice.
+- **Detected hits / time on court / average detected exchange / HR load** as headline tiles.
+  A detected hit is a racket-wrist contact candidate, not the match's total shot count.
+- **Detected hits per session** over time — a transparent external-volume measure.
+- **Detected exchange length** — bursts inferred from quiet gaps between the wearer's hits,
+  not authoritative rally boundaries or the full two-player shot count.
+- **Shot mix** — provisional detected stroke labels. Do not use it for coaching decisions
+  until the classifier is calibrated against real play.
+- **Estimated active-time volume** — a rolling seven-day sum compared with the weekly average
+  from the preceding four complete weeks. Both lines use the same unit. No ratio is labelled
+  a safe zone, readiness score, or injury-risk prediction.
 - **Session table** — every session, and the accessible fallback for every chart above.
 
-Shoulder load weights overhead strokes by the cube of swing intensity: fifty gentle clears
-and fifty full smashes are not the same session for a rotator cuff, and a linear count
-treats them as identical.
+When optical heart rate was actually recorded, the dashboard also shows cardiovascular load
+as elapsed minutes multiplied by mean heart-rate reserve (`HRR-min`), alongside signal
+coverage. It is withheld below 60% signal coverage and remains separate from hits and
+inferred active time because those units are not interchangeable. Old or incomplete sessions
+show an em dash instead of a fabricated value.
+
+All hit, exchange and stroke classification remains provisional. The dashboard reports the
+one-wrist detector's output explicitly; it does not claim to observe the shuttle, opponent,
+partner, official rally boundary or point outcome.

@@ -40,7 +40,9 @@ import androidx.wear.compose.material3.Text
 import com.badwatch.app.ui.theme.CourtColors
 import com.badwatch.core.insight.Insight
 import com.badwatch.core.insight.InsightSeverity
+import com.badwatch.core.model.HeartRateZone
 import com.badwatch.core.model.ShotType
+import com.badwatch.core.model.heartRateZoneFor
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -335,17 +337,23 @@ fun InsightSeverity.label(): String = when (this) {
 // Heart-rate zones
 // ---------------------------------------------------------------------------------------------
 
-/** 0 = no reading, 1..5 = standard zones against fixed badminton-relevant thresholds. */
-fun hrZoneOf(bpm: Float?): Int = when {
-    bpm == null || bpm <= 0f -> 0
-    bpm < 120f -> 1
-    bpm < 140f -> 2
-    bpm < 160f -> 3
-    bpm < 175f -> 4
-    else -> 5
+/**
+ * 0 = no reading, 1..5 = zones relative to this player's estimated maximum heart rate.
+ * Keeping this mapping on the same core function as the session histogram prevents a recap
+ * from disagreeing with the live HUD for younger, older, or manually calibrated players.
+ */
+fun hrZoneOf(bpm: Float?, maxHeartRate: Float): Int {
+    if (bpm == null || bpm <= 0f || maxHeartRate <= 0f) return 0
+    return when (heartRateZoneFor(bpm, maxHeartRate)) {
+        HeartRateZone.WarmUp -> 1
+        HeartRateZone.Endurance -> 2
+        HeartRateZone.Tempo -> 3
+        HeartRateZone.Threshold -> 4
+        HeartRateZone.VO2Max -> 5
+    }
 }
 
-fun hrZoneColor(bpm: Float?): Color = when (hrZoneOf(bpm)) {
+fun hrZoneColor(bpm: Float?, maxHeartRate: Float): Color = when (hrZoneOf(bpm, maxHeartRate)) {
     1 -> CourtColors.Zone1
     2 -> CourtColors.Zone2
     3 -> CourtColors.Zone3
@@ -354,10 +362,11 @@ fun hrZoneColor(bpm: Float?): Color = when (hrZoneOf(bpm)) {
     else -> Color(0xFFA7B4C2)
 }
 
-fun hrZoneLabel(bpm: Float?): String = when (val zone = hrZoneOf(bpm)) {
-    0 -> "--"
-    else -> "Z$zone"
-}
+fun hrZoneLabel(bpm: Float?, maxHeartRate: Float): String =
+    when (val zone = hrZoneOf(bpm, maxHeartRate)) {
+        0 -> "--"
+        else -> "Z$zone"
+    }
 
 // ---------------------------------------------------------------------------------------------
 // Shot types

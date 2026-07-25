@@ -20,6 +20,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.builtins.ListSerializer
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -55,6 +56,14 @@ class CaptureIngestTest {
             assertThat(
                 BadWatchJson.decodeFromString(SyncResponse.serializer(), response.bodyAsText()).accepted
             ).hasSize(3)
+
+            val listedResponse = client.get("/api/v1/captures")
+            assertThat(listedResponse.status).isEqualTo(HttpStatusCode.OK)
+            val listed = BadWatchJson.decodeFromString(
+                ListSerializer(CaptureExport.serializer()),
+                listedResponse.bodyAsText()
+            )
+            assertThat(listed).containsExactlyElementsIn(envelope.captures)
 
             val summary = BadWatchJson.decodeFromString(
                 CaptureSummary.serializer(),

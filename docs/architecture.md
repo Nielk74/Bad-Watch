@@ -49,7 +49,7 @@ These are the decisions everything else follows from.
 :server   Ktor dashboard. Depends on :core for the contract.
           Application.kt      routes and configuration
           SessionRepository   file-per-session storage
-          Analytics           dashboard aggregation, including acute:chronic load
+          Analytics           transparent volume and measured-HR aggregation
           SyntheticSessions   fixtures and demo seeding (developer command only)
           resources/static    the dashboard page
 ```
@@ -64,8 +64,8 @@ SessionController             application-scoped; owns state across Activity dea
         │
         ▼
 SessionRecorder (:core)       ── ShotDetectionPipeline → ShotClassifier → ShotEvent
-        │                     ── TrainingSessionAggregator (HR, zones, effort)
-        │                     ── RallySegmenter (rallies, work:rest)
+        │                     ── TrainingSessionAggregator (distinct HR readings + coverage)
+        │                     ── RallySegmenter (detected-hit bursts + estimated quiet gaps)
         ▼
 SessionStore                  one JSON file per session, atomic write via temp + rename
         │
@@ -136,17 +136,17 @@ the smash rule was tested first, every clear fast enough to pass the smash thres
 reported as a smash. Both overhead rules now test the *sign* of the vertical component, and a
 swing with no decisive direction falls through rather than being assigned one.
 
-## Rally segmentation
+## Detected-play segmentation
 
-Consecutive shots less than 4 s apart belong to the same rally. Badminton rallies have a
-shot every ~0.7–1.5 s while the gap between points is rarely under 5 s, so the two
-distributions separate cleanly without a model. Rallies with a single shot are discarded as
-detector noise — a genuine one-shot rally exists, but with a heuristic classifier a lone
-detection is far more likely to be a false positive.
+Consecutive detected racket-wrist hits less than 4 s apart belong to the same inferred
+exchange. Bursts with a single hit are discarded as detector noise. A real one-contact point
+exists, and the watch does not see an opponent's or partner's contacts, so these groups are
+explicitly **not** authoritative rally boundaries.
 
-This yields the numbers that actually characterise a badminton session: rally length
-distribution, work:rest ratio, and playing-time density. Total session duration on its own
-is nearly meaningless for an interval sport.
+This yields useful within-player estimates: detected hits per exchange, the span between the
+first and last detected hit, and quiet gaps. Product copy calls these rally bursts or detected
+exchanges and labels active time as estimated. See [`SPORT_MODEL.md`](SPORT_MODEL.md) for the
+full measurement contract.
 
 ## Persistence
 
@@ -170,19 +170,20 @@ Revisit if on-watch trend queries over hundreds of sessions become a real featur
   testable without an emulator.
 - `:server` — `testApplication` round-trips using `:core`'s own serializers, so a
   watch/server wire-format disagreement fails the build.
-- `:app` — `SessionStore` and `CaptureStore` are plain JVM tests. Instrumentation coverage
-  of the service lifecycle is still a gap.
+- `:app` — storage and UI-mapping logic have JVM tests. The primary home and live-recording
+  paths are also checked on a Pixel Watch 4; automated service-lifecycle instrumentation is
+  still a gap.
 
 ## Known gaps
 
 - The classifier is uncalibrated; stroke labels are provisional.
-- Heart rate uses `SensorManager` directly. Health Services `ExerciseClient` would be more
-  accurate and more power-efficient, and is the intended replacement.
+- Heart rate uses `SensorManager` directly. Distinct optical readings are now timestamped,
+  deduplicated and coverage-gated, but Health Services `ExerciseClient` remains the intended
+  recording source.
 - No battery measurement harness yet, despite battery being a stated hard requirement.
 - Release-build dashboard configuration has no UI; only the debug adb receiver exists.
-- No Tiles, complications or ambient mode.
-- `ShotDetectionPipeline` allocates a fresh list per sample (`buffer.toList()`). Harmless at
-  the current volumes, but it should become a pre-allocated ring buffer before the sampling
-  rate or sensor count rises.
+- The Tile and ambient session HUD exist; complications and match-mode ambient UI do not.
+- Process death can still lose the in-progress portion of a session; foreground-service
+  survival is tested, but checkpoint/recovery is not implemented yet.
 
 See [`PRODUCT_PLAN.md`](PRODUCT_PLAN.md) for how these are sequenced.

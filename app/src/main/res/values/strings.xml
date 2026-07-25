@@ -6,9 +6,13 @@
     <string name="session_notification_title">Session in progress</string>
     <!-- Both halves are pre-formatted plurals so translations can inflect them independently. -->
     <string name="session_notification_body">%1$s · %2$s</string>
-    <plurals name="session_notification_shots">
-        <item quantity="one">%d shot</item>
-        <item quantity="other">%d shots</item>
+    <plurals name="session_notification_hits">
+        <item quantity="one">%d detected hit</item>
+        <item quantity="other">%d detected hits</item>
+    </plurals>
+    <plurals name="capture_notification_swings">
+        <item quantity="one">%d swing</item>
+        <item quantity="other">%d swings</item>
     </plurals>
     <plurals name="session_notification_minutes">
         <item quantity="one">%d min</item>

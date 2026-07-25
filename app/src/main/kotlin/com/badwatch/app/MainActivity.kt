@@ -8,7 +8,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.lifecycle.lifecycleScope
 import androidx.wear.ambient.AmbientLifecycleObserver
 import com.badwatch.app.service.SessionService
 import com.badwatch.app.sync.SyncWorker
@@ -16,7 +15,6 @@ import com.badwatch.app.ui.BadWatchApp
 import com.badwatch.app.viewmodel.BadWatchViewModel
 import com.badwatch.core.model.ShotType
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -59,8 +57,10 @@ class MainActivity : ComponentActivity() {
                 viewModel = viewModel,
                 onStartSession = ::startSession,
                 onStopSession = ::stopSession,
+                onDiscardSession = ::discardSession,
                 onStartCapture = ::startCapture,
                 onFinishCapture = ::finishCapture,
+                onCancelCapture = ::cancelCapture,
                 isAmbient = isAmbient
             )
         }
@@ -101,11 +101,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun stopSession() {
-        lifecycleScope.launch {
-            container.sessionController.stopAndSave()
-            SessionService.stop(this@MainActivity)
-            SyncWorker.enqueue(this@MainActivity)
-        }
+        SessionService.stop(this)
+    }
+
+    private fun discardSession() {
+        SessionService.discard(this)
     }
 
     /**
@@ -122,9 +122,16 @@ class MainActivity : ComponentActivity() {
         SessionService.stopCapture(this)
     }
 
+    private fun cancelCapture() {
+        SessionService.cancelCapture(this)
+    }
+
     private fun requestSessionPermissions() {
         val permissions = buildList {
-            add(Manifest.permission.BODY_SENSORS)
+            add(
+                if (Build.VERSION.SDK_INT >= 36) READ_HEART_RATE_PERMISSION
+                else Manifest.permission.BODY_SENSORS
+            )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 add(Manifest.permission.POST_NOTIFICATIONS)
             }
@@ -135,5 +142,7 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** Intent extra set by the watch-face tile's Start chip to auto-start a session. */
         const val EXTRA_START_SESSION = "autostart_session"
+        private const val READ_HEART_RATE_PERMISSION =
+            "android.permission.health.READ_HEART_RATE"
     }
 }

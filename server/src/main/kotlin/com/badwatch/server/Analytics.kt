@@ -4,9 +4,9 @@ import com.badwatch.core.insight.Insight
 import com.badwatch.core.insight.InsightBaselineBuilder
 import com.badwatch.core.insight.SessionInsightEngine
 import com.badwatch.core.model.ShotType
+import com.badwatch.core.model.MINIMUM_CARDIOVASCULAR_LOAD_COVERAGE
 import com.badwatch.core.sync.SessionExport
 import kotlinx.serialization.Serializable
-import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
@@ -28,7 +28,7 @@ data class DashboardData(
     val shotDistribution: List<ShotSlice>,
     val rallyHistogram: List<HistogramBucket>,
     val sessions: List<SessionCard>,
-    val loadTrend: List<LoadPoint>
+    val volumeTrend: List<VolumePoint>
 )
 
 @Serializable
@@ -50,7 +50,12 @@ data class SessionCard(
     /** Null when the session recorded no heart rate; the dashboard renders an em dash. */
     val averageHeartRate: Float?,
     val maxHeartRate: Float?,
-    val shoulderLoad: Float,
+    /** Time between the first and last detected hit in each inferred exchange. */
+    val estimatedActiveMillis: Long,
+    /** Share of elapsed seconds represented by a distinct optical heart-rate reading. */
+    val heartRateCoverage: Float,
+    /** Elapsed minutes x mean heart-rate reserve; null unless optical HR was measured. */
+    val cardiovascularLoad: Float?,
     val shotDistribution: List<ShotSlice>,
     /**
      * Derived by the same `:core` engine the watch uses, so a session never carries two
@@ -60,29 +65,32 @@ data class SessionCard(
 )
 
 /**
- * A day on the load trend.
+ * A day on the training-volume trend.
  *
- * @property acute Rolling 7-day load — what the body has just absorbed.
- * @property chronic Rolling 28-day load scaled to a weekly figure — what it is adapted to.
- * @property ratio Acute:chronic workload ratio. The sports-science literature places the
- *   elevated-injury-risk band above roughly 1.5, and undertraining below 0.8. It is a
- *   coarse signal, not a diagnosis, and the dashboard labels it as such.
+ * The chart deliberately uses only time inferred from detected racket-wrist contacts. It
+ * does not turn uncalibrated stroke labels into tissue load, and it does not infer injury
+ * risk or readiness from a rolling ratio.
+ *
+ * @property rolling7DayEstimatedActiveMillis Sum of inferred active time for this day and
+ *   the previous six calendar days.
+ * @property previous28DayWeeklyAverageEstimatedActiveMillis Weekly average over the four
+ *   complete weeks immediately before the rolling seven-day window. Null until 35 calendar
+ *   days of history exist; zeros on days without a recorded session remain part of history.
  */
 @Serializable
-data class LoadPoint(
+data class VolumePoint(
     val dayEpochMillis: Long,
-    val dailyLoad: Float,
-    val acute: Float,
-    val chronic: Float,
-    val ratio: Float
+    val dailyElapsedMillis: Long,
+    val dailyEstimatedActiveMillis: Long,
+    val dailyDetectedHits: Int,
+    val rolling7DayEstimatedActiveMillis: Long,
+    val rolling7DayDetectedHits: Int,
+    val previous28DayWeeklyAverageEstimatedActiveMillis: Long?
 )
 
 object Analytics {
 
     private const val DAY_MILLIS = 24L * 60 * 60 * 1000
-
-    /** Overhead strokes load the shoulder; midcourt and net strokes essentially do not. */
-    private val OVERHEAD_SHOTS = setOf(ShotType.Smash, ShotType.Clear, ShotType.Drop)
 
     fun build(sessions: List<SessionExport>): DashboardData {
         if (sessions.isEmpty()) {
@@ -97,7 +105,7 @@ object Analytics {
                 shotDistribution = emptyList(),
                 rallyHistogram = emptyList(),
                 sessions = emptyList(),
-                loadTrend = emptyList()
+                volumeTrend = emptyList()
             )
         }
 
@@ -126,7 +134,7 @@ object Analytics {
                 },
             rallyHistogram = buildRallyHistogram(allRallies.map { it.shotCount }),
             sessions = cards,
-            loadTrend = buildLoadTrend(cards)
+            volumeTrend = buildVolumeTrend(cards)
         )
     }
 
@@ -161,30 +169,20 @@ object Analytics {
             workDensity = export.rallyProfile.workDensity,
             averageHeartRate = summary.averageHeartRate,
             maxHeartRate = summary.maxHeartRate,
-            shoulderLoad = shoulderLoad(export),
+            estimatedActiveMillis = export.rallyProfile.totalWorkMillis,
+            heartRateCoverage = summary.heartRateCoverage.coerceIn(0f, 1f),
+            // Old sessions can contain contact-time HR values but no distinct optical-sensor
+            // record. Only expose internal load when the recorder proves it measured HR.
+            cardiovascularLoad = summary.cardiovascularLoad?.takeIf {
+                summary.heartRateSampleCount > 0 &&
+                    summary.heartRateCoverage >= MINIMUM_CARDIOVASCULAR_LOAD_COVERAGE
+            },
             shotDistribution = shotOrder.mapNotNull { type ->
                 summary.shotCounts[type]?.takeIf { it > 0 }?.let { ShotSlice(type.name, it) }
             },
             insights = insightEngine.generate(export.session, export.rallyProfile, baseline)
         )
     }
-
-    /**
-     * Shoulder load for one session.
-     *
-     * Cubed intensity, because the mechanical demand of an overhead stroke rises far faster
-     * than its speed: fifty gentle clears and fifty full smashes are not the same session
-     * for a rotator cuff, and a linear count treats them as identical. 6 rad/s is used as
-     * the reference "hard smash" so a typical session lands in a readable double-digit range.
-     */
-    private fun shoulderLoad(export: SessionExport): Float =
-        export.session.shots
-            .filter { it.type in OVERHEAD_SHOTS }
-            .sumOf { shot ->
-                val intensity = (shot.peakAngularVelocity / 6f).coerceIn(0f, 2f)
-                intensity.toDouble().pow(3.0)
-            }
-            .toFloat()
 
     private fun buildRallyHistogram(shotCounts: List<Int>): List<HistogramBucket> {
         if (shotCounts.isEmpty()) return emptyList()
@@ -201,16 +199,23 @@ object Analytics {
     }
 
     /**
-     * Daily acute:chronic workload ratio over the recorded history.
+     * Calendar-day volume with a transparent seven-day sum and prior four-week comparison.
      *
-     * Days without a session count as zero load rather than being skipped — rest is part of
-     * the load picture, and omitting it would make every rolling average wrong.
+     * Days without a session count as zero rather than being skipped. The comparison is
+     * descriptive only: no threshold is treated as a safe zone, readiness score, or injury
+     * prediction. Elapsed time, inferred active time, and detected hits stay separate units.
      */
-    private fun buildLoadTrend(cards: List<SessionCard>): List<LoadPoint> {
+    private fun buildVolumeTrend(cards: List<SessionCard>): List<VolumePoint> {
         if (cards.isEmpty()) return emptyList()
 
         val byDay = cards.groupBy { startOfDay(it.startedAtMillis) }
-            .mapValues { (_, sessions) -> sessions.map { it.shoulderLoad }.sum() }
+            .mapValues { (_, sessions) ->
+                DailyVolume(
+                    elapsedMillis = sessions.sumOf { it.durationMillis },
+                    estimatedActiveMillis = sessions.sumOf { it.estimatedActiveMillis },
+                    detectedHits = sessions.sumOf { it.totalShots }
+                )
+            }
 
         val firstDay = byDay.keys.min()
         val lastDay = byDay.keys.max()
@@ -219,20 +224,36 @@ object Analytics {
             .toList()
 
         return days.mapIndexed { index, day ->
-            val daily = byDay[day] ?: 0f
-            val acuteWindow = days.slice(maxOf(0, index - 6)..index)
-            val chronicWindow = days.slice(maxOf(0, index - 27)..index)
-            val acute = acuteWindow.sumOf { (byDay[it] ?: 0f).toDouble() }.toFloat()
-            // Scale the 28-day total to a comparable weekly figure.
-            val chronic = chronicWindow.sumOf { (byDay[it] ?: 0f).toDouble() }
-                .toFloat() * 7f / chronicWindow.size
-            LoadPoint(
+            val daily = byDay[day] ?: DailyVolume.EMPTY
+            val rolling7Days = days.slice(maxOf(0, index - 6)..index)
+            // A fair prior comparison needs four complete weeks before the current 7-day
+            // window. Until then, returning null is more honest than scaling partial history.
+            val prior28Days = if (index >= 34) days.slice((index - 34)..(index - 7)) else null
+            VolumePoint(
                 dayEpochMillis = day,
-                dailyLoad = daily,
-                acute = acute,
-                chronic = chronic,
-                ratio = if (chronic <= 0.01f) 0f else acute / chronic
+                dailyElapsedMillis = daily.elapsedMillis,
+                dailyEstimatedActiveMillis = daily.estimatedActiveMillis,
+                dailyDetectedHits = daily.detectedHits,
+                rolling7DayEstimatedActiveMillis = rolling7Days.sumOf {
+                    (byDay[it] ?: DailyVolume.EMPTY).estimatedActiveMillis
+                },
+                rolling7DayDetectedHits = rolling7Days.sumOf {
+                    (byDay[it] ?: DailyVolume.EMPTY).detectedHits
+                },
+                previous28DayWeeklyAverageEstimatedActiveMillis = prior28Days?.sumOf {
+                    (byDay[it] ?: DailyVolume.EMPTY).estimatedActiveMillis
+                }?.div(4)
             )
+        }
+    }
+
+    private data class DailyVolume(
+        val elapsedMillis: Long,
+        val estimatedActiveMillis: Long,
+        val detectedHits: Int
+    ) {
+        companion object {
+            val EMPTY = DailyVolume(0L, 0L, 0)
         }
     }
 

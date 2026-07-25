@@ -14,17 +14,17 @@ import io.ktor.server.http.content.staticResources
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.callloging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.request.header
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
-import io.ktor.server.request.header
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.security.MessageDigest
 
 /**
  * Bad Watch dashboard server.
@@ -37,7 +37,7 @@ import java.io.File
  * Configuration, all optional:
  *   `BADWATCH_PORT`      listen port (default 8080)
  *   `BADWATCH_DATA_DIR`  where sessions are written (default ./badwatch-data)
- *   `BADWATCH_TOKEN`     shared bearer token; when unset, uploads are unauthenticated
+ *   `BADWATCH_TOKEN`     shared bearer token; when unset, data APIs are unauthenticated
  */
 fun main() {
     val port = System.getenv("BADWATCH_PORT")?.toIntOrNull() ?: DEFAULT_PORT
@@ -46,7 +46,7 @@ fun main() {
 
     if (token == null) {
         println(
-            "[bad-watch] No BADWATCH_TOKEN set — uploads are unauthenticated. " +
+            "[bad-watch] No BADWATCH_TOKEN set — data APIs are unauthenticated. " +
                 "Set one before exposing this server beyond localhost."
         )
     }
@@ -73,14 +73,6 @@ fun Application.badWatchModule(
         json(Json { encodeDefaults = true; ignoreUnknownKeys = true })
     }
     install(CallLogging)
-    install(CORS) {
-        // The dashboard is served from this same origin; CORS exists only so a phone
-        // browser on the LAN, or a separate front end during development, can read the API.
-        anyHost()
-        allowHeader(io.ktor.http.HttpHeaders.ContentType)
-        allowHeader(io.ktor.http.HttpHeaders.Authorization)
-        allowMethod(io.ktor.http.HttpMethod.Delete)
-    }
     install(StatusPages) {
         exception<Throwable> { call, cause ->
             call.application.environment.log.error("Unhandled failure", cause)
@@ -94,16 +86,15 @@ fun Application.badWatchModule(
     routing {
         staticResources("/", "static") { default("index.html") }
 
+        // Keep liveness public so a reverse proxy can check the process without holding
+        // the user's data token. Every endpoint that exposes or mutates data is guarded.
         get("/api/v1/health") {
             call.respond(HealthResponse(schemaVersion = SessionExport.SCHEMA_VERSION))
         }
 
         /** Upload endpoint the watch's SyncWorker posts to. */
         post("/api/v1/sessions") {
-            if (!call.isAuthorised(token)) {
-                call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Invalid token"))
-                return@post
-            }
+            if (call.rejectIfUnauthorised(token)) return@post
 
             val envelope = call.receive<SyncEnvelope>()
             if (envelope.schemaVersion != SessionExport.SCHEMA_VERSION) {
@@ -130,15 +121,13 @@ fun Application.badWatchModule(
         }
 
         get("/api/v1/sessions") {
+            if (call.rejectIfUnauthorised(token)) return@get
             call.respond(repository.all())
         }
 
         /** Labelled training data from a capture drill. */
         post("/api/v1/captures") {
-            if (!call.isAuthorised(token)) {
-                call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Invalid token"))
-                return@post
-            }
+            if (call.rejectIfUnauthorised(token)) return@post
 
             val envelope = call.receive<CaptureEnvelope>()
             if (envelope.schemaVersion != SessionExport.SCHEMA_VERSION) {
@@ -162,21 +151,31 @@ fun Application.badWatchModule(
             call.respond(SyncResponse(accepted = accepted, rejected = rejected))
         }
 
+        /** Full labelled corpus, used by tools/ingest.py to build a training dataset. */
+        get("/api/v1/captures") {
+            if (call.rejectIfUnauthorised(token)) return@get
+            call.respond(captureRepository.all())
+        }
+
         /** Dataset progress: how many labelled swings exist, per stroke. */
         get("/api/v1/captures/summary") {
+            if (call.rejectIfUnauthorised(token)) return@get
             call.respond(captureRepository.summary())
         }
 
         /** How well the shipped rule-based classifier does on the collected ground truth. */
         get("/api/v1/captures/evaluation") {
+            if (call.rejectIfUnauthorised(token)) return@get
             call.respond(captureRepository.evaluateClassifier())
         }
 
         get("/api/v1/dashboard") {
+            if (call.rejectIfUnauthorised(token)) return@get
             call.respond(Analytics.build(repository.all()))
         }
 
         get("/api/v1/sessions/{id}") {
+            if (call.rejectIfUnauthorised(token)) return@get
             val id = call.parameters["id"]
             val session = id?.let { repository.find(it) }
             if (session == null) {
@@ -187,10 +186,7 @@ fun Application.badWatchModule(
         }
 
         delete("/api/v1/sessions/{id}") {
-            if (!call.isAuthorised(token)) {
-                call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Invalid token"))
-                return@delete
-            }
+            if (call.rejectIfUnauthorised(token)) return@delete
             val id = call.parameters["id"]
             val removed = id != null && repository.delete(id)
             call.respond(DeleteResponse(deleted = removed))
@@ -211,8 +207,22 @@ data class DeleteResponse(val deleted: Boolean)
 @kotlinx.serialization.Serializable
 data class ErrorResponse(val error: String)
 
+private suspend fun io.ktor.server.application.ApplicationCall.rejectIfUnauthorised(
+    token: String?
+): Boolean {
+    if (isAuthorised(token)) return false
+    respond(HttpStatusCode.Unauthorized, ErrorResponse("Invalid token"))
+    return true
+}
+
 private fun io.ktor.server.application.ApplicationCall.isAuthorised(token: String?): Boolean {
     if (token == null) return true
     val header = request.header(io.ktor.http.HttpHeaders.Authorization) ?: return false
-    return header.removePrefix("Bearer ").trim() == token
+    val separator = header.indexOf(' ')
+    if (separator <= 0 || !header.substring(0, separator).equals("Bearer", ignoreCase = true)) {
+        return false
+    }
+    val supplied = header.substring(separator + 1).trim()
+    if (supplied.isEmpty()) return false
+    return MessageDigest.isEqual(supplied.encodeToByteArray(), token.encodeToByteArray())
 }

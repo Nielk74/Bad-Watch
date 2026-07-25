@@ -16,6 +16,10 @@ drill), a way to get them off the watch (dashboard sync, or `adb pull`), and thi
 # 2. Get the captures. Either from the dashboard server…
 ./tools/ingest.py --server http://localhost:8080 --output dataset.csv
 
+#    Include the shared token when BADWATCH_TOKEN is configured on the server:
+./tools/ingest.py --server https://badwatch.example.com \
+  --token "$BADWATCH_TOKEN" --output dataset.csv
+
 #    …or straight off the watch:
 adb exec-out run-as com.badwatch.badwatch tar c files/captures > captures.tar
 tar xf captures.tar && ./tools/ingest.py --input files/captures --output dataset.csv

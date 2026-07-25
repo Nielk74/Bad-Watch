@@ -11,8 +11,9 @@ import kotlin.math.roundToInt
  *
  * **Deliberately ignores stroke type.** The classifier is uncalibrated heuristics, so any
  * insight built on "you hit too few backhands" would be fabricated confidence. Rally
- * structure and heart rate, by contrast, are measured rather than inferred: a rally boundary
- * is a gap in time, and heart rate comes from a sensor. Those are the only inputs here.
+ * structure is an estimate built from gaps between detected racket-wrist hits, while heart
+ * rate comes from a sensor. Copy must describe those observations without claiming a cause,
+ * an opponent's shots, or a technique fault that the watch cannot see.
  *
  * When Phase 2 lands and stroke labels become trustworthy, stroke-based rules can join —
  * as additions, not replacements.
@@ -40,26 +41,26 @@ class SessionInsightEngine(
             enduranceDecayInsight(rallyProfile),
             longestRallyInsight(rallyProfile, baseline),
             intensityInsight(session, rallyProfile),
-            heartRateRecoveryInsight(rallyProfile)
+            heartRateDriftInsight(session, rallyProfile)
         )
-            // Caution first: if something suggests backing off, it should not be buried
-            // under a personal best.
+            // Strongest observations first, so a meaningful change is not buried under a
+            // personal best. Medical or injury cautions require a stronger signal than this
+            // engine currently receives.
             .sortedByDescending { it.severity.ordinal }
             .take(maximumInsights)
     }
 
     /**
-     * Work-to-rest ratio against the player's own norm, or the sport's if there is no norm yet.
-     *
-     * Singles play sits near 1:2 and doubles near 1:1.5. Drifting toward 1:4 usually means
-     * long gaps collecting shuttles or chatting between points — worth knowing, because it
-     * is invisible from inside the session and it halves the training effect of an hour.
+     * Estimated active-to-rest ratio against the player's own norm. With no personal history,
+     * a deliberately high threshold only reports the observed gaps; it does not compare a
+     * mixed training session to elite match norms.
      */
     private fun restRatioInsight(profile: RallyProfile, baseline: InsightBaseline): Insight? {
         val ratio = profile.restRatio
         if (ratio <= 0f) return null
 
-        val evidence = "1:${format(ratio)} work:rest across ${profile.rallyCount} rallies"
+        val evidence = "1:${format(ratio)} estimated active:quiet across " +
+            "${profile.rallyCount} detected exchanges"
 
         if (baseline.hasEnoughHistory && baseline.medianRestRatio != null) {
             val usual = baseline.medianRestRatio
@@ -68,9 +69,9 @@ class SessionInsightEngine(
             if (change > 0.25f) {
                 return Insight(
                     id = "rest-ratio-up",
-                    headline = "You rested more than usual",
-                    detail = "Rest between rallies was ${percent(change)}% longer than your " +
-                        "typical 1:${format(usual)}. Same court time, less training.",
+                    headline = "Longer gaps than usual",
+                    detail = "Gaps between detected exchanges were ${percent(change)}% longer " +
+                        "than your typical 1:${format(usual)} active:quiet pattern.",
                     severity = InsightSeverity.Notable,
                     evidence = evidence
                 )
@@ -79,8 +80,8 @@ class SessionInsightEngine(
                 return Insight(
                     id = "rest-ratio-down",
                     headline = "Denser session than usual",
-                    detail = "You played with ${percent(abs(change))}% less rest than your " +
-                        "typical 1:${format(usual)}.",
+                    detail = "Detected exchanges had ${percent(abs(change))}% less quiet time " +
+                        "than your typical 1:${format(usual)} active:quiet pattern.",
                     severity = InsightSeverity.Info,
                     evidence = evidence
                 )
@@ -88,13 +89,13 @@ class SessionInsightEngine(
             return null
         }
 
-        // No history: fall back to the sport's range.
+        // No history: describe only a conspicuous observation, not whether it is good.
         if (ratio > 3.5f) {
             return Insight(
                 id = "rest-ratio-high",
-                headline = "Long gaps between rallies",
-                detail = "Competitive singles sits near 1:2. At 1:${format(ratio)} you spent " +
-                    "${percent(1f - profile.workDensity)}% of the session not playing.",
+                headline = "Long gaps between exchanges",
+                    detail = "The detected pattern was 1:${format(ratio)} estimated active to quiet time. " +
+                    "Use this as a baseline for your next comparable session.",
                 severity = InsightSeverity.Notable,
                 evidence = evidence
             )
@@ -103,11 +104,8 @@ class SessionInsightEngine(
     }
 
     /**
-     * Rally length decay across the session — the clearest fatigue signal available without
-     * a trustworthy classifier.
-     *
-     * Compares the first and last thirds. Shorter rallies late usually means points are
-     * ending on errors rather than winners.
+     * Change in detected-hit count across the session. This is an observation only: opponent,
+     * drill structure, missed detections and tactics can all change exchange length.
      */
     private fun enduranceDecayInsight(profile: RallyProfile): Insight? {
         // Thirds of fewer than four rallies each are too noisy to compare.
@@ -123,12 +121,12 @@ class SessionInsightEngine(
 
         return Insight(
             id = "endurance-decay",
-            headline = "Rallies got shorter as you tired",
-            detail = "Your last ${third} rallies averaged ${format(closing)} shots against " +
-                "${format(opening)} at the start — ${percent(abs(change))}% shorter. Points " +
-                "ending early late in a session usually means errors, not winners.",
-            severity = InsightSeverity.Caution,
-            evidence = "${format(opening)} → ${format(closing)} shots per rally"
+            headline = "Detected exchanges shortened",
+            detail = "The last $third exchanges averaged ${format(closing)} detected hits " +
+                "against ${format(opening)} at the start — ${percent(abs(change))}% fewer. " +
+                "The watch cannot tell whether tactics, errors, opponents or missed hits caused it.",
+            severity = InsightSeverity.Notable,
+            evidence = "${format(opening)} → ${format(closing)} detected hits per exchange"
         )
     }
 
@@ -139,11 +137,11 @@ class SessionInsightEngine(
             if (longest.shotCount > baseline.bestRallyShots) {
                 return Insight(
                     id = "longest-rally-best",
-                    headline = "Longest rally yet",
-                    detail = "A ${longest.shotCount}-shot rally, beating your previous best of " +
+                    headline = "Longest detected exchange yet",
+                    detail = "A ${longest.shotCount}-hit exchange, above your previous best of " +
                         "${baseline.bestRallyShots}.",
                     severity = InsightSeverity.Notable,
-                    evidence = "${longest.shotCount} shots over ${seconds(longest.durationMillis)}s"
+                    evidence = "${longest.shotCount} detected hits over ${seconds(longest.durationMillis)}s"
                 )
             }
             return null
@@ -154,17 +152,17 @@ class SessionInsightEngine(
             return Insight(
                 id = "longest-rally",
                 headline = "That was a long one",
-                detail = "Your longest rally ran ${longest.shotCount} shots over " +
+                detail = "Your longest detected exchange ran ${longest.shotCount} hits over " +
                     "${seconds(longest.durationMillis)} seconds.",
                 severity = InsightSeverity.Info,
-                evidence = "${longest.shotCount} shots"
+                evidence = "${longest.shotCount} detected hits"
             )
         }
         return null
     }
 
     /**
-     * How much of the session was spent actually playing.
+     * How much of the session sat inside detected exchange windows.
      *
      * Reported only when it is low, because a healthy number here is not news.
      */
@@ -176,22 +174,23 @@ class SessionInsightEngine(
 
         return Insight(
             id = "low-work-density",
-            headline = "Mostly standing around",
-            detail = "Only $minutes of $total minutes were spent in rallies. Shorter sessions " +
-                "with less standing usually beat long ones with a lot.",
+            headline = "Low detected activity density",
+            detail = "$minutes of $total minutes sat inside detected exchange windows. " +
+                "Warm-up, drills without hits and missed detections can lower this estimate.",
             severity = InsightSeverity.Notable,
-            evidence = "${percent(profile.workDensity)}% of the session in play"
+            evidence = "${percent(profile.workDensity)}% estimated active time"
         )
     }
 
     /**
-     * Heart-rate drop during rest intervals, early session vs late.
-     *
-     * A recovery that shrinks over a session is a well-established fatigue marker, and it
-     * shows up before the player notices. Requires heart rate on both ends, so it stays
-     * silent on watches with no sensor lock.
+     * Average heart rate in detected exchanges, early session vs late. This is not a recovery
+     * or fatigue diagnosis: comparable exchange intensity is not yet measured.
      */
-    private fun heartRateRecoveryInsight(profile: RallyProfile): Insight? {
+    private fun heartRateDriftInsight(session: TrainingSession, profile: RallyProfile): Insight? {
+        // Sparse optical coverage can cluster readings at one end of a session and create
+        // a convincing but meaningless drift. Old exports default to zero coverage and are
+        // intentionally ineligible for this interpretation.
+        if (session.summary.heartRateCoverage < MINIMUM_HEART_RATE_COVERAGE) return null
         val withHeartRate = profile.rallies.filter { it.averageHeartRate != null }
         if (withHeartRate.size < 8) return null
 
@@ -200,17 +199,16 @@ class SessionInsightEngine(
         val late = withHeartRate.takeLast(half).mapNotNull { it.averageHeartRate }.average()
         val drift = late - early
 
-        // Rising average heart rate at equal or lower rally intensity is cardiac drift.
         if (drift < 8.0) return null
 
         return Insight(
             id = "cardiac-drift",
-            headline = "Working harder for the same rallies",
-            detail = "Your average rally heart rate rose ${drift.roundToInt()} bpm from the " +
-                "first half to the second. That is normal late in a hard session — worth " +
-                "noticing if it happens early.",
-            severity = InsightSeverity.Caution,
-            evidence = "${early.roundToInt()} → ${late.roundToInt()} bpm average across rallies"
+            headline = "Heart rate rose later",
+            detail = "Average heart rate during detected exchanges rose ${drift.roundToInt()} bpm " +
+                "from the first half to the second. Compare with how the session felt; the " +
+                "watch does not yet know whether the exchanges were equally intense.",
+            severity = InsightSeverity.Notable,
+            evidence = "${early.roundToInt()} → ${late.roundToInt()} bpm across detected exchanges"
         )
     }
 
@@ -226,5 +224,6 @@ class SessionInsightEngine(
     companion object {
         /** Fewer rallies than this is a warm-up, not a session worth characterising. */
         const val MINIMUM_RALLIES = 5
+        const val MINIMUM_HEART_RATE_COVERAGE = 0.6f
     }
 }

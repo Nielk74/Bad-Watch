@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,8 +39,10 @@ fun BadWatchApp(
     viewModel: BadWatchViewModel,
     onStartSession: () -> Unit,
     onStopSession: () -> Unit,
+    onDiscardSession: () -> Unit,
     onStartCapture: (ShotType) -> Unit,
     onFinishCapture: () -> Unit,
+    onCancelCapture: () -> Unit,
     isAmbient: StateFlow<Boolean> = MutableStateFlow(false)
 ) {
     val sessionState by viewModel.sessionState.collectAsStateWithLifecycle()
@@ -48,6 +51,25 @@ fun BadWatchApp(
     val ambient by isAmbient.collectAsStateWithLifecycle()
     var screen by remember { mutableStateOf(Screen.Home) }
     var detailSession by remember { mutableStateOf<StoredSession?>(null) }
+
+    BackHandler(
+        enabled = screen != Screen.Home ||
+            sessionState is SessionState.Completed ||
+            sessionState is SessionState.Failed ||
+            captureState is CaptureState.Saved ||
+            captureState is CaptureState.Failed
+    ) {
+        when {
+            sessionState is SessionState.Completed || sessionState is SessionState.Failed ->
+                viewModel.acknowledge()
+
+            captureState is CaptureState.Saved || captureState is CaptureState.Failed ->
+                viewModel.acknowledgeCapture()
+
+            screen == Screen.SessionDetail -> screen = Screen.History
+            else -> screen = Screen.Home
+        }
+    }
 
     // Haptic-first: a shot detected mid-rally is a buzz, not a pixel. The flow only emits
     // while recording, so there is nothing to gate here.
@@ -58,56 +80,48 @@ fun BadWatchApp(
         }
     }
 
-    val kind = when {
-        onboarded == null -> ScreenKind.Loading
-        onboarded == false -> ScreenKind.Onboarding
-        sessionState is SessionState.Recording -> ScreenKind.Live
-        sessionState is SessionState.Completed -> ScreenKind.Recap
-        captureState is CaptureState.Capturing -> ScreenKind.Drill
-        captureState is CaptureState.Saved -> ScreenKind.DrillSaved
-        screen == Screen.Capture -> ScreenKind.CapturePicker
-        sessionState is SessionState.Failed -> ScreenKind.Failed
-        screen == Screen.History -> ScreenKind.History
-        screen == Screen.Settings -> ScreenKind.Settings
-        screen == Screen.SessionDetail && detailSession != null -> ScreenKind.SessionDetail
-        else -> ScreenKind.Home
-    }
+    val frame = resolveScreenFrame(
+        onboarded = onboarded,
+        sessionState = sessionState,
+        captureState = captureState,
+        screen = screen,
+        detailSession = detailSession
+    )
 
     BadWatchTheme {
         AppScaffold {
             AnimatedContent(
-                targetState = kind,
+                targetState = frame,
+                // The frame carries fresh live data, while the key limits animation to
+                // actual navigation. This lets a 100 Hz recording update recompose the HUD
+                // without restarting its transition and lets the outgoing screen keep the
+                // exact payload it had when navigation began.
+                contentKey = ScreenFrame::kind,
                 transitionSpec = {
                     fadeIn(animationSpec = tween(250)) togetherWith fadeOut(animationSpec = tween(180))
                 },
                 label = "screen"
             ) { target ->
                 when (target) {
-                    ScreenKind.Loading -> LoadingScreen()
+                    ScreenFrame.Loading -> LoadingScreen()
 
-                    ScreenKind.Onboarding -> OnboardingScreen(
+                    ScreenFrame.Onboarding -> OnboardingScreen(
                         onConfirm = { handedness -> viewModel.completeOnboarding(handedness) }
                     )
 
-                    ScreenKind.Live -> {
-                        // Each screen captures its data when its kind becomes current:
-                        // session state changes hands the instant recording stops, and
-                        // without this the outgoing screen would recompose against the
-                        // *next* screen's state mid-crossfade and crash on the cast.
-                        val live = remember(target) { sessionState as SessionState.Recording }
+                    is ScreenFrame.Live -> {
                         LiveScreen(
-                            state = live,
+                            state = target.state,
                             onStop = onStopSession,
-                            onDiscard = viewModel::discardSession,
+                            onDiscard = onDiscardSession,
                             isAmbient = ambient
                         )
                     }
 
-                    ScreenKind.Recap -> {
-                        val done = remember(target) { sessionState as SessionState.Completed }
+                    is ScreenFrame.Recap -> {
                         SummaryScreen(
-                            stored = done.export,
-                            insights = done.insights,
+                            stored = target.state.export,
+                            insights = target.state.insights,
                             onDone = {
                                 viewModel.acknowledge()
                                 screen = Screen.Home
@@ -115,23 +129,21 @@ fun BadWatchApp(
                         )
                     }
 
-                    ScreenKind.Drill -> {
-                        val drill = remember(target) { captureState as CaptureState.Capturing }
+                    is ScreenFrame.Drill -> {
                         CaptureScreen(
-                            state = drill,
+                            state = target.state,
                             onDiscardLast = viewModel::discardLastSwing,
                             onFinish = onFinishCapture,
                             onCancel = {
-                                viewModel.cancelCapture()
+                                onCancelCapture()
                                 screen = Screen.Home
                             }
                         )
                     }
 
-                    ScreenKind.DrillSaved -> {
-                        val saved = remember(target) { captureState as CaptureState.Saved }
+                    is ScreenFrame.DrillSaved -> {
                         CaptureSavedScreen(
-                            export = saved.export,
+                            export = target.state.export,
                             onDone = {
                                 viewModel.acknowledgeCapture()
                                 screen = Screen.Home
@@ -139,22 +151,28 @@ fun BadWatchApp(
                         )
                     }
 
-                    ScreenKind.CapturePicker -> CapturePickerScreen(
+                    ScreenFrame.CapturePicker -> CapturePickerScreen(
                         totalSwings = viewModel.labelledSwingCount
                             .collectAsStateWithLifecycle().value,
                         onPick = onStartCapture,
                         onBack = { screen = Screen.Home }
                     )
 
-                    ScreenKind.Failed -> {
-                        val failed = remember(target) { sessionState as SessionState.Failed }
+                    is ScreenFrame.SessionFailed -> {
                         ErrorScreen(
-                            message = failed.message,
+                            message = target.state.message,
                             onDismiss = viewModel::acknowledge
                         )
                     }
 
-                    ScreenKind.History -> HistoryScreen(
+                    is ScreenFrame.CaptureFailed -> {
+                        ErrorScreen(
+                            message = target.state.message,
+                            onDismiss = viewModel::acknowledgeCapture
+                        )
+                    }
+
+                    ScreenFrame.History -> HistoryScreen(
                         viewModel = viewModel,
                         onOpenSession = { stored ->
                             detailSession = stored
@@ -163,21 +181,20 @@ fun BadWatchApp(
                         onBack = { screen = Screen.Home }
                     )
 
-                    ScreenKind.Settings -> SettingsScreen(
+                    ScreenFrame.Settings -> SettingsScreen(
                         viewModel = viewModel,
                         onBack = { screen = Screen.Home }
                     )
 
-                    ScreenKind.SessionDetail -> {
-                        val detail = remember(target) { detailSession!! }
+                    is ScreenFrame.SessionDetail -> {
                         SummaryScreen(
-                            stored = detail.export,
+                            stored = target.session.export,
                             insights = emptyList(),
                             onDone = { screen = Screen.History }
                         )
                     }
 
-                    ScreenKind.Home -> HomeScreen(
+                    ScreenFrame.Home -> HomeScreen(
                         viewModel = viewModel,
                         onStart = onStartSession,
                         onOpenHistory = { screen = Screen.History },
@@ -196,7 +213,61 @@ fun BadWatchApp(
 
 private enum class Screen { Home, History, Settings, Capture, SessionDetail }
 
+private sealed interface ScreenFrame {
+    val kind: ScreenKind
+
+    data object Loading : ScreenFrame { override val kind = ScreenKind.Loading }
+    data object Onboarding : ScreenFrame { override val kind = ScreenKind.Onboarding }
+    data class Live(val state: SessionState.Recording) : ScreenFrame {
+        override val kind = ScreenKind.Live
+    }
+    data class Recap(val state: SessionState.Completed) : ScreenFrame {
+        override val kind = ScreenKind.Recap
+    }
+    data class Drill(val state: CaptureState.Capturing) : ScreenFrame {
+        override val kind = ScreenKind.Drill
+    }
+    data class DrillSaved(val state: CaptureState.Saved) : ScreenFrame {
+        override val kind = ScreenKind.DrillSaved
+    }
+    data object CapturePicker : ScreenFrame { override val kind = ScreenKind.CapturePicker }
+    data class SessionFailed(val state: SessionState.Failed) : ScreenFrame {
+        override val kind = ScreenKind.SessionFailed
+    }
+    data class CaptureFailed(val state: CaptureState.Failed) : ScreenFrame {
+        override val kind = ScreenKind.CaptureFailed
+    }
+    data object History : ScreenFrame { override val kind = ScreenKind.History }
+    data object Settings : ScreenFrame { override val kind = ScreenKind.Settings }
+    data class SessionDetail(val session: StoredSession) : ScreenFrame {
+        override val kind = ScreenKind.SessionDetail
+    }
+    data object Home : ScreenFrame { override val kind = ScreenKind.Home }
+}
+
+private fun resolveScreenFrame(
+    onboarded: Boolean?,
+    sessionState: SessionState,
+    captureState: CaptureState,
+    screen: Screen,
+    detailSession: StoredSession?
+): ScreenFrame = when {
+    onboarded == null -> ScreenFrame.Loading
+    onboarded == false -> ScreenFrame.Onboarding
+    sessionState is SessionState.Recording -> ScreenFrame.Live(sessionState)
+    sessionState is SessionState.Completed -> ScreenFrame.Recap(sessionState)
+    captureState is CaptureState.Capturing -> ScreenFrame.Drill(captureState)
+    captureState is CaptureState.Saved -> ScreenFrame.DrillSaved(captureState)
+    sessionState is SessionState.Failed -> ScreenFrame.SessionFailed(sessionState)
+    captureState is CaptureState.Failed -> ScreenFrame.CaptureFailed(captureState)
+    screen == Screen.Capture -> ScreenFrame.CapturePicker
+    screen == Screen.History -> ScreenFrame.History
+    screen == Screen.Settings -> ScreenFrame.Settings
+    screen == Screen.SessionDetail && detailSession != null -> ScreenFrame.SessionDetail(detailSession)
+    else -> ScreenFrame.Home
+}
+
 private enum class ScreenKind {
     Loading, Onboarding, Live, Recap, Drill, DrillSaved,
-    CapturePicker, Failed, History, Settings, SessionDetail, Home
+    CapturePicker, SessionFailed, CaptureFailed, History, Settings, SessionDetail, Home
 }

@@ -24,7 +24,16 @@ data class SensorSample(
     val gyro: Vector3,
     val heartRateBpm: Float?,
     val accel: Vector3 = Vector3.ZERO,
-    val accuracy: Int = 0
+    val accuracy: Int = 0,
+    /**
+     * Timestamp of the underlying optical-sensor reading.
+     *
+     * A fused sample is emitted for every gyroscope event, so the same ~1 Hz heart-rate
+     * reading is carried by roughly one hundred motion samples. Keeping its source time lets
+     * aggregation count it once instead of accidentally weighting the final seconds of a
+     * session one hundred times over.
+     */
+    val heartRateSampleTimestampMillis: Long? = null
 ) {
     init {
         // Fail at the point of construction rather than hours later when the session is

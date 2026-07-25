@@ -119,15 +119,15 @@ class BadWatchTileService : TileService() {
             LayoutElementBuilders.Column.Builder()
                 .addContent(
                     bodyText(
-                        "Last: ${plural(summary.totalShots, "shot", "shots")} · " +
-                            plural(last.export.rallyProfile.rallyCount, "rally", "rallies") +
+                        "Last: ${plural(summary.totalShots, "hit", "hits")} · " +
+                            plural(last.export.rallyProfile.rallyCount, "burst", "bursts") +
                             " · ${formatDuration(summary.durationMillis)}"
                     )
                 )
                 .addContent(
                     bodyText(
                         "This week: ${plural(week.size, "session", "sessions")} · " +
-                            plural(week.sumOf { it.export.session.summary.totalShots }, "shot", "shots"),
+                            plural(week.sumOf { it.export.session.summary.totalShots }, "hit", "hits"),
                         color = COLOR_TEXT_DIM
                     )
                 )

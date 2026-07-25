@@ -53,4 +53,88 @@ class TrainingSessionAggregatorTest {
         assertThat(session.summary.durationMillis).isEqualTo(2_500L)
         assertThat(session.summary.averageHeartRate).isGreaterThan(110f)
     }
+
+    @Test
+    fun `heart rate is counted once per optical reading carried by fused samples`() {
+        val start = 10_000L
+        aggregator.reset(start)
+
+        // The 100 Hz gyro stream carries the same 1 Hz optical reading one hundred times.
+        repeat(100) { index ->
+            aggregator.onSample(
+                SensorSample(
+                    timestampMillis = start + index * 10L,
+                    gyro = Vector3.ZERO,
+                    heartRateBpm = 120f,
+                    heartRateSampleTimestampMillis = start
+                )
+            )
+        }
+        repeat(100) { index ->
+            aggregator.onSample(
+                SensorSample(
+                    timestampMillis = start + 1_000L + index * 10L,
+                    gyro = Vector3.ZERO,
+                    heartRateBpm = 160f,
+                    heartRateSampleTimestampMillis = start + 1_000L
+                )
+            )
+        }
+
+        val session = aggregator.buildSession(start + 2_000L)
+
+        assertThat(session.summary.heartRateSampleCount).isEqualTo(2)
+        assertThat(session.summary.averageHeartRate).isEqualTo(140f)
+        assertThat(session.summary.maxHeartRate).isEqualTo(160f)
+        assertThat(session.heartRateTrace.map { it.beatsPerMinute })
+            .containsExactly(120f, 160f)
+            .inOrder()
+    }
+
+    @Test
+    fun `heart rate summary covers the whole session instead of only its tail`() {
+        val start = 20_000L
+        aggregator.reset(start)
+
+        // Ten minutes, with a deliberately different first and second half. The old
+        // 120-entry buffer retained only ~1.2 seconds of fused samples and returned ~180.
+        repeat(600) { second ->
+            val bpm = if (second < 300) 100f else 180f
+            aggregator.onSample(
+                SensorSample(
+                    timestampMillis = start + second * 1_000L,
+                    gyro = Vector3.ZERO,
+                    heartRateBpm = bpm,
+                    heartRateSampleTimestampMillis = start + second * 1_000L
+                )
+            )
+        }
+
+        val session = aggregator.buildSession(start + 600_000L)
+
+        assertThat(session.summary.heartRateSampleCount).isEqualTo(600)
+        assertThat(session.summary.averageHeartRate).isWithin(0.01f).of(140f)
+        assertThat(session.summary.heartRateCoverage).isWithin(0.01f).of(1f)
+        assertThat(session.summary.cardiovascularLoad).isNotNull()
+        assertThat(session.heartRateTrace).hasSize(600)
+    }
+
+    @Test
+    fun `cardiovascular load is withheld when heart rate coverage is sparse`() {
+        val start = 30_000L
+        aggregator.reset(start)
+        aggregator.onSample(
+            SensorSample(
+                timestampMillis = start,
+                gyro = Vector3.ZERO,
+                heartRateBpm = 150f,
+                heartRateSampleTimestampMillis = start
+            )
+        )
+
+        val session = aggregator.buildSession(start + 60_000L)
+
+        assertThat(session.summary.heartRateCoverage).isLessThan(0.02f)
+        assertThat(session.summary.cardiovascularLoad).isNull()
+    }
 }

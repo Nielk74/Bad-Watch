@@ -16,6 +16,7 @@ import com.badwatch.app.MainActivity
 import com.badwatch.app.R
 import com.badwatch.app.domain.CaptureState
 import com.badwatch.app.domain.SessionState
+import com.badwatch.app.sync.SyncWorker
 import com.badwatch.core.model.ShotType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -23,6 +24,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.sample
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import java.util.concurrent.TimeUnit
@@ -53,17 +56,31 @@ class SessionService : Service() {
         when (intent?.action) {
             ACTION_STOP -> {
                 serviceScope.launch {
-                    controller.stopAndSave()
+                    val saved = controller.stopAndSave()
+                    if (saved != null) SyncWorker.enqueue(this@SessionService)
                     stopSelf()
                 }
                 return START_NOT_STICKY
             }
 
+            ACTION_DISCARD -> {
+                controller.discard()
+                stopSelf()
+                return START_NOT_STICKY
+            }
+
             ACTION_STOP_CAPTURE -> {
                 serviceScope.launch {
-                    captureController.finish()
+                    val saved = captureController.finish()
+                    if (saved != null) SyncWorker.enqueue(this@SessionService)
                     stopSelf()
                 }
+                return START_NOT_STICKY
+            }
+
+            ACTION_CANCEL_CAPTURE -> {
+                captureController.cancel()
+                stopSelf()
                 return START_NOT_STICKY
             }
 
@@ -79,6 +96,9 @@ class SessionService : Service() {
                 captureController.start(label)
 
                 captureController.state
+                    .distinctUntilChangedBy { state ->
+                        (state as? CaptureState.Capturing)?.keptCount
+                    }
                     .onEach { state ->
                         if (state is CaptureState.Capturing) {
                             updateNotification(buildCaptureNotification(state.label, state.keptCount))
@@ -96,6 +116,10 @@ class SessionService : Service() {
         // Keep the ongoing notification current so a glance at the notification shade (or
         // the ongoing-activity chip) shows live progress without opening the app.
         controller.state
+            // Sensor state arrives at 100 Hz. A notification is a one-second glance, not a
+            // telemetry stream; updating it per sample overwhelmed NotificationManager and
+            // wasted battery on every live session.
+            .sample(NOTIFICATION_UPDATE_INTERVAL_MILLIS)
             .onEach { state ->
                 if (state is SessionState.Recording) {
                     updateNotification(
@@ -139,7 +163,7 @@ class SessionService : Service() {
             .setContentText(
                 getString(
                     R.string.capture_notification_body,
-                    resources.getQuantityString(R.plurals.session_notification_shots, swings, swings),
+                    resources.getQuantityString(R.plurals.capture_notification_swings, swings, swings),
                     label.name
                 )
             )
@@ -147,8 +171,8 @@ class SessionService : Service() {
 
     private fun buildSessionNotification(shotCount: Int, durationMillis: Long): Notification {
         val minutes = TimeUnit.MILLISECONDS.toMinutes(durationMillis).toInt()
-        val shotsText = resources.getQuantityString(
-            R.plurals.session_notification_shots, shotCount, shotCount
+        val hitsText = resources.getQuantityString(
+            R.plurals.session_notification_hits, shotCount, shotCount
         )
         val minutesText = resources.getQuantityString(
             R.plurals.session_notification_minutes, minutes, minutes
@@ -156,7 +180,7 @@ class SessionService : Service() {
         return baseNotification(stopAction = ACTION_STOP)
             .setContentTitle(getString(R.string.session_notification_title))
             .setContentText(
-                getString(R.string.session_notification_body, shotsText, minutesText)
+                getString(R.string.session_notification_body, hitsText, minutesText)
             )
             .build()
     }
@@ -200,9 +224,12 @@ class SessionService : Service() {
     companion object {
         private const val CHANNEL_ID = "bad_watch_session"
         private const val NOTIFICATION_ID = 1001
+        private const val NOTIFICATION_UPDATE_INTERVAL_MILLIS = 1_000L
         const val ACTION_STOP = "com.badwatch.app.action.STOP_SESSION"
+        const val ACTION_DISCARD = "com.badwatch.app.action.DISCARD_SESSION"
         const val ACTION_START_CAPTURE = "com.badwatch.app.action.START_CAPTURE"
         const val ACTION_STOP_CAPTURE = "com.badwatch.app.action.STOP_CAPTURE"
+        const val ACTION_CANCEL_CAPTURE = "com.badwatch.app.action.CANCEL_CAPTURE"
         const val EXTRA_LABEL = "label"
 
         fun start(context: Context) {
@@ -215,6 +242,11 @@ class SessionService : Service() {
             context.startService(intent)
         }
 
+        fun discard(context: Context) {
+            val intent = Intent(context, SessionService::class.java).setAction(ACTION_DISCARD)
+            context.startService(intent)
+        }
+
         fun startCapture(context: Context, label: ShotType) {
             val intent = Intent(context, SessionService::class.java)
                 .setAction(ACTION_START_CAPTURE)
@@ -224,6 +256,11 @@ class SessionService : Service() {
 
         fun stopCapture(context: Context) {
             val intent = Intent(context, SessionService::class.java).setAction(ACTION_STOP_CAPTURE)
+            context.startService(intent)
+        }
+
+        fun cancelCapture(context: Context) {
+            val intent = Intent(context, SessionService::class.java).setAction(ACTION_CANCEL_CAPTURE)
             context.startService(intent)
         }
     }

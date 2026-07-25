@@ -151,13 +151,13 @@ fun main(args: Array<String>) {
     val now = System.currentTimeMillis()
     val random = Random(7)
 
-    // Three sessions a week for six weeks, with a deliberate volume spike near the end so
-    // the acute:chronic chart has something interesting to show.
+    // Three sessions a week for six weeks, with a deliberate volume change near the end so
+    // the descriptive activity history has something interesting to show.
     var written = 0
     for (dayOffset in 42 downTo 0) {
         if (dayOffset % 7 !in setOf(0, 2, 4)) continue
-        val spike = dayOffset in 2..8
-        val rallies = if (spike) 26 + random.nextInt(10) else 14 + random.nextInt(10)
+        val higherVolume = dayOffset in 2..8
+        val rallies = if (higherVolume) 26 + random.nextInt(10) else 14 + random.nextInt(10)
         val shotsPerRally = 5 + random.nextInt(6)
         val start = now - dayOffset * day + (18L * 60 * 60 * 1000)
         repository.save(SyntheticSessions.session(start, rallies, shotsPerRally, random))

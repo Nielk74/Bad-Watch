@@ -84,8 +84,8 @@ fun HistoryScreen(
                     }
                 ) {
                     StatRow(
-                        Stat("Shots", stored.export.session.summary.totalShots.toString()),
-                        Stat("Rallies", stored.export.rallyProfile.rallyCount.toString()),
+                        Stat("Hits", stored.export.session.summary.totalShots.toString()),
+                        Stat("Bursts", stored.export.rallyProfile.rallyCount.toString()),
                         Stat("Time", formatDuration(stored.export.session.summary.durationMillis))
                     )
                 }
