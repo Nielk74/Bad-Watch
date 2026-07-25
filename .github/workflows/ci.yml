@@ -16,7 +16,8 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      - if: runner.environment == 'github-hosted'
+        uses: android-actions/setup-android@v3
 
       - uses: gradle/actions/setup-gradle@v3
 
