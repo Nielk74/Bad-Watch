@@ -14,7 +14,9 @@ import androidx.core.app.NotificationCompat
 import com.badwatch.app.BadWatchApplication
 import com.badwatch.app.MainActivity
 import com.badwatch.app.R
+import com.badwatch.app.domain.CaptureState
 import com.badwatch.app.domain.SessionState
+import com.badwatch.core.model.ShotType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -36,7 +38,9 @@ import java.util.concurrent.TimeUnit
 class SessionService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val controller get() = (application as BadWatchApplication).container.sessionController
+    private val container get() = (application as BadWatchApplication).container
+    private val controller get() = container.sessionController
+    private val captureController get() = container.captureController
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -54,9 +58,39 @@ class SessionService : Service() {
                 }
                 return START_NOT_STICKY
             }
+
+            ACTION_STOP_CAPTURE -> {
+                serviceScope.launch {
+                    captureController.finish()
+                    stopSelf()
+                }
+                return START_NOT_STICKY
+            }
+
+            ACTION_START_CAPTURE -> {
+                val label = intent.getStringExtra(EXTRA_LABEL)
+                    ?.let { runCatching { ShotType.valueOf(it) }.getOrNull() }
+                    ?: return START_NOT_STICKY
+
+                // A data-collection drill needs the same process protection as a session.
+                // Without it, backgrounding the app mid-drill kills the process and silently
+                // discards every swing the player has just collected.
+                startAsForeground(buildCaptureNotification(label, swings = 0))
+                captureController.start(label)
+
+                captureController.state
+                    .onEach { state ->
+                        if (state is CaptureState.Capturing) {
+                            updateNotification(buildCaptureNotification(state.label, state.keptCount))
+                        }
+                    }
+                    .launchIn(serviceScope)
+
+                return START_STICKY
+            }
         }
 
-        startAsForeground(shotCount = 0, durationMillis = 0L)
+        startAsForeground(buildSessionNotification(shotCount = 0, durationMillis = 0L))
         controller.start()
 
         // Keep the ongoing notification current so a glance at the notification shade (or
@@ -65,8 +99,10 @@ class SessionService : Service() {
             .onEach { state ->
                 if (state is SessionState.Recording) {
                     updateNotification(
-                        shotCount = state.snapshot.totalShots,
-                        durationMillis = state.snapshot.durationMillis
+                        buildSessionNotification(
+                            shotCount = state.snapshot.totalShots,
+                            durationMillis = state.snapshot.durationMillis
+                        )
                     )
                 }
             }
@@ -80,8 +116,7 @@ class SessionService : Service() {
         super.onDestroy()
     }
 
-    private fun startAsForeground(shotCount: Int, durationMillis: Long) {
-        val notification = buildNotification(shotCount, durationMillis)
+    private fun startAsForeground(notification: Notification) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 NOTIFICATION_ID,
@@ -93,12 +128,40 @@ class SessionService : Service() {
         }
     }
 
-    private fun updateNotification(shotCount: Int, durationMillis: Long) {
+    private fun updateNotification(notification: Notification) {
         val manager = getSystemService(NotificationManager::class.java) ?: return
-        manager.notify(NOTIFICATION_ID, buildNotification(shotCount, durationMillis))
+        manager.notify(NOTIFICATION_ID, notification)
     }
 
-    private fun buildNotification(shotCount: Int, durationMillis: Long): Notification {
+    private fun buildCaptureNotification(label: ShotType, swings: Int): Notification =
+        baseNotification(stopAction = ACTION_STOP_CAPTURE)
+            .setContentTitle(getString(R.string.capture_notification_title))
+            .setContentText(
+                getString(
+                    R.string.capture_notification_body,
+                    resources.getQuantityString(R.plurals.session_notification_shots, swings, swings),
+                    label.name
+                )
+            )
+            .build()
+
+    private fun buildSessionNotification(shotCount: Int, durationMillis: Long): Notification {
+        val minutes = TimeUnit.MILLISECONDS.toMinutes(durationMillis).toInt()
+        val shotsText = resources.getQuantityString(
+            R.plurals.session_notification_shots, shotCount, shotCount
+        )
+        val minutesText = resources.getQuantityString(
+            R.plurals.session_notification_minutes, minutes, minutes
+        )
+        return baseNotification(stopAction = ACTION_STOP)
+            .setContentTitle(getString(R.string.session_notification_title))
+            .setContentText(
+                getString(R.string.session_notification_body, shotsText, minutesText)
+            )
+            .build()
+    }
+
+    private fun baseNotification(stopAction: String): NotificationCompat.Builder {
         val openIntent = PendingIntent.getActivity(
             this,
             0,
@@ -107,30 +170,18 @@ class SessionService : Service() {
         )
         val stopIntent = PendingIntent.getService(
             this,
-            1,
-            Intent(this, SessionService::class.java).setAction(ACTION_STOP),
+            stopAction.hashCode(),
+            Intent(this, SessionService::class.java).setAction(stopAction),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val minutes = TimeUnit.MILLISECONDS.toMinutes(durationMillis).toInt()
-        val shotsText = resources.getQuantityString(
-            R.plurals.session_notification_shots, shotCount, shotCount
-        )
-        val minutesText = resources.getQuantityString(
-            R.plurals.session_notification_minutes, minutes, minutes
-        )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.session_notification_title))
-            .setContentText(
-                getString(R.string.session_notification_body, shotsText, minutesText)
-            )
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentIntent(openIntent)
             .addAction(0, getString(R.string.session_notification_stop), stopIntent)
             .setOngoing(true)
             .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_WORKOUT)
-            .build()
     }
 
     private fun createNotificationChannel() {
@@ -150,6 +201,9 @@ class SessionService : Service() {
         private const val CHANNEL_ID = "bad_watch_session"
         private const val NOTIFICATION_ID = 1001
         const val ACTION_STOP = "com.badwatch.app.action.STOP_SESSION"
+        const val ACTION_START_CAPTURE = "com.badwatch.app.action.START_CAPTURE"
+        const val ACTION_STOP_CAPTURE = "com.badwatch.app.action.STOP_CAPTURE"
+        const val EXTRA_LABEL = "label"
 
         fun start(context: Context) {
             val intent = Intent(context, SessionService::class.java)
@@ -158,6 +212,18 @@ class SessionService : Service() {
 
         fun stop(context: Context) {
             val intent = Intent(context, SessionService::class.java).setAction(ACTION_STOP)
+            context.startService(intent)
+        }
+
+        fun startCapture(context: Context, label: ShotType) {
+            val intent = Intent(context, SessionService::class.java)
+                .setAction(ACTION_START_CAPTURE)
+                .putExtra(EXTRA_LABEL, label.name)
+            context.startForegroundService(intent)
+        }
+
+        fun stopCapture(context: Context) {
+            val intent = Intent(context, SessionService::class.java).setAction(ACTION_STOP_CAPTURE)
             context.startService(intent)
         }
     }

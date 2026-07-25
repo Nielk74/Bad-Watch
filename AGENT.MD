@@ -16,25 +16,34 @@ planned; this file is about how to work on it.
    for anything breaking.
 4. **The classifier is not calibrated.** Stroke labels are provisional. Do not build
    user-facing claims on top of them until Phase 2 lands.
+5. **Never put NaN in a serialized field.** JSON cannot represent it, and the failure only
+   surfaces on save — after the recording is already lost. Use null for "no reading".
 
 ## Environment
 
 - **JDK 17.**
-- **Android SDK** with `platforms;android-34`, `build-tools;34.0.0`, `platform-tools`.
+- **Android SDK** with `platforms;android-36`, `build-tools;36.0.0`, `platform-tools`.
 
 ```bash
 brew install --cask android-commandlinetools          # macOS
-sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 echo "sdk.dir=/opt/homebrew/share/android-commandlinetools" > local.properties
 ```
 
 `local.properties` is gitignored and must exist before `:app` will configure.
 
-**Toolchain note:** the project is on Kotlin 2.1 with AGP 8.13. The Compose compiler is
-applied as the `org.jetbrains.kotlin.plugin.compose` Gradle plugin — there is no
-`composeOptions.kotlinCompilerExtensionVersion` any more. Staying on Kotlin 1.9 with this
-AGP made lint crash (`InconsistentKotlinMetadataException` in `ComposableFlowOperatorDetector`),
-so do not downgrade Kotlin without also downgrading AGP.
+**Toolchain note.** Kotlin 2.1, AGP 8.13, Compose BOM 2025.06, `compileSdk` 36. The Compose
+compiler is applied as the `org.jetbrains.kotlin.plugin.compose` Gradle plugin — there is no
+`composeOptions.kotlinCompilerExtensionVersion` any more.
+
+These versions are coupled, and getting them out of step breaks lint rather than the build,
+which makes it confusing to diagnose. `ComposableFlowOperatorDetector` ships with
+`androidx.compose.runtime`'s lint checks and throws `InconsistentKotlinMetadataException` on
+any file using a Flow operator when its metadata reader is older than the Kotlin that
+produced the class files. It aborts the entire analysis task, taking every other check with
+it. If `lintAnalyzeDebug` starts failing with "a bug in lint", the Compose BOM is too old for
+the Kotlin version — bump the BOM, do not add suppressions (they do not work; the detector
+crashes before severity is applied).
 
 ## Module map
 
@@ -43,6 +52,7 @@ so do not downgrade Kotlin without also downgrading AGP.
 | `:core` | Models, feature extraction, classifier, rally segmentation, `SessionRecorder`, sync contract. Pure JVM. |
 | `:app` | Wear app: `FusedSensorCollector`, `SessionService`, `SessionController`, `SessionStore`, `SyncWorker`, Compose UI. |
 | `:server` | Ktor dashboard: ingest, aggregation, static page, synthetic fixtures. |
+| `tools/` | Python: capture ingestion and classifier training. See `tools/README.md`. |
 
 Key entry points: `SessionController` owns the live session at application scope;
 `SessionService` is the foreground service that keeps the process alive; `SessionRecorder`
@@ -117,6 +127,7 @@ CLI if you want scripted verification.
 | No shots detected | Expected on an emulator (static virtual gyro). On device, check the strap and that the watch is on the racket wrist. |
 | Session files | `adb shell run-as com.badwatch.badwatch ls files/sessions` — `*.json` plus `*.json.synced` markers |
 | Classifier regressions | Add the trace as a fixture in `:core` tests rather than debugging on device |
+| Drill lost on save | Should be impossible now — heart rate is nullable and `SensorSample` rejects NaN. If it recurs, check `logcat -b crash` for `JsonEncodingException`. |
 
 ## Release
 

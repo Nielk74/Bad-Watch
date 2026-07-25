@@ -57,7 +57,9 @@ class FusedSensorCollector(
         // Sensor callbacks may be delivered on a different thread than the one that reads
         // them into a sample, so the cross-sensor carry-over values are published atomically.
         val latestAccel = AtomicReference(Vector3.ZERO)
-        val latestHeartRate = AtomicReference(Float.NaN)
+        // Null until the optical sensor gets a lock — never NaN. NaN cannot be encoded as
+        // JSON, so a NaN carried into a sample crashes the app the moment it is persisted.
+        val latestHeartRate = AtomicReference<Float?>(null)
         val latestAccuracy = AtomicInteger(SensorManager.SENSOR_STATUS_UNRELIABLE)
 
         val listener = object : SensorEventListener {

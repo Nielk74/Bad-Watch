@@ -30,14 +30,16 @@ These are the decisions everything else follows from.
           model/       SensorSample, ShotEvent, Rally, TrainingSession, PlayerProfile
           classifier/  MotionFeatureExtractor, ShotClassifier
           pipeline/    ShotDetectionPipeline (sliding window)
+          capture/     SwingSegmenter (labelled training windows)
           session/     SessionRecorder, TrainingSessionAggregator, RallySegmenter
           sync/        SessionExport, SyncEnvelope, SyncResponse — the wire contract
 
 :app      Wear OS application.
           sensors/     FusedSensorCollector (gyro + accel + HR)
           domain/      SessionController — owns the live session at application scope
+                       CaptureController — runs labelled data-collection drills
           service/     SessionService — foreground service, survives screen-off
-          data/        SessionStore (file-per-session), SettingsStore (DataStore prefs)
+          data/        SessionStore, CaptureStore (file-per-drill), SettingsStore
           sync/        DashboardClient, SyncWorker
           ui/          Compose surfaces
           debug/       adb configuration receiver (debug builds only)
@@ -99,6 +101,21 @@ This is a placeholder with the right shape, not a finished classifier. Phase 2 o
 product plan replaces it with a TFLite model trained on labelled swings, keeping the
 rule-based path as a fallback.
 
+### Collecting training data
+
+The **Collect data** drill records labelled swings: the player picks a stroke, hits
+repetitions, and `SwingSegmenter` cuts a window around each angular-velocity peak.
+
+Segmentation is deliberately independent of `ShotClassifier`. Using the classifier to
+find swings would mean the training set only ever contains strokes the heuristics already
+recognise, so the model would inherit exactly the blind spots it is meant to remove. The
+only assumption `SwingSegmenter` makes is physical — a stroke produces a sharp isolated
+peak in |ω| — which holds for every stroke type equally.
+
+Labels come from the player's drill selection, never from inference. Windows are stored raw
+and unfiltered so feature engineering stays a decision for the training pipeline in
+`tools/` rather than something baked into the watch.
+
 ## Rally segmentation
 
 Consecutive shots less than 4 s apart belong to the same rally. Badminton rallies have a
@@ -133,7 +150,8 @@ Revisit if on-watch trend queries over hundreds of sessions become a real featur
   testable without an emulator.
 - `:server` — `testApplication` round-trips using `:core`'s own serializers, so a
   watch/server wire-format disagreement fails the build.
-- `:app` — currently thin. Instrumentation coverage of the service lifecycle is a gap.
+- `:app` — `SessionStore` and `CaptureStore` are plain JVM tests. Instrumentation coverage
+  of the service lifecycle is still a gap.
 
 ## Known gaps
 

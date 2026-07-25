@@ -44,8 +44,9 @@ data class SessionCard(
     val averageRallyShots: Float,
     val restRatio: Float,
     val workDensity: Float,
-    val averageHeartRate: Float,
-    val maxHeartRate: Float,
+    /** Null when the session recorded no heart rate; the dashboard renders an em dash. */
+    val averageHeartRate: Float?,
+    val maxHeartRate: Float?,
     val shoulderLoad: Float,
     val shotDistribution: List<ShotSlice>
 )

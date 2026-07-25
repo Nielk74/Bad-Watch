@@ -18,7 +18,8 @@ data class Rally(
     val shotCount: Int,
     val shotCounts: Map<ShotType, Int>,
     val peakAngularVelocity: Float,
-    val averageHeartRate: Float,
+    /** Null when no shot in the rally carried a heart-rate reading. */
+    val averageHeartRate: Float?,
     /** Gap between the end of the previous rally and the start of this one. */
     val restBeforeMillis: Long
 ) {

@@ -72,7 +72,7 @@ object SyntheticSessions {
         }
 
         val endedAt = cursor
-        val heartRates = shots.map { it.heartRateBpm }
+        val heartRates = shots.mapNotNull { it.heartRateBpm }
         val summary = TrainingSummary(
             totalShots = shots.size,
             shotCounts = shots.groupingBy { it.type }.eachCount(),

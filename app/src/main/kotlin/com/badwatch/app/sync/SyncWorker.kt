@@ -32,6 +32,20 @@ class SyncWorker(
             ?: return Result.success() // No dashboard configured; nothing to do.
         val token = container.settingsStore.dashboardToken.first()
 
+        // Captures upload separately and are strictly secondary: a failure here must not
+        // hold up session sync, which is the thing the player actually sees.
+        val pendingCaptures = container.captureStore.unsynced()
+        if (pendingCaptures.isNotEmpty()) {
+            container.dashboardClient.uploadCaptures(
+                baseUrl = baseUrl,
+                token = token,
+                captures = pendingCaptures.map { it.export }
+            ).fold(
+                onSuccess = { container.captureStore.markSynced(it.accepted) },
+                onFailure = { Log.w(TAG, "Capture upload failed; will retry", it) }
+            )
+        }
+
         val pending = container.sessionStore.unsynced()
         if (pending.isEmpty()) return Result.success()
 

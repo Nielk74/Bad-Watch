@@ -3,6 +3,14 @@
 ## [Unreleased]
 
 ### Added
+- **Labelled data collection.** A "Collect data" drill records swings with a ground-truth
+  label: pick a stroke, hit repetitions, save. `SwingSegmenter` cuts windows on
+  angular-velocity peaks, deliberately independent of the rule-based classifier so the
+  training set does not inherit its blind spots.
+- **Training pipeline** in `tools/`: `ingest.py` flattens captures into a feature dataset
+  (standard library only), `train.py` fits a baseline with cross-validation grouped by
+  device so a player never appears in both train and test.
+- Capture upload endpoint (`POST /api/v1/captures`) and dataset-progress summary.
 - **Real session recording.** Fused gyroscope + accelerometer + heart-rate capture at 100 Hz
   with hardware FIFO batching, driven by a `health` foreground service so a session survives
   the watch screen turning off.
@@ -27,11 +35,15 @@
   referenced by the application.
 - Sensor timestamps come from the monotonic `SensorEvent.timestamp` rather than wall-clock
   time read on the delivery thread.
+- Heart rate is `Float?` rather than `Float` throughout. A session with no readings now
+  reports null instead of standing in the 60 bpm resting baseline, which was a quiet lie.
 - Persistence uses per-session JSON files rather than the previously documented (and never
   implemented) DataStore.
-- Migrated to Kotlin 2.1 with the `org.jetbrains.kotlin.plugin.compose` Gradle plugin.
-  AGP 8.13's lint crashed reading Kotlin 1.9 metadata, which made `lintDebug` fail from a
-  clean build; aligning the toolchain fixed it and removed the need to suppress anything.
+- Migrated to Kotlin 2.1 with the `org.jetbrains.kotlin.plugin.compose` Gradle plugin, and
+  bumped the Compose BOM (2024.05 → 2025.06), Wear Compose and `compileSdk` (34 → 36).
+  `lintDebug` was crashing inside `ComposableFlowOperatorDetector` on any file using a Flow
+  operator: the 2024 detector could not read Kotlin 2.x metadata. Updating the toolchain
+  fixed it properly, with no suppressions. `targetSdk` deliberately stays at 34.
 
 ### Removed
 - The gyroscope diagnostics UI, its ViewModel and its sensor collector. These computed
@@ -41,6 +53,14 @@
   into `Log.d`.
 
 ### Fixed
+- **Saving a session or drill no longer crashes the app.** Heart rate used `Float.NaN` as
+  its "no reading" sentinel, and `kotlinx.serialization` cannot encode NaN — so persisting
+  anything recorded before the optical sensor gets a lock killed the process and lost the
+  recording. Heart rate is now nullable end to end, `SensorSample` rejects NaN at
+  construction, and a serialization test covers the no-heart-rate path.
+- **Data-collection drills survive backgrounding.** Drills now run under the same foreground
+  service as sessions; previously the process could be killed mid-drill, silently discarding
+  every collected swing.
 - Recording no longer stops when the screen sleeps. Capture was previously bound to the
   Activity lifecycle, so it ended seconds after the player started playing.
 - `distinctUntilChanged()` no longer drops repeated sensor readings — a wrist at rest

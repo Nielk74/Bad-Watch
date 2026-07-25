@@ -25,7 +25,9 @@ fun computeVersionCode(version: String): Int {
 
 android {
     namespace = "com.badwatch.app"
-    compileSdk = 34
+    // Compiling against 36 is required by current Compose/Wear artifacts. targetSdk stays
+    // at 34 deliberately — raising it changes runtime behaviour and needs its own testing pass.
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.badwatch.badwatch"

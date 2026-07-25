@@ -16,6 +16,9 @@
     </plurals>
     <string name="session_notification_stop">Stop</string>
 
+    <string name="capture_notification_title">Collecting training data</string>
+    <string name="capture_notification_body">%1$s · %2$s drill</string>
+
     <string name="onboarding_wrist_title">Wear it on your racket hand</string>
     <string name="onboarding_wrist_body">Bad Watch detects shots from the swing itself. Worn on your other wrist it cannot see your strokes at all.</string>
 </resources>

@@ -108,6 +108,8 @@ flag — see the coach-mode item in the product plan.
 | `GET` | `/api/v1/sessions/{id}` | One full session including every shot |
 | `DELETE` | `/api/v1/sessions/{id}` | Remove a session (requires the token) |
 | `GET` | `/api/v1/dashboard` | Pre-aggregated data the dashboard page renders |
+| `POST` | `/api/v1/captures` | Upload labelled training drills (`CaptureEnvelope`) |
+| `GET` | `/api/v1/captures/summary` | Dataset progress: swings per stroke, contributing devices |
 
 A schema-version mismatch is rejected with HTTP 400 rather than being parsed optimistically —
 a silently misread session is worse than an upload the watch retries after an app update.

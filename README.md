@@ -29,7 +29,8 @@ because the backhand pronation signature mirrors between hands.
 | Session persistence | ✅ One JSON file per session on the watch, durable across restarts |
 | Dashboard sync | ✅ WorkManager-backed upload with retry; the watch is fully functional offline |
 | Web dashboard | ✅ Self-hosted Ktor server + browser dashboard with load trend, shot mix, rally distribution |
-| ML classifier | ❌ Not started (Phase 2) |
+| Labelled data collection | ✅ On-watch drill records labelled swings; `tools/` ingests and trains a baseline |
+| ML classifier | ❌ Not started — needs real players. See [`tools/README.md`](tools/README.md) |
 | Footwork, lunges, jumps | ❌ Not started (Phase 4) |
 | Auto-scoring, match mode | ❌ Not started (Phase 5) |
 
@@ -41,6 +42,7 @@ core/      Platform-free analytics — classifier, rally segmentation, session m
            and the sync contract shared verbatim with the server
 server/    Self-hosted Ktor dashboard — session ingest + browser dashboard
 docs/      Architecture, usage, dashboard setup, product plan
+tools/     Python capture ingestion and classifier training
 isolate/   Headless Wear OS emulator tooling (screenshots, UI dumps, adb wrappers)
 tooling/   Release helper scripts
 ```
@@ -54,13 +56,14 @@ drift out of sync.
 ### Prerequisites
 
 - JDK 17
-- Android SDK with `platforms;android-34` and `build-tools;34.0.0`
+- Android SDK with `platforms;android-36` and `build-tools;36.0.0`
+  (the app compiles against 36; `targetSdk` stays at 34)
 
 On macOS:
 
 ```bash
 brew install --cask android-commandlinetools
-sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 echo "sdk.dir=/opt/homebrew/share/android-commandlinetools" > local.properties
 ```
 
@@ -97,6 +100,7 @@ Full setup, including reaching the server from the watch and configuring a token
 - [Architecture](docs/architecture.md) — how the pieces fit
 - [Usage guide](docs/usage.md) — using it on court
 - [Dashboard setup](docs/dashboard.md) — running and securing the server
+- [Training pipeline](tools/README.md) — collecting labelled swings and training a classifier
 - [Agent/maintainer guide](AGENT.MD) — environment, workflows, debugging
 - [Changelog](CHANGELOG.md)
 

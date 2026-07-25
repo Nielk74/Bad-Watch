@@ -5,9 +5,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.badwatch.app.AppContainer
 import com.badwatch.app.data.StoredSession
+import com.badwatch.app.domain.CaptureState
 import com.badwatch.app.domain.SessionController
 import com.badwatch.app.domain.SessionState
 import com.badwatch.core.model.Handedness
+import com.badwatch.core.model.ShotType
 import com.badwatch.core.model.PlayerProfile
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,6 +32,11 @@ class BadWatchViewModel(
 
     val history: StateFlow<List<StoredSession>> = container.sessionStore.sessions
 
+    val captureState: StateFlow<CaptureState> = container.captureController.state
+
+    private val _labelledSwingCount = MutableStateFlow(0)
+    val labelledSwingCount: StateFlow<Int> = _labelledSwingCount.asStateFlow()
+
     val profile: StateFlow<PlayerProfile> = container.settingsStore.profile
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlayerProfile())
 
@@ -45,6 +52,7 @@ class BadWatchViewModel(
     init {
         viewModelScope.launch {
             container.sessionStore.refresh()
+            _labelledSwingCount.value = container.captureStore.totalSwings()
             _dashboardUrl.value = container.settingsStore.dashboardUrl.first()
         }
     }
@@ -74,6 +82,29 @@ class BadWatchViewModel(
     fun acknowledge() {
         container.sessionController.acknowledge()
         viewModelScope.launch { container.sessionStore.refresh() }
+    }
+
+    fun startCapture(label: ShotType) {
+        container.captureController.start(label)
+    }
+
+    fun discardLastSwing() {
+        container.captureController.discardLastSwing()
+    }
+
+    fun finishCapture() {
+        viewModelScope.launch {
+            container.captureController.finish()
+            _labelledSwingCount.value = container.captureStore.totalSwings()
+        }
+    }
+
+    fun cancelCapture() {
+        container.captureController.cancel()
+    }
+
+    fun acknowledgeCapture() {
+        container.captureController.acknowledge()
     }
 
     fun deleteSession(sessionId: String) {

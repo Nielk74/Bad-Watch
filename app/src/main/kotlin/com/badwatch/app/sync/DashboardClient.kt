@@ -1,6 +1,8 @@
 package com.badwatch.app.sync
 
 import com.badwatch.core.sync.BadWatchJson
+import com.badwatch.core.sync.CaptureEnvelope
+import com.badwatch.core.sync.CaptureExport
 import com.badwatch.core.sync.SessionExport
 import com.badwatch.core.sync.SyncEnvelope
 import com.badwatch.core.sync.SyncResponse
@@ -32,11 +34,49 @@ class DashboardClient(
         baseUrl: String,
         token: String?,
         sessions: List<SessionExport>
-    ): Result<SyncResponse> = withContext(Dispatchers.IO) {
-        if (sessions.isEmpty()) return@withContext Result.success(SyncResponse())
+    ): Result<SyncResponse> {
+        if (sessions.isEmpty()) return Result.success(SyncResponse())
+        return post(
+            baseUrl = baseUrl,
+            path = SESSIONS_PATH,
+            token = token,
+            body = BadWatchJson.encodeToString(
+                SyncEnvelope.serializer(),
+                SyncEnvelope(sessions = sessions)
+            )
+        )
+    }
 
+    /**
+     * Uploads labelled training data. Separate from sessions because capture payloads carry
+     * raw sample windows and are orders of magnitude larger — batching them together would
+     * make a single failure retry the whole lot.
+     */
+    suspend fun uploadCaptures(
+        baseUrl: String,
+        token: String?,
+        captures: List<CaptureExport>
+    ): Result<SyncResponse> {
+        if (captures.isEmpty()) return Result.success(SyncResponse())
+        return post(
+            baseUrl = baseUrl,
+            path = CAPTURES_PATH,
+            token = token,
+            body = BadWatchJson.encodeToString(
+                CaptureEnvelope.serializer(),
+                CaptureEnvelope(captures = captures)
+            )
+        )
+    }
+
+    private suspend fun post(
+        baseUrl: String,
+        path: String,
+        token: String?,
+        body: String
+    ): Result<SyncResponse> = withContext(Dispatchers.IO) {
         runCatching {
-            val url = URL(baseUrl.trimEnd('/') + SYNC_PATH)
+            val url = URL(baseUrl.trimEnd('/') + path)
             val connection = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 connectTimeout = connectTimeoutMillis
@@ -50,19 +90,15 @@ class DashboardClient(
             }
 
             try {
-                val payload = BadWatchJson.encodeToString(
-                    SyncEnvelope.serializer(),
-                    SyncEnvelope(sessions = sessions)
-                )
-                connection.outputStream.bufferedWriter().use { it.write(payload) }
+                connection.outputStream.bufferedWriter().use { it.write(body) }
 
                 val code = connection.responseCode
                 if (code !in 200..299) {
                     val detail = connection.errorStream?.bufferedReader()?.use { it.readText() }
                     throw IOException("Dashboard rejected upload: HTTP $code ${detail.orEmpty()}")
                 }
-                val body = connection.inputStream.bufferedReader().use { it.readText() }
-                BadWatchJson.decodeFromString(SyncResponse.serializer(), body)
+                val responseBody = connection.inputStream.bufferedReader().use { it.readText() }
+                BadWatchJson.decodeFromString(SyncResponse.serializer(), responseBody)
             } finally {
                 connection.disconnect()
             }
@@ -70,6 +106,7 @@ class DashboardClient(
     }
 
     private companion object {
-        const val SYNC_PATH = "/api/v1/sessions"
+        const val SESSIONS_PATH = "/api/v1/sessions"
+        const val CAPTURES_PATH = "/api/v1/captures"
     }
 }

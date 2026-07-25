@@ -1,5 +1,6 @@
 package com.badwatch.server
 
+import com.badwatch.core.sync.CaptureEnvelope
 import com.badwatch.core.sync.SessionExport
 import com.badwatch.core.sync.SyncEnvelope
 import com.badwatch.core.sync.SyncResponse
@@ -53,13 +54,21 @@ fun main() {
     println("[bad-watch] Dashboard: http://localhost:$port/")
 
     embeddedServer(Netty, port = port) {
-        badWatchModule(SessionRepository(dataDir), token)
+        badWatchModule(
+            repository = SessionRepository(dataDir),
+            token = token,
+            captureRepository = CaptureRepository(File(dataDir, "captures"))
+        )
     }.start(wait = true)
 }
 
 const val DEFAULT_PORT = 8080
 
-fun Application.badWatchModule(repository: SessionRepository, token: String?) {
+fun Application.badWatchModule(
+    repository: SessionRepository,
+    token: String?,
+    captureRepository: CaptureRepository = CaptureRepository(java.io.File("badwatch-data/captures"))
+) {
     install(ContentNegotiation) {
         json(Json { encodeDefaults = true; ignoreUnknownKeys = true })
     }
@@ -122,6 +131,40 @@ fun Application.badWatchModule(repository: SessionRepository, token: String?) {
 
         get("/api/v1/sessions") {
             call.respond(repository.all())
+        }
+
+        /** Labelled training data from a capture drill. */
+        post("/api/v1/captures") {
+            if (!call.isAuthorised(token)) {
+                call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Invalid token"))
+                return@post
+            }
+
+            val envelope = call.receive<CaptureEnvelope>()
+            if (envelope.schemaVersion != SessionExport.SCHEMA_VERSION) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    ErrorResponse(
+                        "Unsupported schema version ${envelope.schemaVersion}; " +
+                            "this server speaks ${SessionExport.SCHEMA_VERSION}"
+                    )
+                )
+                return@post
+            }
+
+            val accepted = mutableListOf<String>()
+            val rejected = mutableMapOf<String, String>()
+            envelope.captures.forEach { export ->
+                runCatching { captureRepository.save(export) }
+                    .onSuccess { accepted += export.capture.id }
+                    .onFailure { rejected[export.capture.id] = it.message ?: "Could not store capture" }
+            }
+            call.respond(SyncResponse(accepted = accepted, rejected = rejected))
+        }
+
+        /** Dataset progress: how many labelled swings exist, per stroke. */
+        get("/api/v1/captures/summary") {
+            call.respond(captureRepository.summary())
         }
 
         get("/api/v1/dashboard") {

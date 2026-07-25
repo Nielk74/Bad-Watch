@@ -12,7 +12,8 @@ data class ShotEvent(
     val timestampMillis: Long,
     val confidence: Float,
     val peakAngularVelocity: Float,
-    val heartRateBpm: Float,
+    /** Heart rate at contact, or null when the sensor had no lock. */
+    val heartRateBpm: Float?,
     val swingDurationMillis: Long,
     val fatigueEstimate: Float = 0f
 )

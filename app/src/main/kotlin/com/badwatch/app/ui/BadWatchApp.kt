@@ -35,11 +35,13 @@ import androidx.wear.compose.material.ToggleChip
 import androidx.wear.compose.material.ToggleChipDefaults
 import com.badwatch.app.R
 import com.badwatch.app.data.StoredSession
+import com.badwatch.app.domain.CaptureState
 import com.badwatch.app.domain.SessionState
 import com.badwatch.app.ui.theme.AccentCritical
 import com.badwatch.app.ui.theme.AccentPositive
 import com.badwatch.app.ui.theme.BadWatchTheme
 import com.badwatch.core.model.Handedness
+import com.badwatch.core.model.ShotType
 import com.badwatch.app.viewmodel.BadWatchViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -56,9 +58,12 @@ import java.util.Locale
 fun BadWatchApp(
     viewModel: BadWatchViewModel,
     onStartSession: () -> Unit,
-    onStopSession: () -> Unit
+    onStopSession: () -> Unit,
+    onStartCapture: (ShotType) -> Unit,
+    onFinishCapture: () -> Unit
 ) {
     val sessionState by viewModel.sessionState.collectAsStateWithLifecycle()
+    val captureState by viewModel.captureState.collectAsStateWithLifecycle()
     val onboarded by viewModel.onboardingComplete.collectAsStateWithLifecycle()
     var screen by remember { mutableStateOf(Screen.Home) }
 
@@ -84,6 +89,30 @@ fun BadWatchApp(
                 }
             )
 
+            captureState is CaptureState.Capturing -> CaptureScreen(
+                state = captureState as CaptureState.Capturing,
+                onDiscardLast = viewModel::discardLastSwing,
+                onFinish = onFinishCapture,
+                onCancel = {
+                    viewModel.cancelCapture()
+                    screen = Screen.Home
+                }
+            )
+
+            captureState is CaptureState.Saved -> CaptureSavedScreen(
+                export = (captureState as CaptureState.Saved).export,
+                onDone = {
+                    viewModel.acknowledgeCapture()
+                    screen = Screen.Home
+                }
+            )
+
+            screen == Screen.Capture -> CapturePickerScreen(
+                totalSwings = viewModel.labelledSwingCount.collectAsStateWithLifecycle().value,
+                onPick = onStartCapture,
+                onBack = { screen = Screen.Home }
+            )
+
             sessionState is SessionState.Failed -> ErrorScreen(
                 message = (sessionState as SessionState.Failed).message,
                 onDismiss = viewModel::acknowledge
@@ -103,13 +132,14 @@ fun BadWatchApp(
                 viewModel = viewModel,
                 onStart = onStartSession,
                 onOpenHistory = { screen = Screen.History },
-                onOpenSettings = { screen = Screen.Settings }
+                onOpenSettings = { screen = Screen.Settings },
+                onOpenCapture = { screen = Screen.Capture }
             )
         }
     }
 }
 
-private enum class Screen { Home, History, Settings }
+private enum class Screen { Home, History, Settings, Capture }
 
 @Composable
 private fun LoadingScreen() {
@@ -129,7 +159,8 @@ private fun HomeScreen(
     viewModel: BadWatchViewModel,
     onStart: () -> Unit,
     onOpenHistory: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenCapture: () -> Unit
 ) {
     val history by viewModel.history.collectAsStateWithLifecycle()
     val last = history.firstOrNull()
@@ -180,6 +211,13 @@ private fun HomeScreen(
             CompactChip(
                 onClick = onOpenHistory,
                 label = { Text("History (${history.size})") },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        item {
+            CompactChip(
+                onClick = onOpenCapture,
+                label = { Text("Collect data") },
                 modifier = Modifier.fillMaxWidth()
             )
         }

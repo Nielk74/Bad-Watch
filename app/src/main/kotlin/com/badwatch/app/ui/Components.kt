@@ -126,8 +126,8 @@ fun formatDuration(durationMillis: Long): String {
     }
 }
 
-fun formatHeartRate(bpm: Float): String =
-    if (bpm.isNaN() || bpm <= 0f) "--" else bpm.toInt().toString()
+fun formatHeartRate(bpm: Float?): String =
+    if (bpm == null || bpm <= 0f) "--" else bpm.toInt().toString()
 
 /** Work:rest shown the way coaches say it — "1:2.3". */
 fun formatRestRatio(ratio: Float): String =

@@ -41,7 +41,7 @@ class TrainingSessionAggregator(
         }
         lastSample = sample
         val hr = sample.heartRateBpm
-        if (!hr.isNaN() && hr > 0f) {
+        if (hr != null && hr > 0f) {
             heartRates.addLast(hr)
             accumulatedHeartRate += hr.toDouble()
             val zone = heartRateZoneFor(hr, maxHeartRate)
@@ -59,19 +59,21 @@ class TrainingSessionAggregator(
 
     fun snapshot(nowMillis: Long): TrainingSessionSnapshot {
         val duration = max(0L, nowMillis - startTimeMillis)
-        val hrAverage = if (heartRates.isEmpty()) baselineHeartRate else (accumulatedHeartRate / heartRates.size).toFloat()
-        val hrMax = heartRates.maxOrNull() ?: baselineHeartRate
-        val fatigueScore = computeFatigueScore(hrAverage, hrMax)
+        // Null, not a baseline stand-in: reporting 60 bpm for a session that recorded no
+        // heart rate at all is a quiet lie, and the UI already renders null as "--".
+        val hrAverage = if (heartRates.isEmpty()) null else (accumulatedHeartRate / heartRates.size).toFloat()
+        val hrMax = heartRates.maxOrNull()
+        val fatigueScore = computeFatigueScore(hrAverage ?: baselineHeartRate, hrMax ?: baselineHeartRate)
         val recoveryScore = computeRecoveryScore()
-        val effortScore = computeEffortScore(fatigueScore, hrMax)
+        val effortScore = computeEffortScore(fatigueScore, hrMax ?: baselineHeartRate)
         val dominantZone = zoneHistogram.maxByOrNull { it.value }?.key
-            ?: heartRateZoneFor(hrAverage, maxHeartRate)
+            ?: heartRateZoneFor(hrAverage ?: baselineHeartRate, maxHeartRate)
         val counts = shots.groupingBy { it.type }.eachCount()
         val totalShots = shots.size
         return TrainingSessionSnapshot(
             startedAtMillis = startTimeMillis,
             durationMillis = duration,
-            currentHeartRate = lastSample?.heartRateBpm ?: Float.NaN,
+            currentHeartRate = lastSample?.heartRateBpm,
             averageHeartRate = hrAverage,
             maxHeartRate = hrMax,
             totalShots = totalShots,
@@ -86,6 +88,10 @@ class TrainingSessionAggregator(
     }
 
     fun buildSession(nowMillis: Long): TrainingSession {
+        val fatigue = computeFatigueScore(
+            recordedAverageHeartRate() ?: baselineHeartRate,
+            recordedMaxHeartRate() ?: baselineHeartRate
+        )
         val summary = TrainingSummary(
             totalShots = shots.size,
             shotCounts = shots.groupingBy { it.type }.eachCount(),
@@ -93,11 +99,8 @@ class TrainingSessionAggregator(
             averageHeartRate = recordedAverageHeartRate(),
             maxHeartRate = recordedMaxHeartRate(),
             recoveryScore = computeRecoveryScore(),
-            fatigueScore = computeFatigueScore(recordedAverageHeartRate(), recordedMaxHeartRate()),
-            effortScore = computeEffortScore(
-                computeFatigueScore(recordedAverageHeartRate(), recordedMaxHeartRate()),
-                recordedMaxHeartRate()
-            ),
+            fatigueScore = fatigue,
+            effortScore = computeEffortScore(fatigue, recordedMaxHeartRate() ?: baselineHeartRate),
             heartRateZoneHistogram = zoneHistogram.toMap()
         )
         return TrainingSession(
@@ -109,11 +112,10 @@ class TrainingSessionAggregator(
         )
     }
 
-    private fun recordedAverageHeartRate(): Float =
-        if (heartRates.isEmpty()) baselineHeartRate else (accumulatedHeartRate / heartRates.size).toFloat()
+    private fun recordedAverageHeartRate(): Float? =
+        if (heartRates.isEmpty()) null else (accumulatedHeartRate / heartRates.size).toFloat()
 
-    private fun recordedMaxHeartRate(): Float =
-        heartRates.maxOrNull() ?: baselineHeartRate
+    private fun recordedMaxHeartRate(): Float? = heartRates.maxOrNull()
 
     private fun computeFatigueScore(avg: Float, maxHr: Float): Float {
         val loadRatio = (avg - baselineHeartRate) / (maxHeartRate - baselineHeartRate)

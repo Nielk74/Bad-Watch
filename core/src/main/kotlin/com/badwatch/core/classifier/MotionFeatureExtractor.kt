@@ -78,7 +78,14 @@ object MotionFeatureExtractor {
         val horizontalRatio = if (totalComponents == 0f) 0f else horizontalSum / totalComponents
         val handSign = if (handedness == Handedness.Left) -1f else 1f
         val pren = handSign * pronationAccumulator / max(1, count)
-        val heartRateDelta = samples.last().heartRateBpm - samples.first().heartRateBpm
+        // Only meaningful when both ends of the window have a reading.
+        val firstHeartRate = samples.first().heartRateBpm
+        val lastHeartRate = samples.last().heartRateBpm
+        val heartRateDelta = if (firstHeartRate != null && lastHeartRate != null) {
+            lastHeartRate - firstHeartRate
+        } else {
+            0f
+        }
         val directionalTrend = computeDirectionalTrend(samples)
         val stabilityScore = if (count <= 1) 1f else 1f - (stabilityAccumulator / count).coerceIn(0f, 1f)
 

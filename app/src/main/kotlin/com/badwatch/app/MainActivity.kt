@@ -12,6 +12,7 @@ import com.badwatch.app.service.SessionService
 import com.badwatch.app.sync.SyncWorker
 import com.badwatch.app.ui.BadWatchApp
 import com.badwatch.app.viewmodel.BadWatchViewModel
+import com.badwatch.core.model.ShotType
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -34,7 +35,9 @@ class MainActivity : ComponentActivity() {
             BadWatchApp(
                 viewModel = viewModel,
                 onStartSession = ::startSession,
-                onStopSession = ::stopSession
+                onStopSession = ::stopSession,
+                onStartCapture = ::startCapture,
+                onFinishCapture = ::finishCapture
             )
         }
     }
@@ -61,6 +64,20 @@ class MainActivity : ComponentActivity() {
             SessionService.stop(this@MainActivity)
             SyncWorker.enqueue(this@MainActivity)
         }
+    }
+
+    /**
+     * Drills run under the same foreground service as sessions. Without it, backgrounding
+     * the app mid-drill lets the process be killed and silently discards every collected
+     * swing — which is exactly what happened the first time this was tested on a device.
+     */
+    private fun startCapture(label: ShotType) {
+        requestSessionPermissions()
+        SessionService.startCapture(this, label)
+    }
+
+    private fun finishCapture() {
+        SessionService.stopCapture(this)
     }
 
     private fun requestSessionPermissions() {

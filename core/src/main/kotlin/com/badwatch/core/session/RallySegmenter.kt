@@ -56,11 +56,11 @@ class RallySegmenter(
                 shotCount = group.size,
                 shotCounts = group.groupingBy { it.type }.eachCount(),
                 peakAngularVelocity = group.maxOf { it.peakAngularVelocity },
-                averageHeartRate = group.map { it.heartRateBpm }
-                    .filter { !it.isNaN() && it > 0f }
-                    .average()
-                    .takeIf { !it.isNaN() }
-                    ?.toFloat() ?: 0f,
+                averageHeartRate = group.mapNotNull { it.heartRateBpm }
+                    .filter { it > 0f }
+                    .takeIf { it.isNotEmpty() }
+                    ?.average()
+                    ?.toFloat(),
                 restBeforeMillis = previousEnd?.let { start - it } ?: 0L
             )
             previousEnd = end

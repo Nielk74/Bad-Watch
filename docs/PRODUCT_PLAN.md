@@ -4,7 +4,9 @@
 > state of the project, the product thesis, the full feature vision, and a phased
 > plan to get from "gyroscope demo" to "the thing serious players wear every session."
 
-**Progress: Phase 0 complete · Phase 1 substantially complete · dashboard delivered early.**
+**Progress: Phase 0 complete · Phase 1 substantially complete · dashboard and the labelled
+data pipeline delivered.** The blocker on Phase 2 is now data collection with real players,
+not missing tooling.
 See [Part 5 — Roadmap](#part-5--roadmap) for per-phase status and
 [Part 8 — Changes to this plan](#part-8--changes-to-this-plan) for decisions that have been
 revised since it was written.
@@ -104,10 +106,17 @@ speed grade (76–78, and it shifts with hall temperature and altitude), grip, h
 and drafts. They will absolutely log this if you make it two taps, and correlating it with
 performance is a feature no competitor has.
 
-**Which wrist matters enormously.** Most players wear the watch on the *non-dominant* wrist.
-That is a completely different signal: no racket swing, but excellent body rotation, footwork,
-and lunge/jump data. This is not an edge case — it's probably the majority case, and it needs
-its own model and its own honest feature set. Getting this wrong invalidates everything.
+**Which wrist matters enormously.** Habitually, most people wear a watch on the
+*non-dominant* wrist — which for a racket sport is a completely different signal: no swing
+at all, but good body rotation, footwork and lunge/jump data.
+
+> **Decided:** Bad Watch requires the **racket wrist**, and says so in onboarding. Supporting
+> both would mean two models and two honest-but-different feature sets before either is good.
+> The non-dominant, footwork-only mode is deferred, not rejected — `WristPlacement` keeps a
+> place for it in the data model. See [Part 8](#part-8--changes-to-this-plan).
+
+The footwork work in Pillar 3 is what would eventually make that second mode viable, since
+almost all of it works on either wrist.
 
 ---
 
@@ -359,14 +368,21 @@ You cannot build a classifier without data, and there was no way to collect any.
 - ✅ Rally segmentation with work:rest analysis — pulled forward from Phase 3 because the
   dashboard needed it and it is pure, testable math.
 - ⬜ Health Services `ExerciseClient` instead of raw `SensorManager` for HR.
-- ⬜ On-watch labeling: pick a stroke, hit twenty, tap done; plus "tag that last shot".
-- ⬜ `tools/` Python ingestion pipeline.
+- ✅ On-watch labelled capture: pick a stroke, hit repetitions, save the drill.
+  `SwingSegmenter` cuts windows on angular-velocity peaks, deliberately independent of the
+  rule-based classifier so the training set does not inherit its blind spots.
+- ✅ `tools/` ingestion and training pipeline with device-grouped cross-validation.
+- ⬜ Post-hoc "tag that last shot" flow during ordinary sessions.
 - ⬜ Battery instrumentation harness.
 - ⬜ Zero-allocation ring buffers in the hot path (`ShotDetectionPipeline` still calls
   `buffer.toList()` per sample).
 
-**Remaining before Phase 1 closes:** the labeling flow and the ingestion pipeline. Without
-them there is still no path to a training corpus, which is the whole point of this phase.
+**Remaining before Phase 1 closes:** Health Services, the battery harness, and the
+zero-allocation hot path. The dataset path — the thing that actually gates Phase 2 — is now
+open end to end: record a drill on the watch, sync it, run `tools/ingest.py`, train.
+
+**Phase 1 status: substantially complete.** What is left is optimisation and accuracy of the
+physiological signal, not capability.
 
 ### Phase 1.5 — Dashboard ✅ **Complete** *(pulled forward)*
 
