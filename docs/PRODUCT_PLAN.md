@@ -420,12 +420,15 @@ dominant wrist, across players not in the training set.
 
 - ✅ Rally segmentation and work:rest analysis *(delivered in Phase 1)*.
 - 🟡 Live HUD: the glanceable layout (giant primary number, rally metrics, post-session
-  recap) is built. Haptic-first feedback, rotary navigation and ambient mode are not.
+  recap) is built, now with haptic-on-shot and a Wear OS 6 dynamic palette. Rotary
+  navigation comes free with the M3 lists. Ambient mode is wired
+  (`AmbientLifecycleObserver` → dim static HUD) but untested on hardware with always-on
+  enabled.
 - ✅ Session insights — delivered early, because they only need signals that are already
   trustworthy. See [Part 9](#part-9--what-an-insight-is-allowed-to-say).
 - Post-session recap: shot distribution, rally timeline, HR profile, fatigue curve.
 - Session history with trends; goals and personal bests.
-- Tile and complications.
+- 🟡 Tile delivered (last session + weekly load, Start chip deep link); complications not.
 - Fatigue detection from technique degradation — the flagship insight.
 
 **Ships:** v1.0. A complete, useful, self-contained badminton training app.

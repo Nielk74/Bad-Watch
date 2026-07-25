@@ -6,10 +6,13 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.material3.AppScaffold
 import com.badwatch.app.data.StoredSession
@@ -18,6 +21,8 @@ import com.badwatch.app.domain.SessionState
 import com.badwatch.app.ui.theme.BadWatchTheme
 import com.badwatch.app.viewmodel.BadWatchViewModel
 import com.badwatch.core.model.ShotType
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Root of the watch UI.
@@ -34,13 +39,24 @@ fun BadWatchApp(
     onStartSession: () -> Unit,
     onStopSession: () -> Unit,
     onStartCapture: (ShotType) -> Unit,
-    onFinishCapture: () -> Unit
+    onFinishCapture: () -> Unit,
+    isAmbient: StateFlow<Boolean> = MutableStateFlow(false)
 ) {
     val sessionState by viewModel.sessionState.collectAsStateWithLifecycle()
     val captureState by viewModel.captureState.collectAsStateWithLifecycle()
     val onboarded by viewModel.onboardingComplete.collectAsStateWithLifecycle()
+    val ambient by isAmbient.collectAsStateWithLifecycle()
     var screen by remember { mutableStateOf(Screen.Home) }
     var detailSession by remember { mutableStateOf<StoredSession?>(null) }
+
+    // Haptic-first: a shot detected mid-rally is a buzz, not a pixel. The flow only emits
+    // while recording, so there is nothing to gate here.
+    val haptics = LocalHapticFeedback.current
+    LaunchedEffect(Unit) {
+        viewModel.shots.collect {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+    }
 
     val kind = when {
         onboarded == null -> ScreenKind.Loading
@@ -82,7 +98,8 @@ fun BadWatchApp(
                         LiveScreen(
                             state = live,
                             onStop = onStopSession,
-                            onDiscard = viewModel::discardSession
+                            onDiscard = viewModel::discardSession,
+                            isAmbient = ambient
                         )
                     }
 

@@ -90,6 +90,12 @@ dependencies {
     implementation(project(":core"))
 
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.wear)
+    constraints {
+        // androidx.wear:wear pulls an ancient fragment transitively; lint's
+        // InvalidFragmentVersionForActivityResult gate needs >= 1.3.0 resolved.
+        implementation(libs.androidx.fragment)
+    }
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -100,6 +106,12 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.bundles.compose)
     implementation(libs.bundles.wear.compose)
+
+    // Watch-face tile. tiles only exposes concurrent-futures on its runtime classpath, but the
+    // tile service compiles CallbackToFutureAdapter against it, so it is declared explicitly.
+    implementation(libs.androidx.wear.tiles)
+    implementation(libs.androidx.protolayout.material)
+    implementation(libs.androidx.concurrent.futures)
 
     testImplementation(libs.junit)
     testImplementation(libs.google.truth)

@@ -7,6 +7,24 @@
   detail view (`#/session/<id>`): stat strip, a rally timeline (rally bands scaled by shot
   count, per-shot ticks colored by type, tooltips, legend), and the session's shot mix —
   all rendered client-side from the existing `GET /api/v1/sessions/{id}` payload.
+- **Wear OS 6 dynamic theming.** The app now takes its palette from the user's watch face
+  where the system offers one (`dynamicColorScheme`), falling back to the brand scheme
+  elsewhere. Semantic colors (HR zones, shot families, severities) stay fixed — they carry
+  meaning and must not drift with the watch face.
+- **Shot haptics.** Every detected shot fires a haptic from `SessionController.shots` —
+  the flow existed for exactly this and was previously unwired. Haptic-first, as the
+  product thesis demands.
+- **Always-on ambient HUD.** `AmbientLifecycleObserver` drives a dim, static, burn-in-safe
+  rendering of the live HUD (count, HR, duration — no animations, no actions) so the
+  session stays glanceable with the wrist down. Recording continues in the foreground
+  service as before.
+- **Digit-morph shot counter.** On API 31+ the HUD count uses `AnimatedText` with
+  variable-font weight interpolation on top of the spring pulse.
+- **Watch-face Tile.** A `TileService` (protolayout) shows the last session's
+  shots/rallies/duration and the rolling seven-day load, with a Start chip that deep-links
+  into the app and begins recording. The tile reads `SessionStore` directly — the system
+  binds the service on its own schedule, so pulling in the whole app container would be
+  dead weight. Freshness interval: 30 minutes.
 
 ### Changed
 - **Zero-allocation detection window.** `ShotDetectionPipeline` now keeps its sliding

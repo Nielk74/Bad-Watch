@@ -51,7 +51,7 @@ crashes before severity is applied).
 | Module | What lives there |
 | --- | --- |
 | `:core` | Models, feature extraction, classifier, rally segmentation, `SessionRecorder`, sync contract. Pure JVM. |
-| `:app` | Wear app: `FusedSensorCollector`, `SessionService`, `SessionController`, `SessionStore`, `SyncWorker`, Compose UI. |
+| `:app` | Wear app: `FusedSensorCollector`, `SessionService`, `SessionController`, `SessionStore`, `SyncWorker`, Compose UI, watch-face tile (`tile/BadWatchTileService`). |
 | `:server` | Ktor dashboard: ingest, aggregation, static page, synthetic fixtures. |
 | `tools/` | Python: capture ingestion and classifier training. See `tools/README.md`. |
 

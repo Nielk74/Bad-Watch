@@ -1,9 +1,11 @@
 package com.badwatch.app.ui
 
+import android.os.Build
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,12 +30,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.pager.HorizontalPager
 import androidx.wear.compose.foundation.pager.rememberPagerState
 import androidx.wear.compose.material3.AlertDialog
 import androidx.wear.compose.material3.AlertDialogDefaults
+import androidx.wear.compose.material3.AnimatedText
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.CompactButton
@@ -44,6 +48,7 @@ import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ProgressIndicatorDefaults
 import androidx.wear.compose.material3.Text
+import androidx.wear.compose.material3.rememberAnimatedTextFontRegistry
 import com.badwatch.app.domain.SessionState
 import com.badwatch.app.ui.components.DetailRow
 import com.badwatch.app.ui.components.DistributionBar
@@ -74,8 +79,15 @@ import java.util.Locale
 fun LiveScreen(
     state: SessionState.Recording,
     onStop: () -> Unit,
-    onDiscard: () -> Unit
+    onDiscard: () -> Unit,
+    isAmbient: Boolean = false
 ) {
+    // Always-on: in ambient the watch keeps a dim, static face — no animations, no pager,
+    // no actions. Recording runs in the foreground service; this is purely the glance.
+    if (isAmbient) {
+        AmbientHud(state = state)
+        return
+    }
     val pagerState = rememberPagerState(pageCount = { 2 })
     var confirmDiscard by remember { mutableStateOf(false) }
 
@@ -183,7 +195,8 @@ private fun HudPage(
 
 /**
  * The count snaps back to rest with a spring every time it changes — the player *feels* a
- * detected shot when they glance down, without needing haptics to fire mid-rally.
+ * detected shot when they glance down, without needing haptics to fire mid-rally. On API 31+
+ * the digits themselves also morph weight via [AnimatedText] (variable-font interpolation).
  */
 @Composable
 private fun PulsingShotCount(count: Int) {
@@ -192,16 +205,74 @@ private fun PulsingShotCount(count: Int) {
         scale.snapTo(1.3f)
         scale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
     }
-    Text(
-        text = count.toString(),
-        style = MaterialTheme.typography.numeralExtraLarge,
-        color = MaterialTheme.colorScheme.primary,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.graphicsLayer {
-            scaleX = scale.value
-            scaleY = scale.value
+    val pulsed = Modifier.graphicsLayer {
+        scaleX = scale.value
+        scaleY = scale.value
+    }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val style = MaterialTheme.typography.numeralExtraLarge
+            .copy(color = MaterialTheme.colorScheme.primary)
+        val registry = rememberAnimatedTextFontRegistry(
+            startFontVariationSettings = FontVariation.Settings(FontVariation.weight(350)),
+            endFontVariationSettings = FontVariation.Settings(FontVariation.weight(900)),
+            textStyle = style
+        )
+        val fraction = remember { Animatable(1f) }
+        LaunchedEffect(count) {
+            fraction.snapTo(0f)
+            fraction.animateTo(1f, tween(300))
         }
-    )
+        AnimatedText(
+            text = count.toString(),
+            fontRegistry = registry,
+            progressFraction = { fraction.value },
+            modifier = pulsed
+        )
+    } else {
+        Text(
+            text = count.toString(),
+            style = MaterialTheme.typography.numeralExtraLarge,
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = TextAlign.Center,
+            modifier = pulsed
+        )
+    }
+}
+
+/**
+ * The always-on face. Ambient rules: mostly black pixels, thin strokes, no animation, no
+ * interactive elements — the system shifts it periodically against burn-in. Everything here
+ * is legible at a glance with the screen at its lowest power state.
+ */
+@Composable
+private fun AmbientHud(state: SessionState.Recording) {
+    val snapshot = state.snapshot
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "SHOTS",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = snapshot.totalShots.toString(),
+            style = MaterialTheme.typography.numeralExtraLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = "${formatHeartRate(snapshot.currentHeartRate)} bpm · " +
+                formatDuration(snapshot.durationMillis),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+    }
 }
 
 @Composable

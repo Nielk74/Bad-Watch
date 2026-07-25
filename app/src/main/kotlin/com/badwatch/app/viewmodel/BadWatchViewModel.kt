@@ -30,6 +30,9 @@ class BadWatchViewModel(
 
     val sessionState: StateFlow<SessionState> = container.sessionController.state
 
+    /** One emission per detected shot — the UI fires the haptic from this. */
+    val shots = container.sessionController.shots
+
     val history: StateFlow<List<StoredSession>> = container.sessionStore.sessions
 
     val captureState: StateFlow<CaptureState> = container.captureController.state

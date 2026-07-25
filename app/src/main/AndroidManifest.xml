@@ -54,6 +54,21 @@
             android:exported="false"
             android:foregroundServiceType="health" />
 
+        <!-- Watch-face tile: last session + weekly load, Start chip deep-links into MainActivity. -->
+        <service
+            android:name=".tile.BadWatchTileService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:icon="@drawable/ic_launcher_foreground"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@drawable/ic_launcher_foreground" />
+        </service>
+
         <meta-data
             android:name="com.google.android.wearable.standalone"
             android:value="true" />
