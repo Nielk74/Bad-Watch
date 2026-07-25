@@ -1,5 +1,8 @@
 package com.badwatch.server
 
+import com.badwatch.core.insight.Insight
+import com.badwatch.core.insight.InsightBaselineBuilder
+import com.badwatch.core.insight.SessionInsightEngine
 import com.badwatch.core.model.ShotType
 import com.badwatch.core.sync.SessionExport
 import kotlinx.serialization.Serializable
@@ -48,7 +51,12 @@ data class SessionCard(
     val averageHeartRate: Float?,
     val maxHeartRate: Float?,
     val shoulderLoad: Float,
-    val shotDistribution: List<ShotSlice>
+    val shotDistribution: List<ShotSlice>,
+    /**
+     * Derived by the same `:core` engine the watch uses, so a session never carries two
+     * different readings depending on where you look at it.
+     */
+    val insights: List<Insight> = emptyList()
 )
 
 /**
@@ -94,7 +102,7 @@ object Analytics {
         }
 
         val cards = sessions
-            .map { toCard(it) }
+            .map { toCard(it, sessions) }
             .sortedByDescending { it.startedAtMillis }
 
         val allRallies = sessions.flatMap { it.rallyProfile.rallies }
@@ -131,8 +139,17 @@ object Analytics {
         ShotType.Unknown
     )
 
-    private fun toCard(export: SessionExport): SessionCard {
+    private val insightEngine = SessionInsightEngine()
+
+    private fun toCard(export: SessionExport, history: List<SessionExport>): SessionCard {
         val summary = export.session.summary
+        // Baseline uses only sessions that came *before* this one: judging a session against
+        // data from its own future would make the same session read differently over time.
+        val baseline = InsightBaselineBuilder.build(
+            history
+                .filter { it.session.startedAtMillis < export.session.startedAtMillis }
+                .map { it.rallyProfile }
+        )
         return SessionCard(
             id = export.session.id,
             startedAtMillis = export.session.startedAtMillis,
@@ -147,7 +164,8 @@ object Analytics {
             shoulderLoad = shoulderLoad(export),
             shotDistribution = shotOrder.mapNotNull { type ->
                 summary.shotCounts[type]?.takeIf { it > 0 }?.let { ShotSlice(type.name, it) }
-            }
+            },
+            insights = insightEngine.generate(export.session, export.rallyProfile, baseline)
         )
     }
 

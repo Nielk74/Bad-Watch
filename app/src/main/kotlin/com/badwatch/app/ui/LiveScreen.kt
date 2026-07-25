@@ -9,7 +9,12 @@ import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import androidx.compose.ui.graphics.Color
+import androidx.wear.compose.foundation.lazy.items
 import com.badwatch.app.domain.SessionState
+import com.badwatch.app.ui.theme.AccentWarning
+import com.badwatch.core.insight.Insight
+import com.badwatch.core.insight.InsightSeverity
 import com.badwatch.app.ui.theme.AccentCritical
 import com.badwatch.core.model.ShotType
 import com.badwatch.core.sync.SessionExport
@@ -101,7 +106,11 @@ fun LiveScreen(
  * interval sport that is the number that actually characterises the session.
  */
 @Composable
-fun SummaryScreen(stored: SessionExport, onDone: () -> Unit) {
+fun SummaryScreen(
+    stored: SessionExport,
+    insights: List<Insight>,
+    onDone: () -> Unit
+) {
     val summary = stored.session.summary
     val rallies = stored.rallyProfile
 
@@ -121,6 +130,10 @@ fun SummaryScreen(stored: SessionExport, onDone: () -> Unit) {
                 third = "Time" to formatDuration(summary.durationMillis)
             )
         }
+        // Insights lead, because they are the only part of the recap that says something
+        // rather than just reporting. When the engine has nothing trustworthy to say it
+        // returns nothing, and this section simply does not appear.
+        items(insights) { insight -> InsightCard(insight) }
         item {
             SectionCard(title = "Rally structure") {
                 DetailRow("Avg rally", "${rallies.averageShotsPerRally.toInt()} shots")
@@ -155,6 +168,40 @@ fun SummaryScreen(stored: SessionExport, onDone: () -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun InsightCard(insight: Insight) {
+    SectionCard(title = insight.severity.label()) {
+        Text(
+            text = insight.headline,
+            style = MaterialTheme.typography.title3,
+            color = insight.severity.color()
+        )
+        Text(
+            text = insight.detail,
+            style = MaterialTheme.typography.caption1,
+            color = MaterialTheme.colors.onSurface.copy(alpha = 0.8f)
+        )
+        Text(
+            text = insight.evidence,
+            style = MaterialTheme.typography.caption2,
+            color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f)
+        )
+    }
+}
+
+@Composable
+private fun InsightSeverity.color(): Color = when (this) {
+    InsightSeverity.Info -> MaterialTheme.colors.onSurface
+    InsightSeverity.Notable -> MaterialTheme.colors.primary
+    InsightSeverity.Caution -> AccentWarning
+}
+
+private fun InsightSeverity.label(): String = when (this) {
+    InsightSeverity.Info -> "Noticed"
+    InsightSeverity.Notable -> "Stands out"
+    InsightSeverity.Caution -> "Worth watching"
 }
 
 fun ShotType.displayName(): String = when (this) {

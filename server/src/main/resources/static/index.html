@@ -129,6 +129,18 @@
   .tooltip .t-row { display: flex; justify-content: space-between; gap: 14px; color: var(--text-secondary); }
   .tooltip .t-row b { color: var(--text-primary); font-weight: 560; font-variant-numeric: tabular-nums; }
 
+  .insights { display: flex; flex-direction: column; gap: 12px; }
+  .insight { display: flex; gap: 12px; padding: 13px 15px; border-radius: 11px;
+             background: var(--surface-2); border-left: 3px solid var(--text-muted); }
+  .insight.notable { border-left-color: var(--series-1); }
+  .insight.caution { border-left-color: var(--status-warning); }
+  .insight .body { min-width: 0; }
+  .insight h3 { margin: 0 0 3px; font-size: 14.5px; font-weight: 600; }
+  .insight p { margin: 0; font-size: 13.5px; color: var(--text-secondary); }
+  .insight .evidence { margin-top: 5px; font-size: 12px; color: var(--text-muted);
+                       font-variant-numeric: tabular-nums; }
+  .insight-session { font-size: 12px; color: var(--text-muted); margin-bottom: 2px; }
+
   .empty { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
   .empty code { background: var(--surface-2); padding: 2px 7px; border-radius: 5px; font-size: 13px; }
   section { margin-top: 26px; }
@@ -177,6 +189,12 @@ function el(tag, attrs = {}, parent = null) {
   for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
   if (parent) parent.appendChild(node);
   return node;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, ch => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]
+  ));
 }
 
 const fmtInt = n => Math.round(n).toLocaleString();
@@ -412,6 +430,36 @@ function render(data) {
       <div class="foot"><span class="status"><span class="dot" style="background:${status.color}"></span>${status.label}</span></div>
     </div>`;
   content.appendChild(tiles);
+
+  // Insights first: they say something, whereas the charts only report. Sessions with
+  // nothing trustworthy to say produce no insights, and this block is simply absent.
+  const recentInsights = [];
+  for (const session of data.sessions) {
+    for (const insight of session.insights || []) {
+      recentInsights.push({ session, insight });
+      if (recentInsights.length >= 5) break;
+    }
+    if (recentInsights.length >= 5) break;
+  }
+
+  if (recentInsights.length) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="card-head"><h2>What stood out</h2>
+        <p class="card-note">Derived from rally structure and heart rate only — not from
+        stroke labels, which are not yet calibrated.</p></div>
+      <div class="insights">${recentInsights.map(({ session, insight }) => `
+        <div class="insight ${insight.severity.toLowerCase()}">
+          <div class="body">
+            <div class="insight-session">${fmtDateTime(session.startedAtMillis)}</div>
+            <h3>${escapeHtml(insight.headline)}</h3>
+            <p>${escapeHtml(insight.detail)}</p>
+            <div class="evidence">${escapeHtml(insight.evidence)}</div>
+          </div>
+        </div>`).join("")}</div>`;
+    content.appendChild(card);
+  }
 
   const grid = document.createElement("div");
   grid.className = "grid";

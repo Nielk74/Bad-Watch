@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Added
+- **Session insights.** `SessionInsightEngine` produces at most three evidence-backed
+  observations per session — excessive rest, rally-length decay, cardiac drift, a longest
+  rally — derived **only** from rally structure and heart rate. Stroke type is deliberately
+  excluded while the classifier remains uncalibrated. The engine stays silent when the data
+  is thin, and roughly half its test suite asserts exactly that. Shown on the watch recap
+  and on the dashboard, computed by the same `:core` code on both.
 - **Labelled data collection.** A "Collect data" drill records swings with a ground-truth
   label: pick a stroke, hit repetitions, save. `SwingSegmenter` cuts windows on
   angular-velocity peaks, deliberately independent of the rule-based classifier so the
@@ -28,6 +34,9 @@
 - Racket-wrist onboarding and left/right handedness, which mirrors the backhand pronation
   feature.
 - Synthetic session generator (`:server:seedDemoData`) for developing against the dashboard.
+  Its heart-rate model is a drifting baseline plus a within-rally ramp that recovers during
+  rest; the naive version ratcheted upward every shot, producing a 40+ bpm session rise that
+  no human does and making the cardiac-drift insight fire on every seeded session.
 - CI running JVM tests, lint and a debug assemble.
 
 ### Changed

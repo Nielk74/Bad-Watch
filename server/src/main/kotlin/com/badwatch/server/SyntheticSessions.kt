@@ -10,6 +10,7 @@ import com.badwatch.core.session.RallySegmenter
 import com.badwatch.core.sync.SessionExport
 import java.io.File
 import java.util.UUID
+import kotlin.math.exp
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -42,7 +43,12 @@ object SyntheticSessions {
     ): SessionExport {
         val shots = mutableListOf<ShotEvent>()
         var cursor = startedAtMillis
-        var heartRate = 95f
+        // Heart rate is modelled as a slowly drifting resting baseline plus a within-rally
+        // ramp that mostly recovers during the gap between points. A naive model that simply
+        // ratchets upward on every shot produces a 40+ bpm rise across a session, which is
+        // not something a human does — and it made the cardiac-drift insight fire on every
+        // single seeded session, misrepresenting how often that rule actually triggers.
+        var restingBase = 96f
 
         repeat(rallies) {
             // Rally length is heavily right-skewed in badminton: most points are short,
@@ -51,9 +57,12 @@ object SyntheticSessions {
             val length = (shotsPerRally * (0.4f + random.nextFloat() * 1.1f)).roundToInt()
                 .coerceAtLeast(1)
                 .let { if (random.nextInt(12) == 0) it * 2 + random.nextInt(6) else it }
-            repeat(length) {
+            repeat(length) { shotIndex ->
                 val type = weightedShot(random)
-                heartRate = (heartRate + random.nextFloat() * 4f - 0.6f).coerceIn(90f, 186f)
+                // Climbs through the rally, steeply at first then flattening.
+                val ramp = 58f * (1f - exp(-shotIndex / 4.0)).toFloat()
+                val heartRate = (restingBase + ramp + random.nextFloat() * 4f - 2f)
+                    .coerceIn(90f, 190f)
                 shots += ShotEvent(
                     id = UUID.randomUUID().toString(),
                     type = type,
@@ -66,9 +75,11 @@ object SyntheticSessions {
                 // Shots inside a rally land 0.7-1.5 s apart.
                 cursor += 700 + random.nextInt(800)
             }
-            // Between points: retrieve shuttle, walk back, serve.
+            // Between points: retrieve shuttle, walk back, serve. Recovery is nearly
+            // complete early on and degrades slightly as the session wears on — roughly
+            // 8-12 bpm of genuine drift over an hour.
             cursor += 8_000 + random.nextInt(14_000)
-            heartRate = (heartRate - 6f - random.nextFloat() * 6f).coerceAtLeast(92f)
+            restingBase = (restingBase + 0.35f + random.nextFloat() * 0.3f).coerceAtMost(132f)
         }
 
         val endedAt = cursor

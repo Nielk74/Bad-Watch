@@ -3,6 +3,9 @@ package com.badwatch.app.domain
 import com.badwatch.app.data.SessionStore
 import com.badwatch.app.data.SettingsStore
 import com.badwatch.app.sensors.SensorStream
+import com.badwatch.core.insight.Insight
+import com.badwatch.core.insight.InsightBaselineBuilder
+import com.badwatch.core.insight.SessionInsightEngine
 import com.badwatch.core.model.PlayerProfile
 import com.badwatch.core.model.RallyProfile
 import com.badwatch.core.model.ShotEvent
@@ -43,6 +46,8 @@ class SessionController(
     /** Emitted per detected shot so the UI can fire a haptic without diffing snapshots. */
     private val _shots = MutableSharedFlow<ShotEvent>(extraBufferCapacity = 32)
     val shots: SharedFlow<ShotEvent> = _shots.asSharedFlow()
+
+    private val insightEngine = SessionInsightEngine()
 
     private var recorder: SessionRecorder? = null
     private var collectionJob: Job? = null
@@ -108,7 +113,18 @@ class SessionController(
             rallyProfile = recorded.rallyProfile
         )
         sessionStore.save(export)
-        _state.value = SessionState.Completed(export)
+
+        // Baseline is built from the sessions already on the watch, so comparisons are
+        // against this player rather than a population average.
+        val baseline = InsightBaselineBuilder.build(
+            sessionStore.sessions.value
+                .filterNot { it.export.session.id == export.session.id }
+                .map { it.export.rallyProfile }
+        )
+        _state.value = SessionState.Completed(
+            export = export,
+            insights = insightEngine.generate(export.session, export.rallyProfile, baseline)
+        )
         return export
     }
 
@@ -135,7 +151,10 @@ sealed interface SessionState {
         val profile: PlayerProfile
     ) : SessionState
 
-    data class Completed(val export: SessionExport) : SessionState
+    data class Completed(
+        val export: SessionExport,
+        val insights: List<Insight> = emptyList()
+    ) : SessionState
 
     data class Failed(val message: String) : SessionState
 }

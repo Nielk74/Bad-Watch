@@ -31,6 +31,7 @@ These are the decisions everything else follows from.
           classifier/  MotionFeatureExtractor, ShotClassifier
           pipeline/    ShotDetectionPipeline (sliding window)
           capture/     SwingSegmenter (labelled training windows)
+          insight/     SessionInsightEngine — session observations, evidence-backed
           session/     SessionRecorder, TrainingSessionAggregator, RallySegmenter
           sync/        SessionExport, SyncEnvelope, SyncResponse — the wire contract
 

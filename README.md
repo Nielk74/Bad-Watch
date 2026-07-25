@@ -26,6 +26,7 @@ because the backhand pronation signature mirrors between hands.
 | Recording survives screen-off | ✅ Foreground service with `health` type; a session no longer dies when the wrist drops |
 | Shot detection | ⚠️ Rule-based heuristics in `:core`, wired end to end but **not yet calibrated against real play** |
 | Rally segmentation | ✅ Rally count, length distribution, work:rest ratio, playing-time density |
+| Session insights | ✅ Evidence-backed, derived only from rally structure and heart rate — never from stroke labels |
 | Session persistence | ✅ One JSON file per session on the watch, durable across restarts |
 | Dashboard sync | ✅ WorkManager-backed upload with retry; the watch is fully functional offline |
 | Web dashboard | ✅ Self-hosted Ktor server + browser dashboard with load trend, shot mix, rally distribution |

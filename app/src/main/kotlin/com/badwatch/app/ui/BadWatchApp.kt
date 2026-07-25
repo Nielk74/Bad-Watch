@@ -83,6 +83,7 @@ fun BadWatchApp(
 
             sessionState is SessionState.Completed -> SummaryScreen(
                 stored = (sessionState as SessionState.Completed).export,
+                insights = (sessionState as SessionState.Completed).insights,
                 onDone = {
                     viewModel.acknowledge()
                     screen = Screen.Home

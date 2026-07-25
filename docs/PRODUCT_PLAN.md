@@ -4,9 +4,10 @@
 > state of the project, the product thesis, the full feature vision, and a phased
 > plan to get from "gyroscope demo" to "the thing serious players wear every session."
 
-**Progress: Phase 0 complete · Phase 1 substantially complete · dashboard and the labelled
-data pipeline delivered.** The blocker on Phase 2 is now data collection with real players,
-not missing tooling.
+**Progress: Phase 0 complete · Phase 1 substantially complete · dashboard, labelled data
+pipeline and session insights delivered.** The blocker on Phase 2 is now data collection
+with real players, not missing tooling. Six of the seven v1.0 promises are met or partly
+met; the outstanding one is shot-classification accuracy.
 See [Part 5 — Roadmap](#part-5--roadmap) for per-phase status and
 [Part 8 — Changes to this plan](#part-8--changes-to-this-plan) for decisions that have been
 revised since it was written.
@@ -419,6 +420,8 @@ dominant wrist, across players not in the training set.
 - ✅ Rally segmentation and work:rest analysis *(delivered in Phase 1)*.
 - 🟡 Live HUD: the glanceable layout (giant primary number, rally metrics, post-session
   recap) is built. Haptic-first feedback, rotary navigation and ambient mode are not.
+- ✅ Session insights — delivered early, because they only need signals that are already
+  trustworthy. See [Part 9](#part-9--what-an-insight-is-allowed-to-say).
 - Post-session recap: shot distribution, rally timeline, HR profile, fatigue curve.
 - Session history with trends; goals and personal bests.
 - Tile and complications.
@@ -498,7 +501,7 @@ The end of Phase 3. Bad Watch v1.0 ships when a player can:
 | 1 | Start a session with one tap and have it record reliably for three hours with the screen off | 🟡 One tap and screen-off recording work. Three-hour reliability and battery cost are unmeasured. |
 | 2 | Get shot counts by type with >85% accuracy on the dominant wrist, for a player the model has never seen | ❌ Classifier is rule-based and uncalibrated. Phase 2. |
 | 3 | See rally count, rally length distribution, and true work:rest ratio | ✅ On the watch and on the dashboard. |
-| 4 | Receive one honest, specific, actionable insight per session — not four generated adjectives | ❌ Deliberately shipped nothing rather than repeat the old fabricated "insights". Needs #2 first. |
+| 4 | Receive one honest, specific, actionable insight per session — not four generated adjectives | ✅ `SessionInsightEngine` derives insights from rally structure and heart rate only — never from uncalibrated stroke labels. Every insight cites its evidence, and the engine returns nothing when the data is thin. |
 | 5 | Review the last thirty sessions and see whether they are getting better | ✅ History on the watch, trends on the dashboard. |
 | 6 | Get their data out, in a real format, without a computer | 🟡 JSON is durable and syncs to the dashboard; on-watch share/export has no UI. |
 | 7 | Do all of the above with no account, no network, and no subscription | ✅ No account exists anywhere in the system; the watch is fully functional offline. |
@@ -544,3 +547,38 @@ place to display results.
 **Health Services is still deferred.** The plan called for `ExerciseClient` in Phase 1;
 heart rate currently goes through `SensorManager`. This works, but it is less accurate and
 less power-efficient, and it should be replaced before any battery claim is made.
+
+
+---
+
+## Part 9 — What an insight is allowed to say
+
+The app this grew out of generated "insights" like *"Swing variance is 62%. Focus on
+repeatable arcs before pushing pace"* from raw gyroscope magnitude. It read as coaching and
+was closer to a random number generator. Avoiding a repeat needs a rule, not good intentions.
+
+**An insight may only be derived from a signal we measure, not one we infer.**
+
+Today that means rally structure (a rally boundary is a gap in time) and heart rate (a
+sensor reading). It explicitly excludes stroke type, because the classifier is uncalibrated
+heuristics — so "you hit too few backhands" is not an insight, it is a guess wearing a
+coach's jacket. When Phase 2 makes stroke labels trustworthy, stroke rules join as
+*additions*.
+
+Four supporting constraints, all enforced in `SessionInsightEngine` and its tests:
+
+1. **Every insight carries its evidence.** The number the claim rests on is displayed. A
+   player can then disagree with the interpretation while still trusting the measurement,
+   and a wrong insight is debuggable rather than merely irritating.
+2. **Silence is a valid output.** Under five rallies, nothing is said. Rally-decay analysis
+   needs twelve. Cardiac drift needs heart rate on both halves. Roughly half of
+   `SessionInsightEngineTest` asserts that *nothing* is produced — a rule that never stays
+   quiet is a bug.
+3. **Compare against the player, not a population.** Sport-wide norms are the fallback used
+   only until three sessions of history exist, and baselines use medians so one freak
+   session cannot redefine normal.
+4. **At most three, cautions first.** A fatigue signal must not be buried under a personal
+   best.
+
+The observable effect: on nineteen seeded sessions the engine speaks about thirteen and says
+nothing about six. That ratio is the feature.
