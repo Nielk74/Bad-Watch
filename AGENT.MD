@@ -98,6 +98,25 @@ There is no Wear system image required for a smoke test — `uses-feature` does 
 `adb install`, so a phone emulator runs the app fine (stretched, but functional). A real
 Wear AVD is still needed for layout work.
 
+**A Pixel Watch 4 (Wear OS 6, Android 16) is available on the local network** for real
+on-device verification — prefer it over the emulator for anything visual, haptic or
+ambient. The machine and watch are already paired; reconnect with:
+
+```bash
+adb mdns services          # find the _adb-tls-connect._tcp id, then:
+adb -s <mdns-id> shell getprop ro.product.model   # expect "Pixel Watch 4"
+```
+
+If the pairing is ever lost: on the watch, Settings → Developer options → Wireless
+debugging → Pair new device, then `adb pair <ip>:<port> <code>` (run `adb kill-server`
+first — a stale server fails pairing with a cryptic "protocol fault"). Wireless
+debugging is user-controlled and may be off; if the watch is unreachable, ask the user
+to enable it rather than burning time on the emulator for hardware-only checks. The
+debug build is installed; `adb install -r -g app/build/outputs/apk/debug/app-debug.apk`
+updates it. Two quirks verified on this device: Wear M3 edge buttons only grow in as
+you scroll toward the end of a list (not a bug), and AlertDialog confirm/dismiss are
+icon-only circles with no text labels in the accessibility tree.
+
 ```bash
 adb install -r -g app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n com.badwatch.badwatch/com.badwatch.app.MainActivity
