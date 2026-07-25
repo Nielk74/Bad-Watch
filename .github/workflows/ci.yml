@@ -21,14 +21,12 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v3
 
-      - name: JVM tests (core analytics + server contract)
-        run: ./gradlew :core:test :server:test
-
-      - name: Lint
-        run: ./gradlew :app:lintDebug
-
-      - name: Assemble watch app
-        run: ./gradlew :app:assembleDebug
+      # Keep this identical to the release gate: app JVM tests are easy to accidentally
+      # skip when only :core and :server are named explicitly.
+      - name: Release-quality gate
+        run: >-
+          ./gradlew test :app:lintDebug :app:assembleDebug :app:assembleRelease
+          --stacktrace --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

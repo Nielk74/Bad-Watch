@@ -26,11 +26,12 @@ else
   printf '\n## [%s] - %s\n- Describe changes.\n' "$VERSION" "$(date +%Y-%m-%d)" >> CHANGELOG.md
 fi
 
-./gradlew clean test
+./gradlew test :app:lintDebug :app:assembleDebug :app:assembleRelease \
+  --stacktrace --no-daemon
 
 git commit -am "chore: release $VERSION"
 git tag -a "v$VERSION" -m "Release $VERSION"
 
 echo "Tagged v$VERSION. Push with: git push origin master --tags"
-echo "The tag push triggers .github/workflows/release.yml, which verifies, builds and"
-echo "publishes the GitHub Release with the APK attached."
+echo "The tag push triggers .github/workflows/release.yml, which repeats the full gate,"
+echo "verifies package/version/signatures, and publishes APK checksums with the release."

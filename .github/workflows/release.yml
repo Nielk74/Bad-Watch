@@ -4,8 +4,7 @@ name: Release
 # This workflow does the rest: build, sign (when the keystore secrets are configured),
 # and publish the GitHub Release with notes taken from CHANGELOG.md.
 #
-# There is no verify step here on purpose: tags point at master commits that ci.yml
-# has already tested and linted, so re-running it would only delay the release.
+# Tags are immutable release inputs, so this workflow validates the tagged commit itself.
 on:
   push:
     tags: ['v*']
@@ -32,8 +31,10 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v3
 
-      - name: Build APKs
-        run: ./gradlew :app:assembleRelease :app:assembleDebug
+      - name: Release-quality gate
+        run: >-
+          ./gradlew test :app:lintDebug :app:assembleDebug :app:assembleRelease
+          --stacktrace --no-daemon
 
       # The debug APK is signed with the debug key, so it is always installable via adb.
       # It goes into every release as the no-secrets-needed artifact.
@@ -74,6 +75,27 @@ jobs:
         run: |
           echo "No RELEASE_KEYSTORE_* secrets configured — publishing the debug-signed" \
             "APK only. Add the four secrets to attach a properly signed release APK."
+
+      - name: Verify APK identity and signatures
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          for APK in dist/*.apk; do
+            "$BT/apksigner" verify --verbose "$APK"
+            BADGING=$("$BT/aapt" dump badging "$APK")
+            PACKAGE_LINE=$(grep -m1 '^package:' <<<"$BADGING")
+            echo "$PACKAGE_LINE"
+            grep -F "package: name='com.badwatch.badwatch'" <<<"$PACKAGE_LINE"
+            grep -F "versionName='$VERSION'" <<<"$PACKAGE_LINE"
+          done
+
+      - name: Write checksums
+        run: |
+          set -euo pipefail
+          for APK in dist/*.apk; do
+            shasum -a 256 "$APK" > "$APK.sha256"
+          done
 
       # Notes are the CHANGELOG section for this version; the tag_release.sh template
       # guarantees the section exists. Fall back to a one-liner if it is empty.
