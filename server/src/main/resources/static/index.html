@@ -151,6 +151,15 @@
   .empty code { background: var(--surface-2); padding: 2px 7px; border-radius: 5px; font-size: 13px; }
   section { margin-top: 26px; }
   .full { grid-column: 1 / -1; }
+
+  .backlink { display: inline-block; margin-bottom: 8px; color: var(--text-secondary);
+              text-decoration: none; font-size: 13.5px; }
+  .backlink:hover { color: var(--text-primary); text-decoration: underline; }
+  .detail-head { margin: 18px 0 4px; }
+  .detail-title { font-size: 20px; font-weight: 640; letter-spacing: -0.01em; }
+  .detail-meta { color: var(--text-secondary); font-size: 13.5px; margin-top: 3px; }
+  tr.rowlink { cursor: pointer; }
+  tr.rowlink:focus-visible { outline: 2px solid var(--series-1); outline-offset: -2px; }
 </style>
 </head>
 <body>
@@ -214,6 +223,17 @@ function fmtDate(ms) {
 }
 function fmtDateTime(ms) {
   return new Date(ms).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+function fmtDateTimeLong(ms) {
+  return new Date(ms).toLocaleString(undefined, {
+    weekday: "short", day: "numeric", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit"
+  });
+}
+/** Minutes:seconds relative to a session start, for timeline axes and tooltips. */
+function fmtClock(ms) {
+  const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
+  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 /* ---------- Charts ---------- */
@@ -360,6 +380,79 @@ function loadChart(host, points) {
   });
 
   el("line", { class: "axis", x1: 0, x2: iw, y1: ih, y2: ih }, g);
+}
+
+/**
+ * One session on a clock. Each rally is a band spanning its first to its last shot,
+ * taller the more shots it held, with one tick per shot inside, coloured by type.
+ * The gaps between bands are the rests — leaving them empty is the point of the chart.
+ *
+ * Note: `Rally.durationMillis` is a server-side derived getter and is not on the wire;
+ * a rally's span is `startMillis`..`endMillis`, and single-shot rallies have both equal.
+ */
+function rallyTimelineChart(host, exportData) {
+  const rallies = (exportData.rallyProfile && exportData.rallyProfile.rallies) || [];
+  const shots = (exportData.session && exportData.session.shots) || [];
+  const t0 = exportData.session.startedAtMillis;
+  let t1 = exportData.session.endedAtMillis || t0;
+  for (const r of rallies) t1 = Math.max(t1, r.endMillis);
+  for (const s of shots) t1 = Math.max(t1, s.timestampMillis);
+  if (t1 - t0 < 60000) t1 = t0 + 60000; // pad sub-minute sessions so the axis stays readable
+  const span = t1 - t0;
+
+  const W = Math.max(620, host.clientWidth || 760);
+  const H = 200;
+  const M = { top: 14, right: 14, bottom: 30, left: 10 };
+  const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: "img",
+    "aria-label": "Rally timeline" }, host);
+  const g = el("g", { transform: `translate(${M.left},${M.top})` }, svg);
+  const x = t => ((t - t0) / span) * iw;
+
+  const stepMin = [1, 2, 5, 10, 15, 30, 60].find(s => span / 60000 / s <= 8) || 120;
+  for (let m = 0; m * stepMin * 60000 <= span; m++) {
+    const tx = x(m * stepMin * 60000);
+    el("line", { class: "gridline", x1: tx, x2: tx, y1: 0, y2: ih }, g);
+    const lab = el("text", { x: tx, y: ih + 18, "text-anchor": "middle",
+      fill: "var(--text-muted)", "font-size": 11 }, g);
+    lab.textContent = `${m * stepMin}:00`;
+  }
+
+  const maxShots = Math.max(1, ...rallies.map(r => r.shotCount));
+  rallies.forEach(r => {
+    const bx = x(r.startMillis);
+    const bw = Math.max(3, x(r.endMillis) - bx); // single-shot rally: start == end
+    const bh = Math.max(22, (r.shotCount / maxShots) * ih);
+    const by = ih - bh;
+    const band = el("rect", {
+      x: bx, y: by, width: bw, height: bh, rx: 5,
+      fill: "var(--series-1)", "fill-opacity": 0.15,
+      stroke: "var(--series-1)", "stroke-opacity": 0.35
+    }, g);
+    band.addEventListener("mousemove", e => showTip(e,
+      `<div class="t-title">Rally ${r.index + 1} · ${fmtInt(r.shotCount)} shots</div>
+       <div class="t-row"><span>Starts</span><b>${fmtClock(r.startMillis - t0)}</b></div>
+       <div class="t-row"><span>Lasts</span><b>${Math.round((r.endMillis - r.startMillis) / 1000)}s</b></div>`));
+    band.addEventListener("mouseleave", hideTip);
+
+    shots
+      .filter(s => s.timestampMillis >= r.startMillis && s.timestampMillis <= r.endMillis)
+      .forEach(s => {
+        const tx = Math.min(Math.max(x(s.timestampMillis), bx + 2), bx + bw - 2);
+        const tick = el("line", {
+          x1: tx, x2: tx, y1: by + 4, y2: ih - 3,
+          stroke: `var(--series-${SHOT_SLOT[s.type] || 6})`,
+          "stroke-width": 3, "stroke-linecap": "round"
+        }, g);
+        tick.addEventListener("mousemove", e => showTip(e,
+          `<div class="t-title">${escapeHtml(SHOT_LABELS[s.type] || s.type)}</div>
+           <div class="t-row"><span>At</span><b>${fmtClock(s.timestampMillis - t0)}</b></div>
+           ${s.heartRateBpm > 0 ? `<div class="t-row"><span>Heart rate</span><b>${fmtInt(s.heartRateBpm)} bpm</b></div>` : ""}`));
+        tick.addEventListener("mouseleave", hideTip);
+      });
+  });
+
+  el("line", { x1: 0, x2: iw, y1: ih, y2: ih, stroke: "var(--border)" }, g);
 }
 
 function roundedTopBar(x, y, w, h, r) {
@@ -518,7 +611,8 @@ function render(data) {
   table.className = "card full";
   table.innerHTML = `
     <div class="card-head"><h2>Sessions</h2>
-      <p class="card-note">Every recorded session. Work:rest is playing time against resting time.</p></div>
+      <p class="card-note">Every recorded session. Work:rest is playing time against resting time.
+      Open a row for the full rally timeline.</p></div>
     <div class="chart-scroll">
       <table>
         <thead><tr>
@@ -526,7 +620,8 @@ function render(data) {
           <th>Avg rally</th><th>Work : rest</th><th>Playing</th><th>Avg HR</th><th>Peak HR</th>
         </tr></thead>
         <tbody>${data.sessions.map(s => `
-          <tr>
+          <tr class="rowlink" data-session-id="${escapeHtml(s.id)}" tabindex="0" role="link"
+              aria-label="Open session from ${fmtDateTime(s.startedAtMillis)}">
             <td>${fmtDateTime(s.startedAtMillis)}</td>
             <td>${fmtDuration(s.durationMillis)}</td>
             <td>${fmtInt(s.totalShots)}</td>
@@ -540,6 +635,15 @@ function render(data) {
         </tbody>
       </table>
     </div>`;
+  table.querySelectorAll("tr.rowlink").forEach(row => {
+    const open = () => {
+      location.hash = "#/session/" + encodeURIComponent(row.dataset.sessionId);
+    };
+    row.addEventListener("click", open);
+    row.addEventListener("keydown", evt => {
+      if (evt.key === "Enter" || evt.key === " ") { evt.preventDefault(); open(); }
+    });
+  });
   tableSection.appendChild(table);
   content.appendChild(tableSection);
 }
@@ -558,13 +662,185 @@ function card(title, note, draw) {
   return c;
 }
 
+/* ---------- Session detail view ---------- */
+
+// Detail payloads are small and sessions are immutable once uploaded, so cache them.
+const sessionCache = new Map();
+const sessionInFlight = new Set();
+
+function sessionIdFromHash() {
+  const m = location.hash.match(/^#\/session\/(.+)$/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function route() {
+  const id = sessionIdFromHash();
+  if (id != null) {
+    renderSessionDetail(id);
+    return;
+  }
+  if (!window.__data) return; // dashboard payload has not landed yet
+  render(window.__data);
+  if (window.__classifier) {
+    renderClassifier(window.__classifier.evaluation, window.__classifier.summary);
+  }
+}
+
+function sessionErrorHtml(title, text) {
+  return `
+    <div class="detail-head"><a class="backlink" href="#/">← All sessions</a></div>
+    <div class="empty"><h2>${title}</h2><p>${text}</p></div>`;
+}
+
+function renderSessionDetail(id) {
+  const subtitle = document.getElementById("subtitle");
+  const cached = sessionCache.get(id);
+  if (cached) {
+    renderSession(cached);
+    return;
+  }
+  subtitle.textContent = "Loading session…";
+  document.getElementById("content").innerHTML =
+    sessionErrorHtml("Loading…", "Fetching the session from the server.");
+  if (sessionInFlight.has(id)) return; // route() can fire again while a fetch is out
+  sessionInFlight.add(id);
+  fetch("api/v1/sessions/" + encodeURIComponent(id))
+    .then(r => {
+      if (r.status === 404) throw Object.assign(new Error("No such session"), { status: 404 });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(data => {
+      sessionInFlight.delete(id);
+      sessionCache.set(id, data);
+      // The user may have navigated away while the fetch was in flight.
+      if (sessionIdFromHash() === id) renderSession(data);
+    })
+    .catch(err => {
+      sessionInFlight.delete(id);
+      if (sessionIdFromHash() !== id) return;
+      subtitle.textContent = "Session detail";
+      const gone = err && err.status === 404;
+      document.getElementById("content").innerHTML = gone
+        ? sessionErrorHtml("Session not found",
+            "No session with this id — it may have been deleted from the server.")
+        : sessionErrorHtml("Could not load session",
+            "The server could not be reached. Go back and try again in a moment.");
+    });
+}
+
+function renderSession(data) {
+  const content = document.getElementById("content");
+  const subtitle = document.getElementById("subtitle");
+  const session = data.session, sum = session.summary, rp = data.rallyProfile;
+  const rallies = (rp && rp.rallies) || [];
+  const shots = session.shots || [];
+  const work = (rp && rp.totalWorkMillis) || 0, rest = (rp && rp.totalRestMillis) || 0;
+  const density = work + rest > 0 ? work / (work + rest) : null;
+  const longest = rallies.reduce((a, r) => Math.max(a, r.shotCount), 0);
+  const avgRally = rallies.length
+    ? rallies.reduce((a, r) => a + r.shotCount, 0) / rallies.length : 0;
+
+  subtitle.textContent = `Session · ${fmtDate(session.startedAtMillis)}`;
+  content.innerHTML = "";
+
+  const device = String(data.deviceId || "");
+  const head = document.createElement("div");
+  head.className = "detail-head";
+  head.innerHTML = `
+    <a class="backlink" href="#/">← All sessions</a>
+    <div class="detail-title">${fmtDateTimeLong(session.startedAtMillis)}</div>
+    <div class="detail-meta">Device ${escapeHtml(device.length > 12 ? device.slice(0, 8) + "…" : device)}
+      · app ${escapeHtml(String(data.appVersion || ""))}</div>`;
+  content.appendChild(head);
+
+  const tiles = document.createElement("div");
+  tiles.className = "tiles";
+  tiles.innerHTML = `
+    <div class="tile">
+      <div class="label">Shots</div>
+      <div class="value">${fmtInt(sum.totalShots)}</div>
+      <div class="foot">${rallies.length ? fmt1(avgRally) + " per rally" : "no rallies"}</div>
+    </div>
+    <div class="tile">
+      <div class="label">Rallies</div>
+      <div class="value">${fmtInt(rallies.length)}</div>
+      <div class="foot">${longest ? "longest " + fmtInt(longest) + " shots" : "—"}</div>
+    </div>
+    <div class="tile">
+      <div class="label">Duration</div>
+      <div class="value">${fmtDuration(sum.durationMillis)}</div>
+      <div class="foot">${fmtDuration(work)} playing · ${fmtDuration(rest)} rest</div>
+    </div>
+    <div class="tile">
+      <div class="label">Avg heart rate</div>
+      <div class="value">${sum.averageHeartRate > 0 ? fmtInt(sum.averageHeartRate) : "—"}</div>
+      <div class="foot">${sum.averageHeartRate > 0 ? "bpm" : "no readings"}</div>
+    </div>
+    <div class="tile">
+      <div class="label">Peak heart rate</div>
+      <div class="value">${sum.maxHeartRate > 0 ? fmtInt(sum.maxHeartRate) : "—"}</div>
+      <div class="foot">${sum.maxHeartRate > 0 ? "bpm" : "no readings"}</div>
+    </div>
+    <div class="tile">
+      <div class="label">Playing time</div>
+      <div class="value">${density != null ? Math.round(density * 100) + "%" : "—"}</div>
+      <div class="foot">${work > 0 ? "1:" + fmt1(rest / work) + " work : rest" : "of elapsed time"}</div>
+    </div>`;
+  content.appendChild(tiles);
+
+  const grid = document.createElement("div");
+  grid.className = "grid";
+  content.appendChild(grid);
+
+  if (rallies.length) {
+    const timelineCard = card(
+      "Rally timeline",
+      "Each band is a rally — taller means more shots. Ticks are individual shots, " +
+        "coloured by type; the empty gaps are rest.",
+      host => rallyTimelineChart(host, data)
+    );
+    timelineCard.classList.add("full");
+    const types = [...new Set(shots.map(s => s.type))]
+      .sort((a, b) => (SHOT_SLOT[a] || 99) - (SHOT_SLOT[b] || 99));
+    const legend = document.createElement("div");
+    legend.className = "legend";
+    legend.innerHTML =
+      `<span class="key"><span class="swatch" style="background:var(--series-1);opacity:0.4"></span>Rally band</span>` +
+      types.map(t => `<span class="key"><span class="swatch" style="background:var(--series-${SHOT_SLOT[t] || 6})"></span>${escapeHtml(SHOT_LABELS[t] || t)}</span>`).join("");
+    timelineCard.appendChild(legend);
+    grid.appendChild(timelineCard);
+  } else {
+    const empty = document.createElement("div");
+    empty.className = "card full";
+    empty.innerHTML = `
+      <div class="card-head"><h2>Rally timeline</h2></div>
+      <p style="margin:0;color:var(--text-secondary);font-size:14px">
+        No rallies detected in this session.</p>`;
+    grid.appendChild(empty);
+  }
+
+  const counts = sum.shotCounts || {};
+  const slices = Object.keys(counts)
+    .filter(t => counts[t] > 0)
+    .sort((a, b) => (SHOT_SLOT[a] || 99) - (SHOT_SLOT[b] || 99))
+    .map(t => ({ type: t, count: counts[t] }));
+  if (slices.length) {
+    grid.appendChild(card(
+      "Shot mix",
+      "Detected stroke distribution in this session.",
+      host => shotMixChart(host, slices)
+    ));
+  }
+}
+
 document.getElementById("themeToggle").addEventListener("click", () => {
   const current = document.documentElement.getAttribute("data-theme");
   const next = current === "dark" ? "light"
     : current === "light" ? "dark"
     : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark");
   document.documentElement.setAttribute("data-theme", next);
-  if (window.__data) render(window.__data);
+  route(); // re-render whichever view is current so SVG colours pick up the theme
 });
 
 function renderClassifier(evaluation, summary) {
@@ -627,23 +903,25 @@ Promise.all([
   fetch("api/v1/captures/summary").then(r => r.ok ? r.json() : null).catch(() => null)
 ]).then(([evaluation, summary]) => {
   window.__classifier = { evaluation, summary };
-  if (window.__data) renderClassifier(evaluation, summary);
+  if (window.__data && !sessionIdFromHash()) renderClassifier(evaluation, summary);
 });
 
 fetch("api/v1/dashboard")
   .then(r => r.json())
   .then(data => {
     window.__data = data;
-    render(data);
-    if (window.__classifier) {
-      renderClassifier(window.__classifier.evaluation, window.__classifier.summary);
-    }
+    route();
   })
   .catch(err => {
+    if (sessionIdFromHash()) return; // a deep-linked detail view has its own error state
     document.getElementById("subtitle").textContent = "Could not reach the server";
     document.getElementById("content").innerHTML =
       `<div class="empty"><h2>Could not load data</h2><p>${err}</p></div>`;
   });
+
+window.addEventListener("hashchange", route);
+// Initial view from location.hash — no-op for the dashboard until its payload lands.
+route();
 </script>
 </body>
 </html>

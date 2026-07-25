@@ -375,8 +375,8 @@ You cannot build a classifier without data, and there was no way to collect any.
 - ✅ `tools/` ingestion and training pipeline with device-grouped cross-validation.
 - ⬜ Post-hoc "tag that last shot" flow during ordinary sessions.
 - ⬜ Battery instrumentation harness.
-- ⬜ Zero-allocation ring buffers in the hot path (`ShotDetectionPipeline` still calls
-  `buffer.toList()` per sample).
+- ✅ Zero-allocation ring buffer in the hot path: `SampleWindow` replaced the
+  `ArrayDeque.toList()` per sample with a pre-allocated ring and a zero-copy list facade.
 
 **Remaining before Phase 1 closes:** Health Services, the battery harness, and the
 zero-allocation hot path. The dataset path — the thing that actually gates Phase 2 — is now
@@ -399,7 +399,8 @@ be designed properly rather than retrofitted.
   mix, and an acute:chronic shoulder-load trend.
 - ✅ Synthetic session generator for development and fixtures.
 - ⬜ Release-build dashboard configuration UI (only the debug adb receiver exists).
-- ⬜ Per-session detail view with a rally timeline.
+- ✅ Per-session detail view with a rally timeline (hash-routed from the session list,
+  `/api/v1/sessions/{id}` + client-side SVG).
 
 ### Phase 2 — Perception *(4–6 weeks)* — **next**
 

@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+- **Dashboard session detail.** Clicking a session on the dashboard opens a hash-routed
+  detail view (`#/session/<id>`): stat strip, a rally timeline (rally bands scaled by shot
+  count, per-shot ticks colored by type, tooltips, legend), and the session's shot mix —
+  all rendered client-side from the existing `GET /api/v1/sessions/{id}` payload.
+
+### Changed
+- **Zero-allocation detection window.** `ShotDetectionPipeline` now keeps its sliding
+  window in `SampleWindow`, a pre-allocated ring buffer with a zero-copy list facade,
+  instead of calling `ArrayDeque.toList()` on every sample — an allocation per sample at
+  100 Hz across three sensors.
+
 ## [0.2.0] - 2026-07-25
 
 ### Added
