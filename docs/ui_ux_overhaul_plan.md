@@ -1,5 +1,13 @@
 # Bad Watch UI & Insights Overhaul Plan
 
+> **Status (2026-07): Phases 1–2 substantially delivered.** The watch UI was rebuilt
+> wholesale on Wear Compose Material 3 (1.6.2): new OLED-first "court at night" design
+> system, a two-page pager HUD (zone-colored HR ring, spring-animated shot count), edge
+> buttons for primary actions, dialog-confirmed destructive actions, swipe-to-delete
+> history, and a recap that leads with insights over canvas-drawn rally/shot-mix bars.
+> Still open from Phase 1: the launcher-icon redesign and screenshot tests. Still open from
+> Phase 2: contextual help overlays and explicit haptic confirmation. Phase 3+ untouched.
+
 ## Objectives
 - Elevate visual identity with a modern Wear OS aesthetic that remains legible during play.
 - Streamline in-session interactions for faster decision making and reduced clutter.

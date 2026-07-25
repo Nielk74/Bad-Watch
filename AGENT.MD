@@ -32,7 +32,8 @@ echo "sdk.dir=/opt/homebrew/share/android-commandlinetools" > local.properties
 
 `local.properties` is gitignored and must exist before `:app` will configure.
 
-**Toolchain note.** Kotlin 2.1, AGP 8.13, Compose BOM 2025.06, `compileSdk` 36. The Compose
+**Toolchain note.** Kotlin 2.2, AGP 8.13, Compose BOM 2026.01, Wear Compose 1.6.2
+(Material 3 — there is no Wear Material 2 dependency any more), `compileSdk` 36. The Compose
 compiler is applied as the `org.jetbrains.kotlin.plugin.compose` Gradle plugin — there is no
 `composeOptions.kotlinCompilerExtensionVersion` any more.
 

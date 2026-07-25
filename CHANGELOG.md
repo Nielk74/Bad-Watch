@@ -46,6 +46,18 @@
 - CI running JVM tests, lint and a debug assemble.
 
 ### Changed
+- **Whole-watch UI rebuilt on Wear Compose Material 3 (1.6.2).** Every screen was rewritten:
+  the live HUD is now a two-page pager — a glanceable face (giant spring-animated shot
+  count, heart-rate zone ring around the bezel, last-shot badge) with rally/body detail one
+  swipe away — primary actions moved into bottom `EdgeButton`s, destructive actions sit
+  behind `AlertDialog` confirms, history rows delete via `SwipeToReveal`, and session recaps
+  lead with insights followed by rally-structure and shot-mix bars drawn on canvas. New
+  "court at night" design system: OLED-black palette with semantic colors (heart-rate zones,
+  shot families, insight severities), the M3 numeral type scale for glanceable numbers, and
+  expressive motion. Screens are selected by session state as before, now crossfaded via
+  `AnimatedContent` inside `AppScaffold`/`ScreenScaffold`. Toolchain: Kotlin 2.2.21,
+  Compose BOM 2026.01.01, `androidx.wear.compose` 1.4.1 → 1.6.2 (Material 2 dropped
+  entirely).
 - `:app` now depends on `:core`. Previously the analytics module was compiled but never
   referenced by the application.
 - Sensor timestamps come from the monotonic `SensorEvent.timestamp` rather than wall-clock
