@@ -100,7 +100,7 @@ fun SummaryScreen(
                     value = rallies.rallyCount.toString(),
                     // The full, truthful French qualifier must survive a 480 px round screen
                     // and enlarged text; the neighbouring time label needs much less room.
-                    weight = 1.35f
+                    weight = 1.30f
                 ),
                 Stat(
                     stringResource(
@@ -111,7 +111,8 @@ fun SummaryScreen(
                         }
                     ),
                     formatDuration(effective.window.durationMillis),
-                    weight = 0.65f
+                    // `m:ss` still needs enough width for the large numeral on a round edge.
+                    weight = 0.85f
                 )
             )
         }

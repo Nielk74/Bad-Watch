@@ -137,6 +137,7 @@ data class Stat(
 
 @Composable
 fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
+    val dense = stats.size >= 3
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -151,14 +152,25 @@ fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
             ) {
                 Text(
                     text = stat.label.uppercase(Locale.getDefault()),
-                    style = MaterialTheme.typography.labelSmall,
+                    // Three-up cards are narrower than the full screen. Keep both words of
+                    // qualifiers such as "Detected exchanges" visible rather than clipping a
+                    // truth-bearing label at the round edge.
+                    style = if (dense) {
+                        MaterialTheme.typography.bodyExtraSmall
+                    } else {
+                        MaterialTheme.typography.labelSmall
+                    },
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     maxLines = 2
                 )
                 Text(
                     text = stat.value,
-                    style = MaterialTheme.typography.numeralMedium,
+                    style = when {
+                        stat.value.any(Char::isLetter) -> MaterialTheme.typography.titleSmall
+                        dense -> MaterialTheme.typography.numeralSmall
+                        else -> MaterialTheme.typography.numeralMedium
+                    },
                     color = stat.color,
                     textAlign = TextAlign.Center,
                     maxLines = 1
