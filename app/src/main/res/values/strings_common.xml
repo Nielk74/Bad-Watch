@@ -7,6 +7,8 @@
     <string name="action_delete">Delete</string>
     <string name="action_discard">Discard</string>
     <string name="action_dismiss">Dismiss</string>
+    <string name="action_discard_drill">Discard drill</string>
+    <string name="action_retry_save">Retry save</string>
     <string name="action_done">Done</string>
     <string name="action_pause">Pause</string>
     <string name="action_save">Save</string>
@@ -134,6 +136,9 @@
     <string name="error_capture_metadata">Capture metadata was not available.</string>
     <string name="error_capture_start">The Detection Lab could not start.</string>
     <string name="error_capture_save">The Detection Lab capture could not be saved.</string>
+    <string name="error_capture_stopped">Detection Lab stopped</string>
+    <string name="error_capture_discard_question">Discard this drill?</string>
+    <string name="error_capture_discard_body">Its unsaved Detection Lab samples will be lost.</string>
     <string name="error_session_start">The session could not start.</string>
     <string name="error_session_save">The session could not be saved.</string>
     <string name="error_session_pending_save">The previous session still needs to be saved.</string>

@@ -66,7 +66,10 @@ class CaptureController(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: Throwable) {
-            _state.value = CaptureState.Failed(error.message ?: "Capture could not start")
+            _state.value = CaptureState.Failed(
+                message = error.message ?: "Capture could not start",
+                recovery = CaptureFailureRecovery.CancelCapture
+            )
             return@withLock false
         }
         synchronized(swingsLock) {
@@ -101,10 +104,14 @@ class CaptureController(
                         )
                     }
                 }
+                throw IllegalStateException("Sensor stream stopped")
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Throwable) {
-                _state.value = CaptureState.Failed(error.message ?: "Sensor stream stopped")
+                _state.value = CaptureState.Failed(
+                    message = error.message ?: "Sensor stream stopped",
+                    recovery = CaptureFailureRecovery.CancelCapture
+                )
             }
         }
         true
@@ -141,7 +148,10 @@ class CaptureController(
             return@withLock null
         }
         val metadata = captureMetadata ?: run {
-            _state.value = CaptureState.Failed("Capture metadata was not available")
+            _state.value = CaptureState.Failed(
+                message = "Capture metadata was not available",
+                recovery = CaptureFailureRecovery.CancelCapture
+            )
             return@withLock null
         }
 
@@ -199,7 +209,10 @@ class CaptureController(
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: Throwable) {
-            _state.value = CaptureState.Failed(error.message ?: "Capture could not be saved")
+            _state.value = CaptureState.Failed(
+                message = error.message ?: "Capture could not be saved",
+                recovery = CaptureFailureRecovery.RetrySave
+            )
             return null
         }
         pendingExport = null
@@ -222,5 +235,17 @@ sealed interface CaptureState {
 
     data class Saved(val export: CaptureExport) : CaptureState
 
-    data class Failed(val message: String) : CaptureState
+    data class Failed(
+        val message: String,
+        /** The only safe primary action for this failure; storage retries retain one ID. */
+        val recovery: CaptureFailureRecovery
+    ) : CaptureState
+}
+
+enum class CaptureFailureRecovery {
+    /** No durable export exists. Clear the failed collector before starting another drill. */
+    CancelCapture,
+
+    /** A stable pending export exists and must be retried rather than silently discarded. */
+    RetrySave
 }

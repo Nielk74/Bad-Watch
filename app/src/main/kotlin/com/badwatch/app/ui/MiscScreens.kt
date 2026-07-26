@@ -1,5 +1,6 @@
 package com.badwatch.app.ui
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -61,23 +62,32 @@ fun LoadingScreen() {
 }
 
 /**
- * Recovery UI when a session dies mid-record — sensor dropped, service killed. The player may
- * still have a durable recovery checkpoint, so the screen is deliberately quiet: what
- * happened, why, and two explicit choices. Dismiss keeps recovery data for a later retry;
- * discard is destructive and therefore confirmed.
+ * Recovery UI when a sensor-owned flow stops. The player may still have recoverable data, so
+ * the screen is deliberately quiet: what happened, why, and one explicit safe next step.
+ * Every destructive route is confirmed, whether it is a secondary session-journal action or
+ * the only viable action after an unsaved Detection Lab stream fails.
  */
 @Composable
 fun ErrorScreen(
     message: String,
     onDismiss: () -> Unit,
-    onDiscardRecovery: (() -> Unit)? = null
+    onDiscardRecovery: (() -> Unit)? = null,
+    @StringRes titleResource: Int = R.string.error_session_stopped,
+    @StringRes primaryActionResource: Int = R.string.action_dismiss,
+    confirmPrimaryAction: Boolean = false,
+    @StringRes discardQuestionResource: Int = R.string.error_session_discard_question,
+    @StringRes discardBodyResource: Int = R.string.error_session_discard_body
 ) {
     var confirmDiscard by remember { mutableStateOf(false) }
 
     WatchScreen(
         edgeButton = {
-            EdgeButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_dismiss))
+            EdgeButton(
+                onClick = {
+                    if (confirmPrimaryAction) confirmDiscard = true else onDismiss()
+                }
+            ) {
+                Text(stringResource(primaryActionResource))
             }
         }
     ) {
@@ -96,7 +106,7 @@ fun ErrorScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = stringResource(R.string.error_session_stopped),
+                    text = stringResource(titleResource),
                     modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.error,
@@ -147,11 +157,11 @@ fun ErrorScreen(
             AlertDialogDefaults.ConfirmButton(
                 onClick = {
                     confirmDiscard = false
-                    onDiscardRecovery?.invoke()
+                    if (confirmPrimaryAction) onDismiss() else onDiscardRecovery?.invoke()
                 }
             )
         },
-        title = { Text(stringResource(R.string.error_session_discard_question)) },
-        text = { Text(stringResource(R.string.error_session_discard_body)) }
+        title = { Text(stringResource(discardQuestionResource)) },
+        text = { Text(stringResource(discardBodyResource)) }
     )
 }

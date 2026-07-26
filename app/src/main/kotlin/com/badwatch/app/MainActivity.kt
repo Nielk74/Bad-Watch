@@ -82,9 +82,11 @@ class MainActivity : ComponentActivity() {
                 onStartSession = ::startSession,
                 onStopSession = ::stopSession,
                 onDiscardSession = ::discardSession,
+                onAcknowledgeSessionFailure = ::acknowledgeSessionFailure,
                 onStartCapture = ::startCapture,
                 onFinishCapture = ::finishCapture,
                 onCancelCapture = ::cancelCapture,
+                onRetryCaptureSave = ::retryCaptureSave,
                 isAmbient = isAmbient,
                 ambientTimeMillis = ambientTimeMillis
             )
@@ -135,6 +137,10 @@ class MainActivity : ComponentActivity() {
         SessionService.discard(this)
     }
 
+    private fun acknowledgeSessionFailure() {
+        SessionService.acknowledgeFailure(this)
+    }
+
     /**
      * Drills run under the same foreground service as sessions. Without it, backgrounding
      * the app mid-drill lets the process be killed and silently discards every collected
@@ -150,6 +156,10 @@ class MainActivity : ComponentActivity() {
 
     private fun cancelCapture() {
         SessionService.cancelCapture(this)
+    }
+
+    private fun retryCaptureSave() {
+        SessionService.retryCaptureSave(this)
     }
 
     private fun withSessionPermissions(continuation: () -> Unit) {

@@ -34,6 +34,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.sample
@@ -58,7 +59,9 @@ class SessionService : Service() {
     private val captureController get() = container.captureController
     private val heartRateSession get() = container.heartRateSession
     private var sessionNotificationJob: Job? = null
+    private var sessionFailureJob: Job? = null
     private var captureNotificationJob: Job? = null
+    private var captureFailureJob: Job? = null
     private var captureStartJob: Job? = null
     private var sessionStartJob: Job? = null
     // OngoingActivity.apply() extends this exact builder. Reusing it is intentional: building
@@ -82,10 +85,20 @@ class SessionService : Service() {
                 serviceScope.launch {
                     sessionCommandMutex.withLock {
                         sessionNotificationJob?.cancel()
-                        val saved = controller.stopAndSave()
-                        heartRateSession.stop()
-                        if (saved != null) SyncWorker.enqueue(this@SessionService)
-                        stopSelf()
+                        sessionFailureJob?.cancel()
+                        var heartRateStopped = false
+                        try {
+                            val saved = controller.stopAndSave()
+                            heartRateSession.stop()
+                            heartRateStopped = true
+                            if (saved != null) SyncWorker.enqueue(this@SessionService)
+                        } finally {
+                            try {
+                                if (!heartRateStopped) heartRateSession.stop()
+                            } finally {
+                                stopSelf()
+                            }
+                        }
                     }
                 }
                 return START_NOT_STICKY
@@ -95,9 +108,34 @@ class SessionService : Service() {
                 serviceScope.launch {
                     sessionCommandMutex.withLock {
                         sessionNotificationJob?.cancel()
-                        controller.discard()
-                        heartRateSession.stop()
-                        stopSelf()
+                        sessionFailureJob?.cancel()
+                        var heartRateStopped = false
+                        try {
+                            controller.discard()
+                            heartRateSession.stop()
+                            heartRateStopped = true
+                        } finally {
+                            try {
+                                if (!heartRateStopped) heartRateSession.stop()
+                            } finally {
+                                stopSelf()
+                            }
+                        }
+                    }
+                }
+                return START_NOT_STICKY
+            }
+
+            ACTION_ACKNOWLEDGE_FAILURE -> {
+                serviceScope.launch {
+                    sessionCommandMutex.withLock {
+                        sessionNotificationJob?.cancel()
+                        sessionFailureJob?.cancel()
+                        runFailedSessionAcknowledgement(
+                            stopHeartRate = heartRateSession::stop,
+                            stopService = ::stopSelf,
+                            acknowledgeController = controller::acknowledge
+                        )
                     }
                 }
                 return START_NOT_STICKY
@@ -108,9 +146,13 @@ class SessionService : Service() {
                     captureCommandMutex.withLock {
                         captureStartJob?.cancel()
                         captureNotificationJob?.cancel()
-                        val saved = captureController.finish()
-                        if (saved != null) SyncWorker.enqueue(this@SessionService)
-                        stopSelf()
+                        captureFailureJob?.cancel()
+                        try {
+                            val saved = captureController.finish()
+                            if (saved != null) SyncWorker.enqueue(this@SessionService)
+                        } finally {
+                            stopSelf()
+                        }
                     }
                 }
                 return START_NOT_STICKY
@@ -121,8 +163,28 @@ class SessionService : Service() {
                     captureCommandMutex.withLock {
                         captureStartJob?.cancel()
                         captureNotificationJob?.cancel()
-                        captureController.cancel()
-                        stopSelf()
+                        captureFailureJob?.cancel()
+                        try {
+                            captureController.cancel()
+                        } finally {
+                            stopSelf()
+                        }
+                    }
+                }
+                return START_NOT_STICKY
+            }
+
+            ACTION_RETRY_CAPTURE_SAVE -> {
+                serviceScope.launch {
+                    captureCommandMutex.withLock {
+                        captureStartJob?.cancel()
+                        captureNotificationJob?.cancel()
+                        captureFailureJob?.cancel()
+                        retryFailedCaptureSave(
+                            retrySave = captureController::finish,
+                            enqueueSync = { SyncWorker.enqueue(this@SessionService) },
+                            stopService = ::stopSelf
+                        )
                     }
                 }
                 return START_NOT_STICKY
@@ -131,7 +193,10 @@ class SessionService : Service() {
             ACTION_START_CAPTURE -> {
                 val label = intent.getStringExtra(EXTRA_LABEL)
                     ?.let { runCatching { ShotType.valueOf(it) }.getOrNull() }
-                    ?: return START_NOT_STICKY
+                    ?: run {
+                        stopSelf()
+                        return START_NOT_STICKY
+                    }
 
                 // One physical sensor stream owns the foreground service at a time. A Tile or
                 // repeated deep link must not replace a live session notification or collector.
@@ -169,6 +234,17 @@ class SessionService : Service() {
                                 }
                             }
                             .launchIn(serviceScope)
+
+                        // Terminal capture states are rare and must not be sampled or
+                        // conflated with telemetry. Keep collected/pending data untouched;
+                        // the failure's explicit recovery command decides retry vs cancel.
+                        captureFailureJob?.cancel()
+                        captureFailureJob = captureController.state
+                            .filterIsInstance<CaptureState.Failed>()
+                            .onEach {
+                                captureCommandMutex.withLock { stopSelf() }
+                            }
+                            .launchIn(serviceScope)
                     }
                 }
 
@@ -190,53 +266,52 @@ class SessionService : Service() {
         // the ongoing-activity chip) shows live progress without opening the app.
         sessionNotificationJob?.cancel()
         sessionNotificationJob = controller.state
+            .filterIsInstance<SessionState.Recording>()
             // Sensor state arrives at 100 Hz. A notification is a one-second glance, not a
             // telemetry stream; updating it per sample overwhelmed NotificationManager and
             // wasted battery on every live session.
             .sample(NOTIFICATION_UPDATE_INTERVAL_MILLIS)
             .onEach { state ->
-                when (state) {
-                    is SessionState.Recording -> {
-                        updateNotification(
-                            buildSessionNotification(
-                                shotCount = state.snapshot.totalShots,
-                                durationMillis = state.snapshot.durationMillis
-                            )
-                        )
-                    }
-                    is SessionState.Failed -> {
-                        // A motion-sensor failure ends the user-facing recording. Do not
-                        // leave its optional Health Services exercise running in the dark.
-                        sessionCommandMutex.withLock {
-                            heartRateSession.stop()
-                            stopSelf()
-                        }
-                    }
-                    else -> Unit
-                }
+                updateNotification(
+                    buildSessionNotification(
+                        shotCount = state.snapshot.totalShots,
+                        durationMillis = state.snapshot.durationMillis
+                    )
+                )
             }
             .launchIn(serviceScope)
 
         // START_STICKY can re-enter here with a null Intent after Android recreates the
         // process. The controller resolves its journal before Health Services starts, so a
         // crash-after-save is reconciled without accidentally opening a second exercise.
-        if (!controller.isRecording && sessionStartJob?.isActive != true) {
+        val recordingAtCommand = controller.isRecording
+        if (recordingAtCommand) observeSessionFailures()
+        if (!recordingAtCommand && sessionStartJob?.isActive != true) {
             sessionStartJob = serviceScope.launch {
                 sessionCommandMutex.withLock {
                     when (val result = controller.start()) {
                         is SessionStartResult.Started -> {
+                            observeSessionFailures()
                             val heartRateState = heartRateSession.start()
                             if (heartRateState !is ExerciseHeartRateState.Active) {
                                 Log.i(TAG, "Heart rate unavailable for this session: $heartRateState")
                             }
                         }
-                        SessionStartResult.AlreadyRunning -> Unit
+                        SessionStartResult.AlreadyRunning -> observeSessionFailures()
                         is SessionStartResult.AlreadySaved -> {
                             // The process may have died between the atomic save and enqueue.
                             SyncWorker.enqueue(this@SessionService)
                             stopSelf()
                         }
-                        is SessionStartResult.Failed -> stopSelf()
+                        is SessionStartResult.Failed -> {
+                            // Start failures occur while this mutex is held, so clean up
+                            // directly instead of waiting for the state observer to reacquire it.
+                            sessionFailureJob?.cancel()
+                            stopFailedSessionService(
+                                stopHeartRate = heartRateSession::stop,
+                                stopService = ::stopSelf
+                            )
+                        }
                     }
                 }
             }
@@ -265,6 +340,24 @@ class SessionService : Service() {
     private fun updateNotification(notification: Notification) {
         val manager = getSystemService(NotificationManager::class.java) ?: return
         manager.notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun observeSessionFailures() {
+        // Install this only after start() has replaced any old recoverable Failed state.
+        // Terminal cleanup is intentionally independent from the sampled notification flow:
+        // a quick Dismiss must not conflate Failed -> Idle before Health Services stops.
+        sessionFailureJob?.cancel()
+        sessionFailureJob = controller.state
+            .filterIsInstance<SessionState.Failed>()
+            .onEach {
+                sessionCommandMutex.withLock {
+                    stopFailedSessionService(
+                        stopHeartRate = heartRateSession::stop,
+                        stopService = ::stopSelf
+                    )
+                }
+            }
+            .launchIn(serviceScope)
     }
 
     private fun buildCaptureNotification(label: ShotType, swings: Int): Notification =
@@ -442,9 +535,12 @@ class SessionService : Service() {
         private const val ONGOING_STATUS_TIME_PART = "time"
         const val ACTION_STOP = "com.badwatch.app.action.STOP_SESSION"
         const val ACTION_DISCARD = "com.badwatch.app.action.DISCARD_SESSION"
+        const val ACTION_ACKNOWLEDGE_FAILURE =
+            "com.badwatch.app.action.ACKNOWLEDGE_SESSION_FAILURE"
         const val ACTION_START_CAPTURE = "com.badwatch.app.action.START_CAPTURE"
         const val ACTION_STOP_CAPTURE = "com.badwatch.app.action.STOP_CAPTURE"
         const val ACTION_CANCEL_CAPTURE = "com.badwatch.app.action.CANCEL_CAPTURE"
+        const val ACTION_RETRY_CAPTURE_SAVE = "com.badwatch.app.action.RETRY_CAPTURE_SAVE"
         const val EXTRA_LABEL = "label"
 
         fun start(context: Context) {
@@ -459,6 +555,12 @@ class SessionService : Service() {
 
         fun discard(context: Context) {
             val intent = Intent(context, SessionService::class.java).setAction(ACTION_DISCARD)
+            context.startService(intent)
+        }
+
+        fun acknowledgeFailure(context: Context) {
+            val intent = Intent(context, SessionService::class.java)
+                .setAction(ACTION_ACKNOWLEDGE_FAILURE)
             context.startService(intent)
         }
 
@@ -478,5 +580,46 @@ class SessionService : Service() {
             val intent = Intent(context, SessionService::class.java).setAction(ACTION_CANCEL_CAPTURE)
             context.startService(intent)
         }
+
+        fun retryCaptureSave(context: Context) {
+            val intent = Intent(context, SessionService::class.java)
+                .setAction(ACTION_RETRY_CAPTURE_SAVE)
+            context.startService(intent)
+        }
+    }
+}
+
+/** Command-seam helpers kept Android-free so terminal cleanup ordering has JVM coverage. */
+internal suspend fun stopFailedSessionService(
+    stopHeartRate: suspend () -> Unit,
+    stopService: () -> Unit
+) {
+    try {
+        stopHeartRate()
+    } finally {
+        stopService()
+    }
+}
+
+internal suspend fun runFailedSessionAcknowledgement(
+    stopHeartRate: suspend () -> Unit,
+    stopService: () -> Unit,
+    acknowledgeController: () -> Unit
+) {
+    stopFailedSessionService(stopHeartRate, stopService)
+    acknowledgeController()
+}
+
+internal suspend fun <T> retryFailedCaptureSave(
+    retrySave: suspend () -> T?,
+    enqueueSync: () -> Unit,
+    stopService: () -> Unit
+): T? {
+    try {
+        val saved = retrySave()
+        if (saved != null) enqueueSync()
+        return saved
+    } finally {
+        stopService()
     }
 }

@@ -7,6 +7,8 @@
     <string name="action_delete">Supprimer</string>
     <string name="action_discard">Abandonner</string>
     <string name="action_dismiss">Fermer</string>
+    <string name="action_discard_drill">Abandonner l’exercice</string>
+    <string name="action_retry_save">Réessayer</string>
     <string name="action_done">Terminé</string>
     <string name="action_pause">Pause</string>
     <string name="action_save">Enregistrer</string>
@@ -140,6 +142,9 @@
     <string name="error_capture_metadata">Les métadonnées de capture étaient indisponibles.</string>
     <string name="error_capture_start">Le Labo de détection n’a pas pu démarrer.</string>
     <string name="error_capture_save">La capture du Labo de détection n’a pas pu être enregistrée.</string>
+    <string name="error_capture_stopped">Labo de détection interrompu</string>
+    <string name="error_capture_discard_question">Abandonner cet exercice ?</string>
+    <string name="error_capture_discard_body">Ses échantillons non enregistrés du Labo de détection seront perdus.</string>
     <string name="error_session_start">La séance n’a pas pu démarrer.</string>
     <string name="error_session_save">La séance n’a pas pu être enregistrée.</string>
     <string name="error_session_pending_save">La séance précédente doit encore être enregistrée.</string>

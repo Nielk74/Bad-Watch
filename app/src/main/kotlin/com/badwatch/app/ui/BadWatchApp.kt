@@ -20,6 +20,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.material3.AppScaffold
 import com.badwatch.app.R
 import com.badwatch.app.data.StoredSession
+import com.badwatch.app.domain.CaptureFailureRecovery
 import com.badwatch.app.domain.CaptureState
 import com.badwatch.app.domain.MatchControllerState
 import com.badwatch.app.domain.SessionState
@@ -46,9 +47,11 @@ fun BadWatchApp(
     onStartSession: () -> Unit,
     onStopSession: () -> Unit,
     onDiscardSession: () -> Unit,
+    onAcknowledgeSessionFailure: () -> Unit,
     onStartCapture: (ShotType) -> Unit,
     onFinishCapture: () -> Unit,
     onCancelCapture: () -> Unit,
+    onRetryCaptureSave: () -> Unit,
     isAmbient: StateFlow<Boolean> = MutableStateFlow(false),
     ambientTimeMillis: StateFlow<Long> = MutableStateFlow(System.currentTimeMillis())
 ) {
@@ -62,6 +65,7 @@ fun BadWatchApp(
     val detectedHitHaptics by viewModel.detectedHitHaptics.collectAsStateWithLifecycle()
     var screen by remember { mutableStateOf(Screen.Home) }
     var detailSession by remember { mutableStateOf<StoredSession?>(null) }
+    val captureFailure = captureState as? CaptureState.Failed
 
     val matchOwnsScreen = (matchState is MatchControllerState.Active ||
         matchState is MatchControllerState.Failed) &&
@@ -79,11 +83,16 @@ fun BadWatchApp(
             captureState is CaptureState.Failed)
     ) {
         when {
-            sessionState is SessionState.Completed || sessionState is SessionState.Failed ->
-                viewModel.acknowledge()
+            sessionState is SessionState.Completed -> viewModel.acknowledge()
 
-            captureState is CaptureState.Saved || captureState is CaptureState.Failed ->
-                viewModel.acknowledgeCapture()
+            sessionState is SessionState.Failed -> onAcknowledgeSessionFailure()
+
+            captureState is CaptureState.Saved -> viewModel.acknowledgeCapture()
+
+            captureFailure != null -> when (captureFailure.recovery) {
+                CaptureFailureRecovery.CancelCapture -> onCancelCapture()
+                CaptureFailureRecovery.RetrySave -> onRetryCaptureSave()
+            }
 
             screen == Screen.SessionDetail -> screen = Screen.History
             else -> screen = Screen.Home
@@ -279,7 +288,7 @@ fun BadWatchApp(
                     is ScreenFrame.SessionFailed -> {
                         ErrorScreen(
                             message = target.state.message,
-                            onDismiss = viewModel::acknowledge,
+                            onDismiss = onAcknowledgeSessionFailure,
                             // The failed collector may still own a durable journal. Route the
                             // destructive choice through SessionService so recorder, optical HR,
                             // foreground state, and the checkpoint are cleared as one command.
@@ -288,9 +297,19 @@ fun BadWatchApp(
                     }
 
                     is ScreenFrame.CaptureFailed -> {
+                        val retrySave = target.state.recovery == CaptureFailureRecovery.RetrySave
                         ErrorScreen(
                             message = target.state.message,
-                            onDismiss = viewModel::acknowledgeCapture
+                            onDismiss = if (retrySave) onRetryCaptureSave else onCancelCapture,
+                            titleResource = R.string.error_capture_stopped,
+                            primaryActionResource = if (retrySave) {
+                                R.string.action_retry_save
+                            } else {
+                                R.string.action_discard_drill
+                            },
+                            confirmPrimaryAction = !retrySave,
+                            discardQuestionResource = R.string.error_capture_discard_question,
+                            discardBodyResource = R.string.error_capture_discard_body
                         )
                     }
 

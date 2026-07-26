@@ -16,9 +16,11 @@ import kotlin.math.exp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -95,7 +97,8 @@ class CaptureControllerConcurrencyTest {
         runCurrent()
 
         assertThat(controller.finish()).isNull()
-        assertThat(controller.state.value).isInstanceOf(CaptureState.Failed::class.java)
+        val failed = controller.state.value as CaptureState.Failed
+        assertThat(failed.recovery).isEqualTo(CaptureFailureRecovery.RetrySave)
         val retried = controller.finish()
 
         assertThat(retried).isNotNull()
@@ -106,6 +109,43 @@ class CaptureControllerConcurrencyTest {
         assertThat(attemptedIds.toSet()).hasSize(1)
         assertThat(directory.listFiles { file -> file.extension == "json" }?.toList())
             .hasSize(1)
+        controllerScope.cancel()
+    }
+
+    @Test
+    fun sensorFailureRequiresCancelAndNextCaptureStartsFresh() = runTest {
+        val directory = temporaryFolder.newFolder("sensor-failure")
+        val controllerScope = CoroutineScope(
+            SupervisorJob() + StandardTestDispatcher(testScheduler)
+        )
+        var streamCount = 0
+        val stream = object : SensorStream {
+            override fun samples(): Flow<SensorSample> = flow {
+                streamCount += 1
+                if (streamCount == 1) return@flow
+                awaitCancellation()
+            }
+        }
+        val controller = controller(
+            stream = stream,
+            store = CaptureStore(directory),
+            scope = controllerScope,
+            now = { 1_000L }
+        )
+
+        assertThat(controller.start(ShotType.Drop)).isTrue()
+        runCurrent()
+
+        val failed = controller.state.value as CaptureState.Failed
+        assertThat(failed.message).isEqualTo("Sensor stream stopped")
+        assertThat(failed.recovery).isEqualTo(CaptureFailureRecovery.CancelCapture)
+        assertThat(controller.cancel()).isTrue()
+        assertThat(controller.state.value).isEqualTo(CaptureState.Idle)
+
+        assertThat(controller.start(ShotType.Drive)).isTrue()
+        runCurrent()
+        assertThat(controller.state.value).isInstanceOf(CaptureState.Capturing::class.java)
+        assertThat(streamCount).isEqualTo(2)
         controllerScope.cancel()
     }
 
