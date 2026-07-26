@@ -3,8 +3,10 @@ package com.badwatch.app.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -13,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -39,6 +42,7 @@ import com.badwatch.app.ui.components.formatHeartRate
 import com.badwatch.app.ui.components.formatRestRatio
 import com.badwatch.app.ui.components.hrZoneLabel
 import com.badwatch.app.ui.components.provisionalDisplayName
+import com.badwatch.app.ui.components.shouldStackStats
 import com.badwatch.core.insight.Insight
 import com.badwatch.core.model.HeartRateZone
 import com.badwatch.core.physiology.PostBurstHeartRateBuilder
@@ -71,6 +75,10 @@ fun SummaryScreen(
     val rallies = reviewed.rallyProfile
     val effective = reviewed.metrics
     val postBurstHeartRate = PostBurstHeartRateBuilder.build(stored)
+    val headlineLayout = summaryHeadlineLayout(
+        durationMillis = effective.window.durationMillis,
+        fontScale = LocalDensity.current.fontScale
+    )
 
     WatchScreen(
         edgeButton = {
@@ -84,7 +92,7 @@ fun SummaryScreen(
         item { ScreenHeader(stringResource(R.string.summary_saved)) }
 
         item {
-            StatRow(
+            val stats = arrayOf(
                 Stat(
                     stringResource(
                         if (effective.hasCorrections) {
@@ -111,10 +119,28 @@ fun SummaryScreen(
                         }
                     ),
                     formatDuration(effective.window.durationMillis),
-                    // `m:ss` still needs enough width for the large numeral on a round edge.
+                    // Short `m:ss` values still need enough width at the round edge.
                     weight = 0.85f
                 )
             )
+
+            when (headlineLayout) {
+                SummaryHeadlineLayout.WideDuration -> {
+                    // H:MM:SS cannot reliably share the narrow round-screen edge with two
+                    // neighbouring metrics. Keep the exact value and give it a calm,
+                    // full-width second row instead of shrinking or truncating it.
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        StatRow(stats[0], stats[1])
+                        StatRow(stats[2])
+                    }
+                }
+
+                SummaryHeadlineLayout.ThreeUp,
+                SummaryHeadlineLayout.AccessibilityStack -> StatRow(*stats)
+            }
         }
 
         if (stored.context.diaryReviewStatus != DiaryReviewStatus.Unreviewed ||
@@ -389,6 +415,30 @@ fun SummaryScreen(
             }
         }
     }
+}
+
+internal enum class SummaryHeadlineLayout {
+    ThreeUp,
+    WideDuration,
+    AccessibilityStack
+}
+
+/**
+ * Keeps the recap exact and readable on a round Wear display.
+ *
+ * Sub-hour `m:ss` values remain in the glanceable three-up row. Once the formatter adds an
+ * hours field, time moves below the two count metrics and receives the full screen width. At
+ * enlarged text sizes [StatRow] already provides the more readable label/value stack.
+ */
+internal fun summaryHeadlineLayout(
+    durationMillis: Long,
+    fontScale: Float
+): SummaryHeadlineLayout = when {
+    shouldStackStats(statCount = 3, fontScale = fontScale) ->
+        SummaryHeadlineLayout.AccessibilityStack
+    durationMillis.coerceAtLeast(0L) >= 60L * 60L * 1_000L ->
+        SummaryHeadlineLayout.WideDuration
+    else -> SummaryHeadlineLayout.ThreeUp
 }
 
 @Composable
