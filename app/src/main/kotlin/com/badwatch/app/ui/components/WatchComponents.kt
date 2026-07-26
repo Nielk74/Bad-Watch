@@ -26,6 +26,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
@@ -37,6 +41,8 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ProgressIndicatorDefaults
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
+import com.badwatch.app.R
+import com.badwatch.app.localization.displayNameResource
 import com.badwatch.app.ui.theme.CourtColors
 import com.badwatch.core.insight.Insight
 import com.badwatch.core.insight.InsightSeverity
@@ -89,7 +95,7 @@ fun WatchScreen(
 @Composable
 fun ScreenHeader(title: String, modifier: Modifier = Modifier) {
     Text(
-        text = title.uppercase(Locale.US),
+        text = title.uppercase(Locale.getDefault()),
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 2.dp),
@@ -110,7 +116,7 @@ fun InfoCard(
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (title != null) {
                 Text(
-                    text = title.uppercase(Locale.US),
+                    text = title.uppercase(Locale.getDefault()),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -132,15 +138,17 @@ fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
     ) {
         stats.forEach { stat ->
             Column(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics(mergeDescendants = true) {},
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = stat.label.uppercase(Locale.US),
+                    text = stat.label.uppercase(Locale.getDefault()),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
-                    maxLines = 1
+                    maxLines = 2
                 )
                 Text(
                     text = stat.value,
@@ -162,17 +170,21 @@ fun DetailRow(
     valueColor: Color = Color.Unspecified
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) {},
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
+            modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
             text = value,
+            modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
             color = valueColor,
             textAlign = TextAlign.End
@@ -180,7 +192,7 @@ fun DetailRow(
     }
 }
 
-/** A labeled progress meter, e.g. fatigue or effort scores in 0..1. */
+/** A labeled progress meter for a bounded value in 0..1, such as goal completion. */
 @Composable
 fun MeterRow(
     label: String,
@@ -188,7 +200,10 @@ fun MeterRow(
     color: Color,
     valueText: String? = null
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    Column(
+        modifier = Modifier.semantics(mergeDescendants = true) {},
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -221,9 +236,15 @@ fun MeterRow(
 fun Sparkline(
     values: List<Float>,
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null
 ) {
-    Canvas(modifier = modifier.fillMaxWidth().height(28.dp)) {
+    val accessibility = if (contentDescription == null) {
+        Modifier
+    } else {
+        Modifier.semantics { this.contentDescription = contentDescription }
+    }
+    Canvas(modifier = modifier.fillMaxWidth().height(28.dp).then(accessibility)) {
         if (values.size < 2) return@Canvas
         val min = values.min()
         val max = values.max()
@@ -253,13 +274,20 @@ data class DistributionSegment(val color: Color, val fraction: Float)
 @Composable
 fun DistributionBar(
     segments: List<DistributionSegment>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null
 ) {
+    val accessibility = if (contentDescription == null) {
+        Modifier
+    } else {
+        Modifier.semantics { this.contentDescription = contentDescription }
+    }
     Canvas(
         modifier = modifier
             .fillMaxWidth()
             .height(10.dp)
             .clip(RoundedCornerShape(5.dp))
+            .then(accessibility)
     ) {
         var x = 0f
         segments.forEach { segment ->
@@ -283,6 +311,7 @@ fun DistributionBar(
 @Composable
 fun InsightCard(insight: Insight) {
     val accent = insight.severity.color()
+    val localized = insight.localizedText()
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(
@@ -296,27 +325,169 @@ fun InsightCard(insight: Insight) {
             }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = insight.severity.label().uppercase(Locale.US),
+                    text = insight.severity.label().uppercase(Locale.getDefault()),
                     style = MaterialTheme.typography.labelSmall,
                     color = accent
                 )
                 Text(
-                    text = insight.headline,
+                    text = localized.headline,
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = insight.detail,
+                    text = localized.detail,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = insight.evidence,
+                    text = localized.evidence,
                     style = MaterialTheme.typography.bodyExtraSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 )
             }
         }
+    }
+}
+
+private data class LocalizedInsightText(
+    val headline: String,
+    val detail: String,
+    val evidence: String
+)
+
+@Composable
+private fun Insight.localizedText(): LocalizedInsightText {
+    fun fallback() = LocalizedInsightText(headline, detail, evidence)
+    fun int(key: String) = localizationArgs[key]?.toIntOrNull()
+    fun decimal(key: String) = localizationArgs[key]?.toFloatOrNull()
+
+    return when (id) {
+        "rest-ratio-up" -> {
+            val ratio = decimal("ratio") ?: return fallback()
+            val exchanges = int("exchanges") ?: return fallback()
+            val change = int("change") ?: return fallback()
+            val usual = decimal("usual") ?: return fallback()
+            LocalizedInsightText(
+                headline = stringResource(R.string.insight_rest_up_headline),
+                detail = stringResource(R.string.insight_rest_up_detail, change, usual),
+                evidence = pluralStringResource(
+                    R.plurals.insight_rest_evidence,
+                    exchanges,
+                    ratio,
+                    exchanges
+                )
+            )
+        }
+        "rest-ratio-down" -> {
+            val ratio = decimal("ratio") ?: return fallback()
+            val exchanges = int("exchanges") ?: return fallback()
+            val change = int("change") ?: return fallback()
+            val usual = decimal("usual") ?: return fallback()
+            LocalizedInsightText(
+                headline = stringResource(R.string.insight_rest_down_headline),
+                detail = stringResource(R.string.insight_rest_down_detail, change, usual),
+                evidence = pluralStringResource(
+                    R.plurals.insight_rest_evidence,
+                    exchanges,
+                    ratio,
+                    exchanges
+                )
+            )
+        }
+        "rest-ratio-high" -> {
+            val ratio = decimal("ratio") ?: return fallback()
+            val exchanges = int("exchanges") ?: return fallback()
+            LocalizedInsightText(
+                headline = stringResource(R.string.insight_rest_high_headline),
+                detail = stringResource(R.string.insight_rest_high_detail, ratio),
+                evidence = pluralStringResource(
+                    R.plurals.insight_rest_evidence,
+                    exchanges,
+                    ratio,
+                    exchanges
+                )
+            )
+        }
+        "endurance-decay" -> {
+            val third = int("third") ?: return fallback()
+            val closing = decimal("closing") ?: return fallback()
+            val opening = decimal("opening") ?: return fallback()
+            val change = int("change") ?: return fallback()
+            LocalizedInsightText(
+                headline = stringResource(R.string.insight_endurance_headline),
+                detail = pluralStringResource(
+                    R.plurals.insight_endurance_detail,
+                    third,
+                    third,
+                    closing,
+                    opening,
+                    change
+                ),
+                evidence = stringResource(
+                    R.string.insight_endurance_evidence,
+                    opening,
+                    closing
+                )
+            )
+        }
+        "longest-rally-best" -> {
+            val hits = int("hits") ?: return fallback()
+            val previous = int("previous") ?: return fallback()
+            val seconds = int("seconds") ?: return fallback()
+            LocalizedInsightText(
+                headline = stringResource(R.string.insight_longest_best_headline),
+                detail = stringResource(R.string.insight_longest_best_detail, hits, previous),
+                evidence = pluralStringResource(
+                    R.plurals.insight_longest_best_evidence,
+                    hits,
+                    hits,
+                    seconds
+                )
+            )
+        }
+        "longest-rally" -> {
+            val hits = int("hits") ?: return fallback()
+            val seconds = int("seconds") ?: return fallback()
+            LocalizedInsightText(
+                headline = stringResource(R.string.insight_longest_headline),
+                detail = pluralStringResource(
+                    R.plurals.insight_longest_detail,
+                    hits,
+                    hits,
+                    seconds
+                ),
+                evidence = pluralStringResource(
+                    R.plurals.insight_longest_evidence,
+                    hits,
+                    hits
+                )
+            )
+        }
+        "low-work-density" -> {
+            val activeMinutes = int("activeMinutes") ?: return fallback()
+            val totalMinutes = int("totalMinutes") ?: return fallback()
+            val activePercent = int("activePercent") ?: return fallback()
+            LocalizedInsightText(
+                headline = stringResource(R.string.insight_density_headline),
+                detail = stringResource(
+                    R.string.insight_density_detail,
+                    stringResource(R.string.format_minutes, activeMinutes),
+                    stringResource(R.string.format_minutes, totalMinutes)
+                ),
+                evidence = stringResource(R.string.insight_density_evidence, activePercent)
+            )
+        }
+        "cardiac-drift" -> {
+            val drift = int("drift") ?: return fallback()
+            val early = int("early") ?: return fallback()
+            val late = int("late") ?: return fallback()
+            LocalizedInsightText(
+                headline = stringResource(R.string.insight_cardiac_headline),
+                detail = stringResource(R.string.insight_cardiac_detail, drift),
+                evidence = stringResource(R.string.insight_cardiac_evidence, early, late)
+            )
+        }
+        else -> fallback()
     }
 }
 
@@ -327,10 +498,11 @@ fun InsightSeverity.color(): Color = when (this) {
     InsightSeverity.Caution -> CourtColors.Warning
 }
 
+@Composable
 fun InsightSeverity.label(): String = when (this) {
-    InsightSeverity.Info -> "Noticed"
-    InsightSeverity.Notable -> "Stands out"
-    InsightSeverity.Caution -> "Worth watching"
+    InsightSeverity.Info -> stringResource(R.string.insight_severity_info)
+    InsightSeverity.Notable -> stringResource(R.string.insight_severity_notable)
+    InsightSeverity.Caution -> stringResource(R.string.insight_severity_caution)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -372,14 +544,8 @@ fun hrZoneLabel(bpm: Float?, maxHeartRate: Float): String =
 // Shot types
 // ---------------------------------------------------------------------------------------------
 
-fun ShotType.displayName(): String = when (this) {
-    ShotType.Smash -> "Smash"
-    ShotType.Clear -> "Clear"
-    ShotType.Drop -> "Drop"
-    ShotType.Drive -> "Drive"
-    ShotType.BackhandDrive -> "Backhand drive"
-    ShotType.Unknown -> "Unclassified"
-}
+@Composable
+fun ShotType.displayName(): String = stringResource(displayNameResource)
 
 fun ShotType.color(): Color = when (this) {
     ShotType.Smash -> CourtColors.Smash
@@ -399,9 +565,9 @@ fun formatDuration(durationMillis: Long): String {
     val minutes = TimeUnit.MILLISECONDS.toMinutes(durationMillis) % 60
     val seconds = TimeUnit.MILLISECONDS.toSeconds(durationMillis) % 60
     return if (hours > 0) {
-        String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
+        String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
     } else {
-        String.format(Locale.US, "%d:%02d", minutes, seconds)
+        String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
     }
 }
 
@@ -410,7 +576,7 @@ fun formatHeartRate(bpm: Float?): String =
 
 /** Work:rest shown the way coaches say it — "1:2.3". */
 fun formatRestRatio(ratio: Float): String =
-    if (ratio <= 0f) "--" else String.format(Locale.US, "1:%.1f", ratio)
+    if (ratio <= 0f) "--" else String.format(Locale.getDefault(), "1:%.1f", ratio)
 
 fun formatSessionDate(epochMillis: Long): String =
     SimpleDateFormat("EEE d MMM · HH:mm", Locale.getDefault()).format(Date(epochMillis))

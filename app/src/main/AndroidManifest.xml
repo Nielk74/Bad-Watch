@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-feature
         android:name="android.hardware.type.watch"
@@ -18,20 +19,29 @@
     <!-- Android 16 replaces BODY_SENSORS for heart-rate access. -->
     <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
     <!--
-      HIGH_SAMPLING_RATE_SENSORS is deliberately NOT requested. The platform caps motion
-      sensors at 200 Hz without it, and capture runs at 100 Hz, so the permission would
-      widen the permission surface for nothing. Add it only if sampling ever exceeds 200 Hz.
+      Manifest-only prerequisite for a health foreground service on targetSdk 34+. The
+      session service continuously samples IMU sensors and must remain startable when the
+      optional heart-rate runtime permission is denied.
     -->
+    <uses-permission
+        android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS"
+        tools:ignore="HighSamplingRate" />
 
     <!-- Recording must survive the screen turning off mid-rally. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- Dashboard sync. The app is fully functional with these denied. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Health Services is optional; package visibility lets the client discover it safely. -->
+    <queries>
+        <package android:name="com.google.android.wearable.healthservices" />
+    </queries>
 
     <application
         android:name=".BadWatchApplication"
@@ -73,6 +83,24 @@
             <meta-data
                 android:name="androidx.wear.tiles.PREVIEW"
                 android:resource="@drawable/ic_launcher_foreground" />
+        </service>
+
+        <!-- Config-free watch-face complication: corrected detected hits in a rolling 7 days. -->
+        <service
+            android:name=".complication.WeeklyHitsComplicationDataSourceService"
+            android:exported="true"
+            android:icon="@drawable/ic_complication_weekly_hits"
+            android:label="@string/weekly_hits_complication_name"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT,LONG_TEXT" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="1800" />
         </service>
 
         <meta-data

@@ -1,114 +1,117 @@
 # Bad Watch
 
-A badminton training companion for Wear OS, built for the Pixel Watch 3. It records what
-actually happened in a session — shots, rallies, work-to-rest ratio, heart rate — from the
-wrist alone, and pushes it to a self-hosted dashboard you can open in any browser.
+Bad Watch is a private, standalone badminton session companion for Wear OS. Wear it on the
+racket hand, tap once, and it keeps a durable record of what the watch actually observed:
+elapsed time, candidate hits, inferred exchange bursts, and optical heart rate when available.
+After play, add context and correct the detector before comparing like-for-like sessions.
 
-No racket sensors. No account. No cloud you do not run yourself.
+No account. No subscription. No racket sensor. The optional self-hosted dashboard works in any
+browser and keeps the archive under your control.
 
-> **Status: in development.** See [What works today](#what-works-today) for the honest
-> current state, and [`docs/PRODUCT_PLAN.md`](docs/PRODUCT_PLAN.md) for where it is going.
-> Shot classification is currently rule-based and uncalibrated — treat the stroke labels as
-> provisional until the ML work in Phase 2 lands.
+> **Measurement boundary:** a single wrist does not see shuttle contact, the opponent, partner,
+> point outcome, court position, or technique. Counts are **detected hits**, exchange boundaries
+> and active time are **estimates**, stroke names are **provisional**, and score/RPE/soreness are
+> **player-reported**. See [the sport model](docs/SPORT_MODEL.md).
 
-## Wear it on your racket hand
+## What is included
 
-Bad Watch detects shots from the swing itself. Worn on the non-racket wrist there is simply
-no swing to read, and stroke detection does not work at all. The app says so during
-onboarding rather than producing confident nonsense. Handedness (left/right) is a setting,
-because the backhand pronation signature mirrors between hands.
-
-## What works today
-
-| Area | State |
+| Area | Current behavior |
 | --- | --- |
-| Multi-sensor capture | ✅ Gyroscope + accelerometer + heart rate, fused at 100 Hz with hardware FIFO batching and monotonic sensor timestamps |
-| Recording survives screen-off | ✅ Foreground service with `health` type; a session no longer dies when the wrist drops |
-| Shot detection | ⚠️ Rule-based heuristics in `:core`, wired end to end but **not yet calibrated against real play** |
-| Rally segmentation | ✅ Rally count, length distribution, work:rest ratio, playing-time density |
-| Session insights | ✅ Evidence-backed, derived only from rally structure and heart rate — never from stroke labels |
-| Session persistence | ✅ One JSON file per session on the watch, durable across restarts |
-| Dashboard sync | ✅ WorkManager-backed upload with retry; the watch is fully functional offline |
-| Web dashboard | ✅ Self-hosted Ktor server + browser dashboard with load trend, shot mix, rally distribution |
-| Labelled data collection | ✅ On-watch drill records labelled swings; `tools/` ingests and trains a baseline |
-| ML classifier | ❌ Not started — needs real players. See [`tools/README.md`](tools/README.md) |
-| Footwork, lunges, jumps | ❌ Not started (Phase 4) |
-| Auto-scoring, match mode | ❌ Not started (Phase 5) |
+| Reliable recording | Health foreground service, required gyro plus optional accelerometer/Health Services HR, screen-off capture, process-death journal |
+| Live watch UI | Glance-first OLED design, optional hit haptics, ambient mode, stop/save/discard controls |
+| Session review | Activity, RPE, soreness, completion, recording quality, equipment, conditions, notes, edge trim, false-hit and missed-hit review |
+| Honest analysis | Corrected detected-hit totals, rebuilt exchange estimates, HR coverage, transparent HRR-min/session-RPE, evidence-backed insights |
+| Progress | Seven-day goals, personal archive records, self-reported experience, multidimensional like-for-like play pattern—never a guessed global level |
+| Match utility | Manual singles/doubles BWF scoring, service side, intervals, change of ends, undo, ambient display, durable recovery |
+| Practice | Balanced six-corner shadow prompts and sourced BWF practice cards with explicit measurement limits |
+| Wear surfaces | Start/recap Tile and rolling seven-day corrected-detected-hit complication |
+| Data ownership | Atomic local JSON, fingerprinted sync state, authenticated self-hosted dashboard, reviewed CSV, deterministic backup and validated restore |
+| Detection research | Consent-bound labelled capture plus participant-grouped ingestion/training/evaluation; no learned model is shipped without real-player evidence |
+| Language/platform | English and French, accessibility semantics, Android 16 granular HR permission, `targetSdk 36` |
 
-## Repository layout
+The current motion classifier is a rule-based fallback and is not validated against representative
+match play. It is useful for exercising the end-to-end detector and research pipeline; do not use
+its stroke labels as coaching truth.
 
+## Repository
+
+```text
+app/       Wear OS app: sensing, Health Services, foreground lifecycle, stores, sync, UI
+core/      Android-free models, detector, corrections, scoring, training and analytics
+server/    Ktor API plus responsive self-hosted browser dashboard
+docs/      Product contract, sport model, architecture and operating guides
+tools/     Consent-aware capture ingestion and offline classifier evaluation/training
+isolate/   Wear/emulator inspection helpers
+tooling/   Release and real-device endurance probes
 ```
-app/       Wear OS app — sensing, foreground service, storage, sync, Compose UI
-core/      Platform-free analytics — classifier, rally segmentation, session math,
-           and the sync contract shared verbatim with the server
-server/    Self-hosted Ktor dashboard — session ingest + browser dashboard
-docs/      Architecture, usage, dashboard setup, product plan
-tools/     Python capture ingestion and classifier training
-isolate/   Headless Wear OS emulator tooling (screenshots, UI dumps, adb wrappers)
-tooling/   Release helper scripts
-```
 
-`core` is the single source of truth for the data model. Both the watch and the server
-compile against the same `@Serializable` Kotlin types, so there is no second schema to
-drift out of sync.
+`core` is the single schema and analysis source for the watch and server. Raw session evidence is
+immutable; reviewed metrics are deterministic projections shared by every surface.
 
-## Getting started
+## Build
 
-### Prerequisites
-
-- JDK 17
-- Android SDK with `platforms;android-36` and `build-tools;36.0.0`
-  (the app compiles against 36; `targetSdk` stays at 34)
-
-On macOS:
+Requirements: JDK 17 and Android SDK platform/build-tools 36.
 
 ```bash
 brew install --cask android-commandlinetools
 sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 echo "sdk.dir=/opt/homebrew/share/android-commandlinetools" > local.properties
+
+./gradlew test :app:lintDebug :app:assembleDebug :app:assembleRelease \
+  --stacktrace --no-daemon
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-`local.properties` is gitignored and must exist before `:app` will build.
-
-### Build and test
+The complete CI-equivalent gate also verifies the Python model tooling:
 
 ```bash
-./gradlew test                    # JVM tests: core analytics + server contract
-./gradlew :app:assembleDebug
-adb install app/build/outputs/apk/debug/app-debug.apk
+python3 -m unittest discover -s tools -p 'test_*.py' -v
+python3 -m py_compile tools/ingest.py tools/train.py tooling/wear_session_probe.py
 ```
 
-### Run the dashboard
+## Dashboard
+
+Local-only, with no token required:
 
 ```bash
 ./gradlew :server:run
-# → http://localhost:8080/
+# http://127.0.0.1:8080
 ```
 
-To see it populated without a watch on a court:
+To reach it from a watch on the LAN, a bearer token is mandatory:
 
 ```bash
-./gradlew :server:seedDemoData    # writes synthetic sessions into ./badwatch-data
+BADWATCH_HOST=0.0.0.0 \
+BADWATCH_TOKEN="$(openssl rand -hex 24)" \
 ./gradlew :server:run
 ```
 
-Full setup, including reaching the server from the watch and configuring a token, is in
-[`docs/dashboard.md`](docs/dashboard.md).
+Configure and test the URL/token directly in **Settings → Dashboard** on the watch. The server is
+plain HTTP; use only a trusted private LAN or put it behind a TLS reverse proxy. Full setup,
+backup/restore, API, and security details are in [dashboard.md](docs/dashboard.md).
 
 ## Documentation
 
-- [Product plan and roadmap](docs/PRODUCT_PLAN.md) — the vision, phased
-- [Architecture](docs/architecture.md) — how the pieces fit
-- [Usage guide](docs/usage.md) — using it on court
-- [Dashboard setup](docs/dashboard.md) — running and securing the server
-- [Training pipeline](tools/README.md) — collecting labelled swings and training a classifier
-- [Agent/maintainer guide](AGENT.MD) — environment, workflows, debugging
+- [Completed product plan](docs/PRODUCT_PLAN.md)
+- [Sport and measurement model](docs/SPORT_MODEL.md)
+- [Architecture](docs/architecture.md)
+- [Court usage guide](docs/usage.md)
+- [Session diary and correction schema](docs/session-diary-schema.md)
+- [Manual match mode](docs/match-mode.md)
+- [Practice and shadow training](docs/training.md)
+- [Accessibility and localization](docs/accessibility-localization.md)
+- [Watch-face complication](docs/watch-face-complication.md)
+- [Dashboard and data ownership](docs/dashboard.md)
+- [Detection research tools](tools/README.md)
+- [Maintainer guide](AGENT.MD)
 - [Changelog](CHANGELOG.md)
 
-## Versioning
+## Versioning and releases
 
-The version in `VERSION.md` is injected into the manifest at build time.
-`tooling/tag_release.sh <version>` bumps it, runs tests, and tags a release.
+`VERSION.md` is injected as the Android version name/code. CI runs the full software gate on every
+push. `tooling/tag_release.sh <version>` validates a clean version bump and creates an annotated
+`v<version>` tag; the tag workflow rebuilds, verifies package/signature/version, writes checksums,
+and publishes the artifacts.
 
 ## License
 

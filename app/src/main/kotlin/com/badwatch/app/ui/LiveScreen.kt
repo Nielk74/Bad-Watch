@@ -30,6 +30,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -49,6 +52,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ProgressIndicatorDefaults
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.rememberAnimatedTextFontRegistry
+import com.badwatch.app.R
 import com.badwatch.app.domain.SessionState
 import com.badwatch.app.ui.components.DetailRow
 import com.badwatch.app.ui.components.DistributionBar
@@ -113,8 +117,8 @@ fun LiveScreen(
                 }
             )
         },
-        title = { Text("Discard session?") },
-        text = { Text("Recording stops and nothing is saved.") }
+        title = { Text(stringResource(R.string.live_discard_question)) },
+        text = { Text(stringResource(R.string.live_discard_body)) }
     )
 }
 
@@ -126,19 +130,28 @@ private fun HudPage(
     val snapshot = state.snapshot
     val heartRate = snapshot.currentHeartRate
     val maxHeartRate = state.profile.maxHeartRate
-    val zoneColor = hrZoneColor(heartRate, maxHeartRate)
+    val hasPersonalizedZones = state.profile.hasConfiguredMaxHeartRate
+    val zoneColor = if (hasPersonalizedZones) {
+        hrZoneColor(heartRate, maxHeartRate)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Heart-rate as a ring: both zone and fill use this player's estimated maximum.
-        CircularProgressIndicator(
-            progress = { ((heartRate ?: 0f) / maxHeartRate).coerceIn(0.02f, 1f) },
-            modifier = Modifier.fillMaxSize(),
-            colors = ProgressIndicatorDefaults.colors(
-                indicatorColor = zoneColor,
-                trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-            ),
-            strokeWidth = 5.dp
-        )
+        if (hasPersonalizedZones) {
+            CircularProgressIndicator(
+                progress = { ((heartRate ?: 0f) / maxHeartRate).coerceIn(0.02f, 1f) },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clearAndSetSemantics {},
+                colors = ProgressIndicatorDefaults.colors(
+                    indicatorColor = zoneColor,
+                    trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                ),
+                strokeWidth = 5.dp
+            )
+        }
 
         Column(
             modifier = Modifier
@@ -148,7 +161,7 @@ private fun HudPage(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "HITS",
+                text = stringResource(R.string.live_hits_upper),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -164,7 +177,18 @@ private fun HudPage(
                     modifier = Modifier.size(14.dp)
                 )
                 Text(
-                    text = "${formatHeartRate(heartRate)} bpm · ${hrZoneLabel(heartRate, maxHeartRate)}",
+                    text = if (hasPersonalizedZones) {
+                        stringResource(
+                            R.string.live_heart_rate_line,
+                            formatHeartRate(heartRate),
+                            hrZoneLabel(heartRate, maxHeartRate)
+                        )
+                    } else {
+                        stringResource(
+                            R.string.live_heart_rate_only,
+                            formatHeartRate(heartRate)
+                        )
+                    },
                     style = MaterialTheme.typography.labelMedium,
                     color = zoneColor
                 )
@@ -188,7 +212,7 @@ private fun HudPage(
                 contentColor = MaterialTheme.colorScheme.onErrorContainer
             )
         ) {
-            Text("Stop & save")
+            Text(stringResource(R.string.live_stop_save))
         }
     }
 }
@@ -255,7 +279,7 @@ private fun AmbientHud(state: SessionState.Recording) {
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "HITS",
+            text = stringResource(R.string.live_hits_upper),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -266,8 +290,11 @@ private fun AmbientHud(state: SessionState.Recording) {
             textAlign = TextAlign.Center
         )
         Text(
-            text = "${formatHeartRate(snapshot.currentHeartRate)} bpm · " +
-                formatDuration(snapshot.durationMillis),
+            text = stringResource(
+                R.string.live_heart_rate_duration,
+                formatHeartRate(snapshot.currentHeartRate),
+                formatDuration(snapshot.durationMillis)
+            ),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -313,13 +340,21 @@ private fun HudDetailsPage(
 
     WatchScreen {
         item {
-            InfoCard(title = "Detected play") {
-                DetailRow("Rally bursts", rallies.rallyCount.toString())
-                DetailRow("Avg hits", String.format(Locale.US, "%.1f", rallies.averageShotsPerRally))
-                DetailRow("Longest", "${rallies.longestRally?.shotCount ?: 0} hits")
-                DetailRow("Est. active : quiet", formatRestRatio(rallies.restRatio))
+            InfoCard(title = stringResource(R.string.live_detected_play)) {
+                DetailRow(stringResource(R.string.live_rally_bursts), rallies.rallyCount.toString())
+                DetailRow(
+                    stringResource(R.string.live_average_hits),
+                    String.format(Locale.getDefault(), "%.1f", rallies.averageShotsPerRally)
+                )
+                val longestHits = rallies.longestRally?.shotCount ?: 0
+                DetailRow(
+                    stringResource(R.string.label_longest),
+                    pluralStringResource(R.plurals.common_hits_count, longestHits, longestHits)
+                )
+                DetailRow(stringResource(R.string.live_active_quiet), formatRestRatio(rallies.restRatio))
                 val total = rallies.totalWorkMillis + rallies.totalRestMillis
                 if (total > 0) {
+                    val activePercent = (rallies.workDensity * 100).toInt()
                     DistributionBar(
                         segments = listOf(
                             DistributionSegment(
@@ -330,21 +365,38 @@ private fun HudDetailsPage(
                                 color = MaterialTheme.colorScheme.secondary,
                                 fraction = rallies.totalRestMillis.toFloat() / total
                             )
+                        ),
+                        contentDescription = stringResource(
+                            R.string.live_activity_distribution,
+                            activePercent,
+                            100 - activePercent
                         )
                     )
-                    DetailRow("Estimated active", "${(rallies.workDensity * 100).toInt()}%")
+                    DetailRow(
+                        stringResource(R.string.label_estimated_active),
+                        "$activePercent%"
+                    )
                 }
             }
         }
 
         item {
-            InfoCard(title = "Heart rate") {
-                DetailRow("Current", "${formatHeartRate(snapshot.currentHeartRate)} bpm")
-                DetailRow("Average", "${formatHeartRate(snapshot.averageHeartRate)} bpm")
-                DetailRow("Peak", "${formatHeartRate(snapshot.maxHeartRate)} bpm")
+            InfoCard(title = stringResource(R.string.label_heart_rate)) {
+                DetailRow(
+                    stringResource(R.string.label_current),
+                    stringResource(R.string.format_bpm, formatHeartRate(snapshot.currentHeartRate))
+                )
+                DetailRow(
+                    stringResource(R.string.label_average),
+                    stringResource(R.string.format_bpm, formatHeartRate(snapshot.averageHeartRate))
+                )
+                DetailRow(
+                    stringResource(R.string.label_peak),
+                    stringResource(R.string.format_bpm, formatHeartRate(snapshot.maxHeartRate))
+                )
                 snapshot.averageHeartRateReserve?.let { reserve ->
                     MeterRow(
-                        label = "HR reserve",
+                        label = stringResource(R.string.live_heart_rate_reserve),
                         fraction = reserve,
                         color = MaterialTheme.colorScheme.secondary,
                         valueText = "${(reserve * 100).toInt()}%"
@@ -352,7 +404,7 @@ private fun HudDetailsPage(
                 }
                 if (snapshot.heartRateSampleCount > 0) {
                     DetailRow(
-                        "Signal coverage",
+                        stringResource(R.string.label_signal_coverage),
                         "${(snapshot.heartRateCoverage * 100).toInt()}%"
                     )
                 }
@@ -360,24 +412,23 @@ private fun HudDetailsPage(
         }
 
         item {
-            InfoCard(title = "Last detected hit") {
+            InfoCard(title = stringResource(R.string.live_last_hit)) {
                 val last = snapshot.lastShot
                 if (last == null) {
                     Text(
-                        text = "Waiting for your first swing",
+                        text = stringResource(R.string.live_waiting_swing),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
                     DetailRow(
-                        label = "Type",
+                        label = stringResource(R.string.label_type),
                         value = last.type.displayName(),
                         valueColor = last.type.color()
                     )
-                    DetailRow("Confidence", "${(last.confidence * 100).toInt()}%")
                     DetailRow(
-                        "Peak",
-                        String.format(Locale.US, "%.1f rad/s", last.peakAngularVelocity)
+                        stringResource(R.string.label_peak),
+                        stringResource(R.string.format_radians_per_second, last.peakAngularVelocity)
                     )
                 }
             }
@@ -398,7 +449,7 @@ private fun HudDetailsPage(
                         modifier = Modifier.size(ButtonDefaults.SmallIconSize)
                     )
                 },
-                label = { Text("Discard") }
+                label = { Text(stringResource(R.string.action_discard)) }
             )
         }
     }

@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">Bad Watch</string>
+    <string name="weekly_hits_complication_name">7-day detected hits</string>
 
     <string name="session_notification_channel">Training session</string>
     <string name="session_notification_channel_description">Keeps your session recording while the screen is off.</string>
@@ -24,5 +25,5 @@
     <string name="capture_notification_body">%1$s · %2$s drill</string>
 
     <string name="onboarding_wrist_title">Wear it on your racket hand</string>
-    <string name="onboarding_wrist_body">Bad Watch detects shots from the swing itself. Worn on your other wrist it cannot see your strokes at all.</string>
+    <string name="onboarding_wrist_body">Bad Watch detects candidate hit motions at the racket wrist. On your other wrist, it would measure the wrong arm.</string>
 </resources>

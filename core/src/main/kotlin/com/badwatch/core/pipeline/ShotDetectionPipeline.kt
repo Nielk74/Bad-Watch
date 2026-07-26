@@ -3,6 +3,7 @@ package com.badwatch.core.pipeline
 import com.badwatch.core.classifier.ShotClassifier
 import com.badwatch.core.model.SensorSample
 import com.badwatch.core.model.ShotEvent
+import com.badwatch.core.session.ShotDetectionPipelineCheckpoint
 
 /**
  * Sliding-window pipeline that feeds sensor samples into the classifier.
@@ -22,6 +23,17 @@ class ShotDetectionPipeline(
     fun reset() {
         buffer.clear()
         lastEmittedAt = 0L
+    }
+
+    fun checkpoint(): ShotDetectionPipelineCheckpoint = ShotDetectionPipelineCheckpoint(
+        recentSamples = buffer.asList().toList(),
+        lastEmittedAtMillis = lastEmittedAt
+    )
+
+    fun restore(checkpoint: ShotDetectionPipelineCheckpoint) {
+        buffer.clear()
+        checkpoint.recentSamples.forEach(buffer::addLast)
+        lastEmittedAt = checkpoint.lastEmittedAtMillis
     }
 
     fun addSample(sample: SensorSample): ShotEvent? {

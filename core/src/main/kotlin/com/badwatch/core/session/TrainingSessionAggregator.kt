@@ -19,7 +19,9 @@ import kotlin.math.max
  */
 class TrainingSessionAggregator(
     private val baselineHeartRate: Float = 60f,
-    private val maxHeartRate: Float = 195f
+    private val maxHeartRate: Float = 195f,
+    private val restingHeartRateConfigured: Boolean = false,
+    private val maxHeartRateConfigured: Boolean = false
 ) {
     private val heartRates = mutableListOf<HeartRatePoint>()
     private val shots = mutableListOf<ShotEvent>()
@@ -39,6 +41,33 @@ class TrainingSessionAggregator(
         lastHeartRateSourceMillis = null
     }
 
+    fun checkpoint(): TrainingSessionAggregatorCheckpoint =
+        TrainingSessionAggregatorCheckpoint(
+            startedAtMillis = startTimeMillis,
+            heartRateTrace = heartRates.toList(),
+            shots = shots.toList(),
+            lastSample = lastSample
+        )
+
+    fun restore(checkpoint: TrainingSessionAggregatorCheckpoint) {
+        heartRates.clear()
+        heartRates += checkpoint.heartRateTrace
+        shots.clear()
+        shots += checkpoint.shots
+        zoneHistogram.clear()
+        if (maxHeartRateConfigured) {
+            checkpoint.heartRateTrace.forEach { point ->
+                val zone = heartRateZoneFor(point.beatsPerMinute, maxHeartRate)
+                zoneHistogram[zone] = zoneHistogram.getOrDefault(zone, 0) + 1
+            }
+        }
+        startTimeMillis = checkpoint.startedAtMillis
+        lastSample = checkpoint.lastSample
+        accumulatedHeartRate = checkpoint.heartRateTrace
+            .sumOf { it.beatsPerMinute.toDouble() }
+        lastHeartRateSourceMillis = checkpoint.heartRateTrace.lastOrNull()?.timestampMillis
+    }
+
     fun onSample(sample: SensorSample) {
         if (startTimeMillis == 0L) {
             startTimeMillis = sample.timestampMillis
@@ -55,8 +84,10 @@ class TrainingSessionAggregator(
                 heartRates += HeartRatePoint(sourceMillis, hr)
                 lastHeartRateSourceMillis = sourceMillis
                 accumulatedHeartRate += hr.toDouble()
-                val zone = heartRateZoneFor(hr, maxHeartRate)
-                zoneHistogram[zone] = zoneHistogram.getOrDefault(zone, 0) + 1
+                if (maxHeartRateConfigured) {
+                    val zone = heartRateZoneFor(hr, maxHeartRate)
+                    zoneHistogram[zone] = zoneHistogram.getOrDefault(zone, 0) + 1
+                }
             }
         }
     }
@@ -71,15 +102,18 @@ class TrainingSessionAggregator(
         // heart rate at all is a quiet lie, and the UI already renders null as "--".
         val hrAverage = if (heartRates.isEmpty()) null else (accumulatedHeartRate / heartRates.size).toFloat()
         val hrMax = heartRates.maxOfOrNull { it.beatsPerMinute }
-        val reserve = hrAverage?.let(::heartRateReserve)
-        // A wrist heart-rate trace measures cardiovascular intensity. It does not measure
-        // technique fatigue or recovery, so those legacy fields remain neutral until a
-        // validated signal replaces them. The UI no longer surfaces them.
-        val fatigueScore = 0f
-        val recoveryScore = 0f
-        val effortScore = reserve ?: 0f
-        val dominantZone = zoneHistogram.maxByOrNull { it.value }?.key
-            ?: heartRateZoneFor(hrAverage ?: baselineHeartRate, maxHeartRate)
+        val reserve = hrAverage
+            ?.takeIf { hasConfiguredHeartRateReserve }
+            ?.let(::heartRateReserve)
+        // These schema-1 scores never had validated definitions. Keep them neutral for wire
+        // compatibility; measured HR reserve remains separately and truthfully named.
+        val legacyScore = 0f
+        val dominantZone = if (maxHeartRateConfigured) {
+            zoneHistogram.maxByOrNull { it.value }?.key
+                ?: hrAverage?.let { heartRateZoneFor(it, maxHeartRate) }
+        } else {
+            null
+        }
         val counts = shots.groupingBy { it.type }.eachCount()
         val totalShots = shots.size
         return TrainingSessionSnapshot(
@@ -91,9 +125,9 @@ class TrainingSessionAggregator(
             totalShots = totalShots,
             lastShot = shots.lastOrNull(),
             shotCounts = counts,
-            fatigueScore = fatigueScore,
-            effortScore = effortScore,
-            recoveryScore = recoveryScore,
+            fatigueScore = legacyScore,
+            effortScore = legacyScore,
+            recoveryScore = legacyScore,
             dominantZone = dominantZone,
             lastGyro = lastSample?.gyro ?: Vector3(0f, 0f, 0f),
             heartRateSampleCount = heartRates.size,
@@ -102,10 +136,15 @@ class TrainingSessionAggregator(
         )
     }
 
-    fun buildSession(nowMillis: Long): TrainingSession {
+    fun buildSession(
+        nowMillis: Long,
+        sessionId: String = UUID.randomUUID().toString()
+    ): TrainingSession {
         val duration = max(0L, nowMillis - startTimeMillis)
         val averageHeartRate = recordedAverageHeartRate()
-        val reserve = averageHeartRate?.let(::heartRateReserve)
+        val reserve = averageHeartRate
+            ?.takeIf { hasConfiguredHeartRateReserve }
+            ?.let(::heartRateReserve)
         val coverage = heartRateCoverage(duration)
         val summary = TrainingSummary(
             totalShots = shots.size,
@@ -115,7 +154,7 @@ class TrainingSessionAggregator(
             maxHeartRate = recordedMaxHeartRate(),
             recoveryScore = 0f,
             fatigueScore = 0f,
-            effortScore = reserve ?: 0f,
+            effortScore = 0f,
             heartRateZoneHistogram = zoneHistogram.toMap(),
             heartRateSampleCount = heartRates.size,
             heartRateCoverage = coverage,
@@ -125,7 +164,7 @@ class TrainingSessionAggregator(
                 ?.times(duration / 60_000f)
         )
         return TrainingSession(
-            id = UUID.randomUUID().toString(),
+            id = sessionId,
             startedAtMillis = startTimeMillis,
             endedAtMillis = nowMillis,
             summary = summary,
@@ -141,6 +180,9 @@ class TrainingSessionAggregator(
 
     private fun heartRateReserve(heartRate: Float): Float =
         ((heartRate - baselineHeartRate) / (maxHeartRate - baselineHeartRate)).coerceIn(0f, 1f)
+
+    private val hasConfiguredHeartRateReserve: Boolean
+        get() = restingHeartRateConfigured && maxHeartRateConfigured
 
     private fun heartRateCoverage(durationMillis: Long): Float {
         if (durationMillis <= 0L || heartRates.isEmpty()) return 0f

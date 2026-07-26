@@ -1,25 +1,40 @@
 # Wear device validation
 
-Bad Watch treats reliability and battery life as measured release properties. The checked-in
-probe runs the same start and stop surfaces as a player, leaves the screen free to sleep, and
-produces evidence that can be compared across releases.
+Bad Watch treats reliability, usability, and battery life as measured release properties. JVM
+tests and emulator automation are the software gate; retained evidence from a physical watch is a
+separate release gate.
+
+The active validation target is a 480 x 480 Pixel Watch 4 running Android 17 / API 37; the APK
+itself targets SDK 36. Record the
+exact model, build fingerprint, app version, APK SHA-256, locale, font size, AOD state, connection
+mode, and charger state with every release-candidate run.
+
+## Software gate
+
+Run from the repository root:
+
+```bash
+python3 -m unittest discover -s tools -p 'test_*.py' -v
+python3 -m py_compile tools/*.py tooling/*.py isolate/wearos_tool.py
+./gradlew test :app:lintDebug :app:assembleDebug :app:assembleRelease --stacktrace --no-daemon
+```
+
+These checks cover deterministic core behavior, durable stores and recovery, Health Services
+decisions, sync/server contracts, and Python tooling. They do not prove OEM lifecycle behavior,
+ambient legibility, accessibility, release-network policy, or battery drain.
 
 ## Session and battery probe
 
-Prerequisites:
+The probe needs an unlocked watch reachable by `adb`, no active Bad Watch session, and a debug APK.
+It reads app-private session files through `run-as`, so it cannot inspect a release APK.
 
-- a debug build installed on an unlocked Wear OS watch;
-- `adb` connected over USB or Wi-Fi;
-- no Bad Watch session already in progress;
-- the watch off its charger for a meaningful battery result.
-
-Run a five-minute smoke test:
+Five-minute lifecycle smoke:
 
 ```bash
 ./tooling/wear_session_probe.py --serial <adb-serial> --duration-minutes 5
 ```
 
-Run the three-hour release gate:
+Three-hour release gate:
 
 ```bash
 ./tooling/wear_session_probe.py \
@@ -29,36 +44,49 @@ Run the three-hour release gate:
   --output build/wear-session-probe
 ```
 
-The probe:
+The probe refuses to overlap an active session, captures device/app metadata, starts through the
+Tile-compatible Activity extra, samples service and battery state with the display free to sleep,
+then stops through the visible **Stop & save** action. It requires exactly one new valid session
+and a saved duration within five seconds of the recorder's start-to-stop wall interval. Each run
+writes `start.png`, `recap.png`, and `report.json` in a timestamped directory without clearing app
+data or deleting the resulting session.
 
-1. refuses to run over an existing session;
-2. records device, OS, build and app metadata;
-3. snapshots initial battery/temperature and starts via the Tile-compatible Activity extra;
-4. samples battery while checking that the foreground service remains alive;
-5. wakes the watch only at the end, presses the visible **Stop & save** action, and waits for
-   the service to finish;
-6. requires exactly one new, valid session JSON;
-7. requires persisted duration to be within five seconds of the actual start-to-stop wall
-   interval (the requested monitoring window excludes setup and stop-UI overhead);
-8. writes `start.png`, `recap.png`, and `report.json` under a timestamped directory.
+A short run is smoke evidence. A powered 180-minute run can satisfy the screen-off lifecycle and
+duration gate, but not a battery-drain claim. `batteryDeltaPercent` is valid only when every
+reading reports the watch unpowered; battery endurance remains unmeasured until a separate full
+run is performed off charger under recorded, repeatable conditions. Release APK installation,
+version/signature inspection, and dashboard setup must be checked separately.
 
-It never clears application data and never deletes the validation session. Delete that session
-from History after retaining the report if it should not remain in personal history.
+Process-death recovery probe:
 
-Battery percentage is coarse, so a short smoke test only validates lifecycle behavior. The
-three-hour run is the basis for a release battery statement. Record AOD state, connection mode,
-screen interactions, charger state and unusual thermal conditions alongside the report; those
-conditions materially affect comparisons.
+```bash
+./tooling/wear_recovery_probe.py \
+  --serial <adb-serial> \
+  --output build/wear-recovery-probe
+```
 
-## Current hardware evidence
+This probe requires one stable session identity and start time across a forced process stop,
+advancing motion samples after restoration, an incremented recovery count, one saved `Partial`
+session, and retained before/after/recap screenshots.
 
-The repository's active development device is a 480×480 Pixel Watch 4 on API 36. For each
-release candidate, retain evidence for:
+## Physical-watch release matrix
 
-- Home, live HUD, recap, History, Settings, Match, Tile, complication and ambient mode;
-- the three-hour session probe;
-- an airplane-mode save followed by successful retry/sync;
-- Activity recreation during recording;
-- a process-recovery exercise once active-session checkpointing is implemented.
+Use one retained artifact directory per release candidate. Do not replace **Pending** with
+**Passed** without adding its path, UTC date, app version, and device build fingerprint.
 
-Passing compilation or an emulator screenshot is not a substitute for these checks.
+| Gate | Evidence to retain | v0.3 release-candidate status |
+| --- | --- | --- |
+| Release install and first-run permissions | APK hash/version/signature, install log, permission notes | **Pending:** add final RC evidence path. |
+| Start, live HUD, stop, save with HR granted and denied | Start/live/recap images plus session/report IDs | **Pending:** add final RC evidence path. |
+| Activity recreation during recording | Log and stable session ID/start-time comparison | **Pending:** add final RC evidence path. |
+| Process death and journal recovery | Before/after export, stable identity, `Partial` quality, missing-interval note | **Pending:** add final RC evidence path. |
+| Offline save then retry/sync | Session ID and before/after sync state against authenticated HTTPS server | **Pending:** add final RC evidence path. |
+| Home, live, recap, review/corrections, History, Progress, Training, Match, Settings, Tile, complication, ambient | Named 480×480 screenshot set | **Pending:** add final RC evidence path. |
+| Normal/enlarged text and English/French spot checks | Screenshot matrix plus clipping/accessibility notes | **Pending:** add final RC evidence path. |
+| 180-minute powered screen-off lifecycle | Probe `report.json`, `start.png`, `recap.png`, charger state and lifecycle result | **Pending:** no qualifying run is documented yet. |
+| 180-minute unpowered battery measurement | Probe report with every reading unpowered and measured battery delta | **Not claimed:** no qualifying run is documented. |
+
+Active-session checkpoint recovery, match action-log recovery, and shadow-routine recovery are
+implemented and covered by automated tests. The physical process-death rows above remain required:
+code coverage is not device evidence. Likewise, an emulator screenshot does not prove touch
+comfort, ambient behavior, OEM Health Services behavior, or endurance on the Pixel Watch 4.

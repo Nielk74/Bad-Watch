@@ -6,6 +6,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.SystemClock
+import com.badwatch.app.health.HeartRateReadingProvider
 import com.badwatch.core.model.SensorSample
 import com.badwatch.core.model.Vector3
 import kotlinx.coroutines.channels.awaitClose
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.abs
 
 /**
  * Streams fused gyroscope + accelerometer + heart-rate samples.
@@ -33,6 +35,7 @@ import java.util.concurrent.atomic.AtomicReference
  */
 class FusedSensorCollector(
     context: Context,
+    private val heartRateProvider: HeartRateReadingProvider? = null,
     private val samplingPeriodMicros: Int = DEFAULT_SAMPLING_PERIOD_MICROS,
     private val maxReportLatencyMicros: Int = DEFAULT_MAX_REPORT_LATENCY_MICROS
 ) : SensorStream {
@@ -48,8 +51,6 @@ class FusedSensorCollector(
         // Optional sensors: the app degrades rather than failing if they are absent.
         val accelerometer = manager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
             ?: manager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-        val heartRate = manager.getDefaultSensor(Sensor.TYPE_HEART_RATE)
-
         // SensorEvent.timestamp is nanoseconds on the monotonic boot clock. Anchor it to
         // epoch time once, so every sample shares a single consistent conversion.
         val bootEpochMillis = System.currentTimeMillis() - SystemClock.elapsedRealtime()
@@ -57,9 +58,6 @@ class FusedSensorCollector(
         // Sensor callbacks may be delivered on a different thread than the one that reads
         // them into a sample, so the cross-sensor carry-over values are published atomically.
         val latestAccel = AtomicReference(Vector3.ZERO)
-        // Null until the optical sensor gets a lock — never NaN. NaN cannot be encoded as
-        // JSON, so a NaN carried into a sample crashes the app the moment it is persisted.
-        val latestHeartRate = AtomicReference<HeartRateReading?>(null)
         val latestAccuracy = AtomicInteger(SensorManager.SENSOR_STATUS_UNRELIABLE)
 
         val listener = object : SensorEventListener {
@@ -67,9 +65,16 @@ class FusedSensorCollector(
                 when (event.sensor.type) {
                     Sensor.TYPE_GYROSCOPE -> {
                         if (event.values.size < 3) return
-                        val heartRate = latestHeartRate.get()
+                        val timestampMillis = bootEpochMillis + event.timestamp / 1_000_000L
+                        // Health Services owns the optical sensor during a real session. A
+                        // reading is carried on high-rate motion samples only while it is fresh;
+                        // the source timestamp lets core retain it exactly once.
+                        val heartRate = heartRateProvider?.latestReading()?.takeIf { reading ->
+                            abs(timestampMillis - reading.timestampMillis) <=
+                                HEART_RATE_STALE_AFTER_MILLIS
+                        }
                         val sample = SensorSample(
-                            timestampMillis = bootEpochMillis + event.timestamp / 1_000_000L,
+                            timestampMillis = timestampMillis,
                             gyro = Vector3(event.values[0], event.values[1], event.values[2]),
                             heartRateBpm = heartRate?.beatsPerMinute,
                             accel = latestAccel.get(),
@@ -84,18 +89,6 @@ class FusedSensorCollector(
                         latestAccel.set(Vector3(event.values[0], event.values[1], event.values[2]))
                     }
 
-                    Sensor.TYPE_HEART_RATE -> {
-                        val bpm = event.values.firstOrNull() ?: return
-                        // The optical sensor reports 0 while it is still acquiring a lock.
-                        if (bpm > 0f) {
-                            latestHeartRate.set(
-                                HeartRateReading(
-                                    beatsPerMinute = bpm,
-                                    timestampMillis = bootEpochMillis + event.timestamp / 1_000_000L
-                                )
-                            )
-                        }
-                    }
                 }
             }
 
@@ -104,15 +97,33 @@ class FusedSensorCollector(
             }
         }
 
-        manager.registerListener(listener, gyroscope, samplingPeriodMicros, maxReportLatencyMicros)
+        // A required sensor object can still refuse registration (device service failure,
+        // invalidated sensor, or vendor implementation fault). Failing explicitly is safer
+        // than showing a recording timer that will never receive a sample. Some devices also
+        // reject batched registration despite advertising the sensor, so retry unbatched once.
+        val gyroRegistered =
+            manager.registerListener(
+                listener,
+                gyroscope,
+                samplingPeriodMicros,
+                maxReportLatencyMicros
+            ) || manager.registerListener(listener, gyroscope, samplingPeriodMicros)
+        if (!gyroRegistered) {
+            throw IllegalStateException("The gyroscope could not start; no session was recorded")
+        }
         accelerometer?.let {
-            manager.registerListener(listener, it, samplingPeriodMicros, maxReportLatencyMicros)
+            if (!manager.registerListener(
+                    listener,
+                    it,
+                    samplingPeriodMicros,
+                    maxReportLatencyMicros
+                )
+            ) {
+                // Linear acceleration enriches provisional labels but is not required for
+                // hit timing. Retry without FIFO batching, then degrade to gyro-only.
+                manager.registerListener(listener, it, samplingPeriodMicros)
+            }
         }
-        heartRate?.let {
-            // HR is inherently ~1 Hz; requesting faster only burns battery.
-            manager.registerListener(listener, it, SensorManager.SENSOR_DELAY_NORMAL)
-        }
-
         awaitClose { manager.unregisterListener(listener) }
     }
         // FIFO batching delivers up to 200 ms of samples in one burst, so the consumer needs
@@ -129,13 +140,11 @@ class FusedSensorCollector(
          * because timestamps come from the sensor hub, not from delivery time.
          */
         const val DEFAULT_MAX_REPORT_LATENCY_MICROS: Int = 200_000
+
+        /** Stop presenting an old optical lock as the player's current heart rate. */
+        const val HEART_RATE_STALE_AFTER_MILLIS: Long = 15_000L
     }
 }
-
-private data class HeartRateReading(
-    val beatsPerMinute: Float,
-    val timestampMillis: Long
-)
 
 /** Kept separate from the collector so tests and previews can supply synthetic streams. */
 interface SensorStream {

@@ -1,8 +1,8 @@
 # Bad Watch – Maintainer Guide
 
 For anyone (human or agent) developing, debugging or triaging this project. Read
-[`docs/PRODUCT_PLAN.md`](docs/PRODUCT_PLAN.md) for *why* the project exists and what is
-planned; this file is about how to work on it.
+[`docs/PRODUCT_PLAN.md`](docs/PRODUCT_PLAN.md) for the completed product contract and
+research boundaries; this file is about how to work on it.
 
 ## Ground rules
 
@@ -15,9 +15,15 @@ planned; this file is about how to work on it.
    the watch and the server. Changing them changes both — bump `SessionExport.SCHEMA_VERSION`
    for anything breaking.
 4. **The classifier is not calibrated.** Stroke labels are provisional. Do not build
-   user-facing claims on top of them until Phase 2 lands.
+   user-facing claims on top of them unless every model gate in the product plan has passed
+   on separately held-out real play.
 5. **Never put NaN in a serialized field.** JSON cannot represent it, and the failure only
    surfaces on save — after the recording is already lost. Use null for "no reading".
+6. **Raw and reviewed are separate.** Never overwrite `SessionExport.session` or its original
+   `rallyProfile`. Use `reviewedAnalysis()` for current user-facing metrics and keep reported
+   misses separate because they have no timestamp.
+7. **A server rejection is not a transport failure.** Only permanent record validation may
+   create a `.rejected` marker. Network, disk and server failures must remain retryable.
 
 ## Environment
 
@@ -50,22 +56,25 @@ crashes before severity is applied).
 
 | Module | What lives there |
 | --- | --- |
-| `:core` | Models, feature extraction, classifier, rally segmentation, `SessionRecorder`, sync contract. Pure JVM. |
-| `:app` | Wear app: `FusedSensorCollector`, `SessionService`, `SessionController`, `SessionStore`, `SyncWorker`, Compose UI, watch-face tile (`tile/BadWatchTileService`). |
-| `:server` | Ktor dashboard: ingest, aggregation, static page, synthetic fixtures. |
-| `tools/` | Python: capture ingestion and classifier training. See `tools/README.md`. |
+| `:core` | Models, detector, exchange segmentation, reviewed projection, physiology, insights, progress, match/training reducers, and shared sync/archive contract. Pure JVM. |
+| `:app` | Wear sensing/Health Services, health FGS, active journal, atomic stores, sync markers, Compose UI, Tile, and complication. |
+| `:server` | Ktor auth/ingest, persistence, reviewed analytics, diary editing, backup/CSV/restore, browser dashboard, and fixtures. |
+| `tools/` | Consent-aware capture ingestion and participant-grouped offline classifier evaluation/training. |
 
 Key entry points: `SessionController` owns the live session at application scope;
 `SessionService` is the foreground service that keeps the process alive; `SessionRecorder`
-is the `:core` orchestrator you probably want to change for analysis work.
+is the `:core` orchestrator you probably want to change for analysis work. Active recordings
+checkpoint to `files/active-session/journal.json`; do not clear that file except after a
+durable final save or an explicit user discard.
 
 ## Build and verify
 
 ```bash
-./gradlew test                # JVM tests, both :core and :server — fast, run these constantly
-./gradlew :app:lintDebug      # abortOnError + warningsAsErrors; treat failures as real
-./gradlew :app:assembleDebug
-./gradlew :server:run         # dashboard on :8080
+python3 -m unittest discover -s tools -p 'test_*.py' -v
+python3 -m py_compile tools/ingest.py tools/train.py tooling/wear_session_probe.py
+./gradlew test :app:lintDebug :app:assembleDebug :app:assembleRelease \
+  --stacktrace --no-daemon
+./gradlew :server:run         # dashboard on 127.0.0.1:8080
 ```
 
 Lint is strict on purpose. Two families of check are disabled in `app/build.gradle.kts`
@@ -98,7 +107,7 @@ There is no Wear system image required for a smoke test — `uses-feature` does 
 `adb install`, so a phone emulator runs the app fine (stretched, but functional). A real
 Wear AVD is still needed for layout work.
 
-**A Pixel Watch 4 (Wear OS 6, Android 16) is available on the local network** for real
+**A 480 x 480 Pixel Watch 4 running Android 17 / API 37 is available on the local network** for real
 on-device verification — prefer it over the emulator for anything visual, haptic or
 ambient. The machine and watch are already paired; reconnect with:
 
@@ -120,7 +129,8 @@ icon-only circles with no text labels in the accessibility tree.
 ```bash
 adb install -r -g app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n com.badwatch.badwatch/com.badwatch.app.MainActivity
-adb exec-out screencap -p > screen.png
+python3 isolate/wearos_tool.py --serial <mdns-id> screenshot \
+  --output isolate/artifacts/screenshots/screen.png
 ```
 
 Point a debug build at a dashboard:
@@ -145,13 +155,14 @@ CLI if you want scripted verification.
 | Recording stops when screen sleeps | `dumpsys activity services com.badwatch.badwatch` — expect `isForeground=true types=0x100` |
 | Sessions not syncing | `adb logcat -s BadWatchSync` — the worker logs the cause. Cleartext HTTP in a release build is the usual answer. |
 | No shots detected | Expected on an emulator (static virtual gyro). On device, check the strap and that the watch is on the racket wrist. |
-| Session files | `adb shell run-as com.badwatch.badwatch ls files/sessions` — `*.json` plus `*.json.synced` markers |
+| Session files | `adb shell run-as com.badwatch.badwatch ls files/sessions` — `*.json` plus fingerprinted `.synced`/`.rejected` markers |
+| Recording restored after a process kill | `adb shell run-as com.badwatch.badwatch ls -l files/active-session` before restart; the resumed export keeps its ID and is marked `Partial` |
 | Classifier regressions | Add the trace as a fixture in `:core` tests rather than debugging on device |
 | Drill lost on save | Should be impossible now — heart rate is nullable and `SensorSample` rejects NaN. If it recurs, check `logcat -b crash` for `JsonEncodingException`. |
 
 ## Release
 
-1. Clean tree, `./gradlew test :app:lintDebug` green.
+1. Clean tree and the complete Python/JVM/lint/debug/release gate above green.
 2. `tooling/tag_release.sh <version>` bumps `VERSION.md`, runs tests, commits and tags.
 3. `git push origin master --tags` — pushing the `v*` tag triggers
    `.github/workflows/release.yml`: it re-runs tests and lint, builds the APKs, and

@@ -1,87 +1,192 @@
-# Bad Watch Usage Guide
+# Bad Watch usage guide
 
-## Before you start
+## Before the first session
 
-- **Wear the watch on your racket hand.** This is a hard requirement, not a preference.
-  Bad Watch detects shots from the swing, so on the other wrist there is nothing to detect.
-  The app asks you to confirm this the first time it opens.
-- Set left- or right-handed in onboarding. The backhand signature mirrors between hands.
-- Wear the watch snugly. A loose strap ruins both heart rate and swing detection.
-- Grant heart-rate and notifications when prompted. Both are optional — recording works
-  without either — but you lose heart rate and the ongoing session notification.
+1. Wear the watch snugly on your **racket hand**. Bad Watch reads that wrist's swing; the other
+   wrist cannot produce meaningful hit detections.
+2. Choose left- or right-handed during onboarding. You can change it later in Settings.
+3. Heart rate and notifications are optional. If heart-rate permission is denied, Health Services
+   is unavailable, or another app owns the workout, the session remains motion-only. Bad Watch does
+   not interrupt the other workout.
+4. In **Settings → Heart-rate profile**, optionally enter adult age or an exact maximum HR. Zones
+   need a maximum. HR-reserve values additionally need a resting HR. An exact maximum overrides the
+   age estimate; **Clear profile** removes the authorization.
+5. Detected-hit vibrations are off by default. Enable them only if feedback during a rally is useful
+   rather than distracting.
 
-## Recording a session
+The app does not need an account, phone, dashboard, or network.
 
-1. Open **Bad Watch** and tap **Start session**.
-2. Play. You can put your wrist down; recording continues with the screen off, via a
-   foreground service. A notification shows the running detected-hit count.
-3. Glance at your wrist any time for the live screen:
-   - Detected-hit count (the large number) and elapsed time
-   - Current heart rate, detected exchange count, and estimated active:quiet ratio
-   - Last detected hit with its provisional stroke label
-   - Detected-play summary: average hits, longest burst, and estimated active span
-4. Tap **Stop & save** to end and store the session, or **Discard** to throw it away.
+## Record a session
 
-You can also stop from the notification without opening the app.
+1. From Home, tap **Start session**. The Tile's Start action opens the same path.
+2. Play normally. The health foreground service continues with the display off.
+3. The glance face shows corrected/live detector output:
+   - large **detected-hit** count;
+   - elapsed recording time;
+   - current optical BPM only while a fresh Health Services reading exists.
+4. Swipe for detected-play detail: inferred exchange bursts, average detected hits, estimated
+   active:quiet structure, and the latest provisional stroke label.
+5. Tap **Stop & save**, or use confirmed **Discard** if no record should remain.
+
+If Wear OS recreates the process, Bad Watch restores the same session and start time from its
+checkpoint. The unobserved interval is not invented, and recording quality is marked partial so
+the player can decide whether to keep it.
+
+## Review the session
+
+After save, a skippable five-question diary asks:
+
+- activity type;
+- reported effort (RPE 0–10);
+- whether soreness was reviewed and, optionally, one quick body-area entry;
+- whether the intended session was completed;
+- whether the recording looks complete, partial, unusable, or unreviewed.
+
+Completion and recording quality are different facts. Finishing a match does not prove the watch
+captured all of it. RPE and soreness are player reports, not sensor conclusions or medical advice.
+
+The recap then shows:
+
+- corrected **detected** hits, inferred bursts, and reviewed duration;
+- the player report and up to three evidence-backed observations;
+- average/longest inferred burst and estimated active:quiet structure;
+- measured average/peak HR and signal coverage when available;
+- personalized zones/HRR-min only when the profile authorizes them;
+- a provisional stroke mix for detector inspection, not coaching;
+- the correction trail.
+
+### Correct detector output
+
+Tap **Review detection** from a recap or historical detail. You can:
+
+- trim time from the recording start or end;
+- mark recent timestamped motion events that were not hits;
+- report how many hits the detector missed.
+
+False events and edge trim change the primary detected count, reviewed duration, rebuilt exchange
+bursts, insight baseline, Progress, Tile, complication, dashboard, and CSV. Reported misses stay a
+separate number because they have no event time or provisional type; they never inflate a detected
+headline or exchange.
+
+Every edit appends an actor/time/reason revision. The raw events and original inferred profile are
+kept for audit and backup.
+
+## History and Progress
+
+**History** shows each durable session, whether it is accepted by the dashboard, only on the watch,
+or explicitly rejected by the server. A rejection includes the server reason and stops retrying
+until the record is edited. Open a session to review/correct it. Deletion requires confirmation and
+removes the local record; it is not a remote-delete command.
+
+Mark a broken recording **Unusable** rather than deleting it when the audit trail matters. Unusable
+sessions remain in History but do not contribute to Home, Progress, personal baselines, Tile, or
+complication totals.
+
+**Progress** contains:
+
+- player-chosen session and recorded-minute goals for the rolling seven days;
+- personal records from usable reviewed data;
+- editable self-reported playing experience;
+- a like-for-like play pattern after five qualifying sessions across three days.
+
+The play pattern reports descriptive medians for one comparable context. It never turns more hits,
+heart rate, or activity into a global badminton level.
+
+## Manual match scoreboard
+
+Open **Match score**, choose singles/doubles and the first serving side, then tap the side that won
+each rally. Bad Watch applies:
+
+- rally scoring to 21;
+- a two-point winning margin;
+- 30-point cap;
+- best of three;
+- interval at 11;
+- change-of-ends prompts and service side;
+- undo.
+
+The watch never awards a point automatically. In doubles it knows only the serving pair and
+left/right court, not which partner is serving. The active score and undo history survive process
+recreation. Closing a completed scoreboard clears that live utility; it is not uploaded as a
+sensor session.
+
+## Practice and shadow training
+
+Open **Practice** for two distinct tools:
+
+- **Watch-guided six-corner shadow:** follow the visual/haptic racket-relative corner, move and
+  recover, then tap **I'm back at base**. The recorded value is cue-to-confirmation delay—not
+  reaction time, corner arrival, return-to-base detection, speed, balance, or technique quality.
+- **BWF practice cards:** player-selected general cues for movement rhythm, lunge, overhead
+  preparation, and relaxed grip. Each card states its source and what a wrist cannot assess.
+
+Shadow can pause, resume, finish early, and recover after process recreation without counting the
+unobserved downtime.
+
+## Detection Lab and raw-motion consent
+
+Detection Lab is research tooling, deliberately secondary on Home. Pick the stroke you intend to
+repeat, perform the drill, discard a bad final window if needed, and save.
+
+Raw windows stay local by default. **Share detection drills** applies only to captures started after
+the toggle is enabled. Consent, anonymous participant ID, protocol, profile, device, and app version
+are frozen before the first sample; later settings cannot retroactively release an older capture.
+The current heuristic stroke classifier remains provisional even when the lab pipeline is working.
+
+## Configure the optional dashboard
+
+Run the server first; see [dashboard.md](dashboard.md). On the watch:
+
+1. Open **Settings → Dashboard**.
+2. Enter the complete base URL and optional bearer token.
+3. Save and run the connection check.
+
+Plain HTTP shows a warning because token and session data are readable in transit. Use it only on a
+trusted private LAN; prefer HTTPS through a reverse proxy. An unchanged record explicitly rejected
+by the server is quarantined with the reason instead of retrying forever. Edit it after correcting
+the cause to create a new upload candidate.
+
+## Export, backup, and restore
+
+The release data-ownership path is the authenticated browser dashboard:
+
+- **Backup JSON**: deterministic, lossless sessions plus only eligible consented raw captures;
+- **Export CSV**: reviewed spreadsheet view with raw/corrected audit columns;
+- **Restore**: validate the complete archive, then merge without deleting records absent from it.
+
+For development builds only, maintainers can inspect the app sandbox with `adb run-as`; that is not
+a release-user export feature.
 
 ## Reading the numbers
 
-**Detected-play structure is the headline.** A single racket-wrist watch sees the wearer's
-candidate hits, not the opponent, partner, shuttle or point outcome. It groups two or more
-nearby detections into a *rally burst*. This is useful for personal trends, but is not a
-complete rally or exact effective playing time.
+| Label | Meaning |
+| --- | --- |
+| Recorded duration | Direct clock interval, with process-recovery caveat when marked partial |
+| Detected hit | Racket-wrist motion event; not proof of shuttle contact |
+| Provisional stroke | Unvalidated heuristic label; not coaching evidence |
+| Detected exchange / rally burst | Two or more nearby wearer detections; not the full rally |
+| Estimated active span | First-to-last wearer detection inside kept bursts; not exact playing time |
+| Heart-rate coverage | Approximate share of elapsed seconds with distinct optical readings |
+| HRR-min | Reviewed minutes × mean HR reserve, only with sourced endpoints and sufficient coverage |
+| Session-RPE | Reviewed minutes × player-reported RPE; descriptive, not an injury forecast |
 
-- **Estimated active:quiet** — first-to-last detected-hit spans against the gaps between
-  them, shown as `1:N`. Missed boundary hits and one-hit points change this estimate.
-- **Estimated active %** — the share represented by those detected spans, not court truth.
-- **Average / longest burst** — the wearer's detected hits, not all rally contacts.
-- **Heart rate** — average and peak over distinct optical readings, with signal coverage.
-
-**All hit and stroke detection is provisional.** The classifier is currently rule-based and
-has not been validated against representative match play. Treat both counts and labels as
-detector output that may include false positives and missed hits; the specific stroke names
-are the least trustworthy layer.
-
-## The dashboard
-
-Sessions stay on the watch and are pushed to your dashboard server whenever the watch has
-network. Nothing is lost if the server is unreachable or you never set one up.
-
-The dashboard adds what does not fit on a watch: detected-hit volume over time, inferred
-exchange length, provisional stroke mix, an estimated-active-time trend, and heart-rate-
-reserve load only for sessions that actually measured optical heart rate. It does not
-estimate tissue injury risk or declare a workload "safe".
-
-See [`dashboard.md`](dashboard.md) for running and configuring the server.
-
-### Getting the raw data out
-
-Every session is a JSON file on the watch:
-
-```bash
-adb shell run-as com.badwatch.badwatch ls files/sessions
-adb exec-out run-as com.badwatch.badwatch cat files/sessions/<file>.json > session.json
-```
-
-The file format is exactly the sync payload — the same `SessionExport` type the server
-receives — so anything that reads one reads the other.
+The detailed contract is [SPORT_MODEL.md](SPORT_MODEL.md).
 
 ## Troubleshooting
 
-**No hits detected.** Confirm the watch is on your racket hand and the strap is snug. Give
-the classifier a few full swings; gentle practice motions may fall below threshold. Very
-short or very slow strokes are the most likely to be missed.
+**No hits:** confirm racket-hand wear and a snug strap. Compact/slow strokes and unusual motions can
+be missed; other arm movements can be false positives. Use post-session correction.
 
-**Recording stopped when the screen turned off.** It should not — that is what the
-foreground service is for. Check that the session notification is present. If the watch is
-in battery saver, Wear OS may still restrict background work.
+**No heart rate:** check permission, sensor contact, and whether another fitness app is already
+tracking. Motion recording should continue. On Android 16 the permission is **Heart rate**
+(`READ_HEART_RATE`), not the older body-sensors label.
 
-**No heart rate.** Re-grant the heart-rate permission, clean the sensor window on the
-back of the watch, and tighten the strap.
+**Recording stopped:** check the ongoing notification and History. A process restart should restore
+the same session as partial. Record `adb logcat` and the device/API level for a bug report.
 
-**Sessions not appearing on the dashboard.** The watch queues them until the server is
-reachable — nothing is lost. Confirm the watch is on the same network, that the URL is
-reachable from the watch (not just your laptop), and that the token matches. History shows
-"On watch only" until a session is acknowledged by the server.
+**Dashboard connection failed:** from the watch—not only the computer—verify the host/port, token,
+network, and TLS certificate. The bundled server defaults to loopback; LAN access requires
+`BADWATCH_HOST=0.0.0.0` (or a specific LAN address) and a token.
 
-**Crashes.** `adb logcat | grep -i badwatch` and file an issue with the stack trace.
+**Server rejected a record:** open History for its exact reason. Fix the invalid/incompatible field
+or update the server, then edit/resave the session. Do not repeatedly delete/recreate it.

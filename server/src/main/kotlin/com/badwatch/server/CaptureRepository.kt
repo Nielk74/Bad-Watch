@@ -4,10 +4,10 @@ import com.badwatch.core.sync.BadWatchJson
 import com.badwatch.core.eval.ClassifierEvaluation
 import com.badwatch.core.eval.ClassifierEvaluator
 import com.badwatch.core.sync.CaptureExport
+import com.badwatch.core.sync.isEligibleForModelTrainingUpload
 import kotlinx.serialization.Serializable
 import java.io.File
 import java.util.concurrent.locks.ReentrantReadWriteLock
-import kotlin.concurrent.read
 import kotlin.concurrent.write
 
 /**
@@ -19,35 +19,77 @@ import kotlin.concurrent.write
  */
 class CaptureRepository(private val directory: File) {
 
+    // Disk reads also perform orphan recovery and quarantine moves, so they are serialized with
+    // writes rather than sharing a read lock during filesystem mutation.
     private val lock = ReentrantReadWriteLock()
 
-    fun save(export: CaptureExport): Boolean = lock.write {
-        directory.mkdirs()
-        val file = File(
-            directory,
-            "${export.capture.startedAtMillis}-${export.capture.label.name}-${export.capture.id}.json"
-        )
-        val isNew = !file.exists()
-        val temp = File(directory, "${file.name}.tmp")
-        temp.writeText(BadWatchJson.encodeToString(CaptureExport.serializer(), export))
-        if (!temp.renameTo(file)) {
-            temp.copyTo(file, overwrite = true)
-            temp.delete()
+    fun save(export: CaptureExport): Boolean = upsert(export) == StoreResult.Created
+
+    fun upsert(export: CaptureExport): StoreResult = lock.write {
+        if (!isSafeStorageId(export.capture.id)) {
+            throw StoredRecordValidationException("Unsafe capture id")
         }
-        isNew
+        directory.mkdirs()
+        val existingFiles = storedFilesUnlocked()
+            .filter { (_, stored) -> stored.capture.id == export.capture.id }
+        val existing = existingFiles.firstOrNull()?.second
+        if (existingFiles.any { (_, stored) -> stored != export }) {
+            throw StoredRecordValidationException(
+                "Capture '${export.capture.id}' conflicts with immutable recorded evidence"
+            )
+        }
+        if (existing == export && existingFiles.size == 1) return@write StoreResult.Unchanged
+        val file = File(directory, export.storageFileName())
+        writeDurableAtomically(
+            file,
+            BadWatchJson.encodeToString(CaptureExport.serializer(), export)
+        )
+        // A restored record may legitimately correct its timestamp or label, both of which
+        // affect the historical filename. Remove stale same-id files only after the new file
+        // is safely in place.
+        existingFiles.map { it.first }.filter { it != file }.forEach { it.delete() }
+        when {
+            existing == null -> StoreResult.Created
+            existing == export -> StoreResult.Unchanged
+            else -> error("Conflicting immutable capture reached the write path")
+        }
     }
 
-    fun all(): List<CaptureExport> = lock.read {
-        directory.mkdirs()
-        directory.listFiles { file -> file.extension == "json" }
-            ?.mapNotNull { file ->
-                runCatching {
-                    BadWatchJson.decodeFromString(CaptureExport.serializer(), file.readText())
-                }.getOrNull()
+    /** Validates immutable-id compatibility without writing, for archive preflight. */
+    fun validateUpserts(exports: List<CaptureExport>) = lock.write {
+        val stored = storedFilesUnlocked().groupBy { (_, export) -> export.capture.id }
+        exports.forEach { incoming ->
+            if (!isSafeStorageId(incoming.capture.id)) {
+                throw StoredRecordValidationException("Unsafe capture id")
             }
-            ?.sortedByDescending { it.capture.startedAtMillis }
-            .orEmpty()
+            if (stored[incoming.capture.id].orEmpty().any { (_, existing) ->
+                    existing != incoming
+                }
+            ) {
+                throw StoredRecordValidationException(
+                    "Capture '${incoming.capture.id}' conflicts with immutable recorded evidence"
+                )
+            }
+        }
     }
+
+    fun all(): List<CaptureExport> = lock.write {
+        directory.mkdirs()
+        storedFilesUnlocked()
+            .map { it.second }
+            .distinctBy { it.capture.id }
+            .sortedByDescending { it.capture.startedAtMillis }
+    }
+
+    fun find(captureId: String): CaptureExport? = lock.write {
+        storedFilesUnlocked().firstOrNull { (_, export) ->
+            export.capture.id == captureId
+        }?.second
+    }
+
+    /** Raw windows that carried explicit recording-time consent and complete provenance. */
+    fun trainingEligible(): List<CaptureExport> = all()
+        .filter { it.isEligibleForModelTrainingUpload }
 
     /**
      * Scores the shipped rule-based classifier against the collected ground truth.
@@ -56,7 +98,7 @@ class CaptureRepository(private val directory: File) {
      * pooling both hands would blur the one stroke that discriminator exists for.
      */
     fun evaluateClassifier(): ClassifierEvaluation {
-        val captures = all()
+        val captures = trainingEligible()
         if (captures.isEmpty()) return ClassifierEvaluation.EMPTY
         // Group by handedness, evaluate with a matching classifier, then merge the swings
         // that each classifier saw. Simplest correct approach: evaluate the dominant group.
@@ -76,7 +118,7 @@ class CaptureRepository(private val directory: File) {
      * more than one player.
      */
     fun summary(): CaptureSummary {
-        val captures = all()
+        val captures = trainingEligible()
         val perLabel = captures
             .groupBy { it.capture.label.name }
             .mapValues { (_, group) -> group.sumOf { it.capture.swingCount } }
@@ -85,10 +127,26 @@ class CaptureRepository(private val directory: File) {
             drillCount = captures.size,
             totalSwings = perLabel.values.sum(),
             contributingDevices = captures.map { it.deviceId }.distinct().size,
+            contributingParticipants = captures.mapNotNull { it.participantId }.distinct().size,
             swingsPerLabel = perLabel.map { (label, count) -> LabelCount(label, count) }
         )
     }
+
+    private fun storedFilesUnlocked(): List<Pair<File, CaptureExport>> {
+        return recoverStoredJsonRecords(
+            directory = directory,
+            decode = { text ->
+                BadWatchJson.decodeFromString(CaptureExport.serializer(), text)
+            },
+            belongsToDestination = { file, export ->
+                isSafeStorageId(export.capture.id) && file.name == export.storageFileName()
+            }
+        )
+    }
 }
+
+private fun CaptureExport.storageFileName(): String =
+    "${capture.startedAtMillis}-${capture.label.name}-${capture.id}.json"
 
 @Serializable
 data class CaptureSummary(
@@ -96,6 +154,7 @@ data class CaptureSummary(
     val drillCount: Int,
     val totalSwings: Int,
     val contributingDevices: Int,
+    val contributingParticipants: Int = 0,
     val swingsPerLabel: List<LabelCount>
 )
 

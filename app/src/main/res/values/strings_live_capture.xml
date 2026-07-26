@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="live_discard_question">Discard session?</string>
+    <string name="live_discard_body">Recording stops and nothing is saved.</string>
+    <string name="live_hits_upper">HITS</string>
+    <string name="live_heart_rate_line">%1$s bpm · %2$s</string>
+    <string name="live_heart_rate_only">%1$s bpm</string>
+    <string name="live_heart_rate_duration">%1$s bpm · %2$s</string>
+    <string name="live_stop_save">Stop &amp; save</string>
+    <string name="live_detected_play">Detected play</string>
+    <string name="live_rally_bursts">Detected exchanges</string>
+    <string name="live_average_hits">Avg hits</string>
+    <string name="live_active_quiet">Est. active : quiet</string>
+    <string name="live_activity_distribution" tools:ignore="PluralsCandidate">Estimated active time %1$d percent, quiet time %2$d percent</string>
+    <string name="live_heart_rate_reserve">HR reserve</string>
+    <string name="live_last_hit">Last detected hit</string>
+    <string name="live_waiting_swing">Waiting for your first swing</string>
+    <string name="format_radians_per_second">%1$.1f rad/s</string>
+    <string name="capture_title">Collect data</string>
+    <string name="capture_intro_empty">Pick a stroke, then hit twenty of them. Raw motion stays local unless sharing is enabled in Settings.</string>
+    <plurals name="capture_intro_existing">
+        <item quantity="one">%d labelled swing on this watch. Sharing is off by default.</item>
+        <item quantity="other">%d labelled swings on this watch. Sharing is off by default.</item>
+    </plurals>
+    <string name="capture_reps_recommended">20 reps recommended</string>
+    <string name="capture_swing_unit_one">swing</string>
+    <string name="capture_swing_unit_other">swings</string>
+    <string name="capture_waiting_swing">Waiting for your first swing</string>
+    <string name="capture_last_peak">Last peak %1$.1f rad/s</string>
+    <string name="capture_drop_last">Drop last</string>
+    <string name="capture_save_drill">Save drill</string>
+    <string name="capture_cancel_question">Cancel drill?</string>
+    <string name="capture_cancel_body">Swings collected so far are lost.</string>
+    <string name="capture_saved">Drill saved</string>
+    <string name="capture_rate">Rate</string>
+    <string name="capture_sync_eligible">Eligible to sync to your self-hosted dashboard under this drill’s consent.</string>
+    <string name="capture_saved_local">Saved locally. This raw motion recording is not eligible to upload.</string>
+</resources>

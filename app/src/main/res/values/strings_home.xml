@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_confirm">Got it</string>
+    <string name="onboarding_tagline">Badminton, from your racket wrist</string>
+
+    <string name="home_start_session">Start session</string>
+    <string name="home_start_session_subtitle">Detected hits · heart rate</string>
+    <string name="home_practice">Practice</string>
+    <string name="home_practice_count">5 drills</string>
+    <string name="home_practice_subtitle">Watch-guided shadow · BWF practice cues</string>
+    <string name="home_score_match">Score a match</string>
+    <string name="home_manual">Manual</string>
+    <string name="home_match_subtitle">Giant point taps · serve court · interval timers</string>
+    <string name="home_last_session">Last session</string>
+    <string name="home_history">History</string>
+    <string name="home_progress">Progress</string>
+    <string name="home_settings">Settings</string>
+    <string name="home_detection_lab">Detection lab</string>
+    <string name="home_optional">Optional</string>
+    <string name="home_detection_lab_subtitle">Label practice swings to improve detection.</string>
+    <string name="home_ready">Ready on your racket wrist</string>
+    <string name="home_this_week">This week</string>
+    <string name="home_first_recap">Your first recap will appear here after you save a session.</string>
+    <string name="home_estimated_active_short">Est active</string>
+    <string name="home_recent_hits">Detected hits · last %1$d</string>
+    <plurals name="home_hits_trend">
+        <item quantity="one">Detected-hit trend over %1$d session, from %2$d to %3$d</item>
+        <item quantity="other">Detected-hit trend over %1$d sessions, from %2$d to %3$d</item>
+    </plurals>
+
+    <string name="history_title">History</string>
+    <string name="history_empty">Nothing recorded yet. Your last 30 sessions live here.</string>
+    <string name="history_synced">Synced</string>
+    <string name="history_on_watch">On watch</string>
+    <string name="history_action_needed">Action needed</string>
+    <string name="history_rejected_default">The dashboard could not accept this exact record. Edit it to retry.</string>
+    <string name="history_rejected_schema">The watch and dashboard data versions differ. Update the older app.</string>
+    <string name="history_rejected_edit_conflict">This review changed elsewhere. Open the dashboard before editing again.</string>
+    <string name="history_rejected_identity_conflict">A different recording already uses this ID. Export the archive to resolve it safely.</string>
+    <string name="history_rejected_invalid">This record needs repair before it can sync. Keep it on the watch and export it for inspection.</string>
+    <string name="history_delete_question">Delete session?</string>
+    <string name="history_delete_body">Permanently delete the session from %1$s?</string>
+
+    <string name="loading_brand">Loading Bad Watch</string>
+    <string name="error_session_stopped">Session stopped</string>
+
+    <string name="dashboard_setup_title">Dashboard setup</string>
+    <string name="dashboard_setup_intro">Optional and self-hosted. Sessions stay on this watch when the server is absent or offline.</string>
+    <string name="dashboard_server_url">Server URL</string>
+    <string name="dashboard_server_placeholder">https://badwatch.example</string>
+    <string name="dashboard_bearer_token">Bearer token</string>
+    <string name="dashboard_optional">Optional</string>
+    <string name="dashboard_keep_token">Leave blank to keep saved token</string>
+    <string name="dashboard_connection">Connection</string>
+    <string name="dashboard_not_checked">Not checked</string>
+    <string name="dashboard_checking">Checking…</string>
+    <string name="dashboard_connected">Connected · schema compatible</string>
+    <string name="dashboard_save_test">Save &amp; test</string>
+    <string name="dashboard_save_test_subtitle">Authenticated status check</string>
+    <string name="dashboard_remove_server">Remove server</string>
+    <string name="dashboard_http_warning">HTTP is unencrypted: the bearer token and session data can be read in transit. Use it only on a trusted private LAN; prefer HTTPS.</string>
+</resources>

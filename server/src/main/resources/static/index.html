@@ -79,11 +79,21 @@
   h1 { font-size: 24px; font-weight: 650; letter-spacing: -0.01em; margin: 0; }
   .sub { color: var(--text-secondary); font-size: 14px; }
   .theme-toggle {
-    margin-left: auto; background: var(--surface-2); color: var(--text-secondary);
+    background: var(--surface-2); color: var(--text-secondary);
     border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px;
     font: inherit; font-size: 13px; cursor: pointer;
   }
   .theme-toggle:hover { color: var(--text-primary); }
+  .data-actions { margin-left: auto; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .data-action {
+    background: var(--surface-1); color: var(--text-secondary);
+    border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px;
+    font: inherit; font-size: 13px; cursor: pointer;
+  }
+  .data-action:hover { color: var(--text-primary); border-color: var(--text-muted); }
+  .data-action:disabled { cursor: wait; opacity: .55; }
+  .transfer-status { min-height: 20px; margin-top: 8px; color: var(--text-secondary); font-size: 12.5px; }
+  .transfer-status.error { color: var(--status-critical); }
 
   .auth-dialog {
     width: min(420px, calc(100vw - 32px)); padding: 0;
@@ -186,8 +196,69 @@
   .detail-head { margin: 18px 0 4px; }
   .detail-title { font-size: 20px; font-weight: 640; letter-spacing: -0.01em; }
   .detail-meta { color: var(--text-secondary); font-size: 13.5px; margin-top: 3px; }
+  .review-banner { margin: 18px 0 -6px; padding: 14px 16px; border: 1px solid
+                   color-mix(in srgb, var(--series-1) 42%, var(--border)); border-radius: 12px;
+                   background: color-mix(in srgb, var(--series-1) 9%, var(--surface-1)); }
+  .review-banner.clean { border-color: var(--border); background: var(--surface-1); }
+  .review-banner .kicker { color: var(--series-1); font-size: 11.5px; font-weight: 700;
+                           letter-spacing: .06em; text-transform: uppercase; }
+  .review-banner.clean .kicker { color: var(--text-muted); }
+  .review-banner strong { display: block; margin-top: 3px; font-size: 14px; }
+  .review-banner p { margin: 5px 0 0; color: var(--text-secondary); font-size: 12.5px;
+                     line-height: 1.45; }
+  .audit-card { border-style: dashed; background: color-mix(in srgb, var(--surface-1) 82%, var(--surface-0)); }
+  .audit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 10px; margin: 14px 0 0; }
+  .audit-stat { padding: 11px 12px; border-radius: 9px; background: var(--surface-2); }
+  .audit-stat .k { color: var(--text-muted); font-size: 11.5px; }
+  .audit-stat .v { margin-top: 2px; font-size: 18px; font-weight: 620;
+                   font-variant-numeric: tabular-nums; }
+  .audit-notes { margin: 12px 0 0; color: var(--text-secondary); font-size: 12.5px;
+                 line-height: 1.5; }
   tr.rowlink { cursor: pointer; }
   tr.rowlink:focus-visible { outline: 2px solid var(--series-1); outline-offset: -2px; }
+
+  .diary-card { padding-bottom: 20px; }
+  .diary-title-row { display: flex; justify-content: space-between; align-items: flex-start;
+                     gap: 14px; margin-bottom: 18px; }
+  .diary-state { flex: none; padding: 4px 9px; border: 1px solid var(--border);
+                 border-radius: 999px; color: var(--text-secondary); font-size: 11.5px; }
+  .diary-section { border: 0; padding: 0; margin: 20px 0 0; min-width: 0; }
+  .diary-section:first-of-type { margin-top: 0; }
+  .diary-section legend { width: 100%; margin-bottom: 10px; color: var(--text-primary);
+                          font-size: 13px; font-weight: 650; }
+  .diary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+                gap: 12px 14px; }
+  .diary-field { display: grid; align-content: start; gap: 5px; min-width: 0; }
+  .diary-field.wide { grid-column: 1 / -1; }
+  .diary-field label { color: var(--text-secondary); font-size: 12px; font-weight: 600; }
+  .diary-field .hint { color: var(--text-muted); font-size: 11.5px; line-height: 1.35; }
+  .diary-field input, .diary-field select, .diary-field textarea {
+    width: 100%; min-width: 0; padding: 9px 10px; color: var(--text-primary);
+    background: var(--surface-0); border: 1px solid var(--border); border-radius: 9px;
+    font: inherit; font-size: 13.5px;
+  }
+  .diary-field textarea { resize: vertical; min-height: 88px; }
+  .diary-field input:focus, .diary-field select:focus, .diary-field textarea:focus {
+    border-color: var(--series-1); outline: 3px solid color-mix(in srgb, var(--series-1) 18%, transparent);
+  }
+  .diary-check { display: flex; align-items: flex-start; gap: 9px; padding: 9px 0; }
+  .diary-check input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--series-1); }
+  .diary-check label { color: var(--text-secondary); font-size: 13px; }
+  .diary-existing { margin-top: 5px; color: var(--text-muted); font-size: 12px; }
+  .diary-actions { display: flex; align-items: center; justify-content: flex-end;
+                   flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+  .diary-status { flex: 1; min-width: 180px; color: var(--text-secondary); font-size: 12.5px; }
+  .diary-status.error { color: var(--status-critical); }
+  .diary-save { border: 1px solid var(--series-1); border-radius: 999px; padding: 8px 16px;
+                background: var(--series-1); color: white; font: inherit; font-size: 13px;
+                font-weight: 650; cursor: pointer; }
+  .diary-save:disabled { cursor: wait; opacity: .58; }
+  @media (max-width: 520px) {
+    .wrap { padding-left: 14px; padding-right: 14px; }
+    .grid { grid-template-columns: minmax(0, 1fr); }
+    .diary-grid { grid-template-columns: minmax(0, 1fr); }
+  }
 </style>
 </head>
 <body>
@@ -195,8 +266,15 @@
   <header>
     <h1>Bad Watch</h1>
     <span class="sub" id="subtitle">Loading…</span>
+    <nav class="data-actions" aria-label="Your data">
+      <button class="data-action" id="downloadArchive" type="button">Backup JSON</button>
+      <button class="data-action" id="downloadCsv" type="button">Export CSV</button>
+      <button class="data-action" id="restoreArchive" type="button">Restore</button>
+    </nav>
     <button class="theme-toggle" id="themeToggle" type="button">Theme</button>
   </header>
+  <div class="transfer-status" id="transferStatus" role="status" aria-live="polite"></div>
+  <input id="archiveFile" type="file" accept="application/json,.json" hidden>
 
   <div id="content"></div>
 </div>
@@ -335,6 +413,103 @@ async function apiJson(resource) {
   return response.json();
 }
 
+/* ---------- Data ownership ---------- */
+
+const transferStatus = document.getElementById("transferStatus");
+
+function reportTransfer(message, isError = false) {
+  transferStatus.textContent = message;
+  transferStatus.classList.toggle("error", isError);
+}
+
+function attachmentFilename(response, fallback) {
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  return match ? match[1] : fallback;
+}
+
+async function downloadOwnerData(button, path, fallbackName) {
+  button.disabled = true;
+  reportTransfer("Preparing download…");
+  try {
+    const response = await apiFetch(path);
+    if (!response.ok) throw new Error(`Download failed (HTTP ${response.status})`);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = attachmentFilename(response, fallbackName);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    reportTransfer(`Downloaded ${link.download}.`);
+  } catch (error) {
+    reportTransfer(error.message || "Download failed.", true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+document.getElementById("downloadArchive").addEventListener("click", event => {
+  downloadOwnerData(event.currentTarget, "api/v1/export/archive", "badwatch-archive.json");
+});
+
+document.getElementById("downloadCsv").addEventListener("click", event => {
+  downloadOwnerData(event.currentTarget, "api/v1/export/sessions.csv", "badwatch-sessions.csv");
+});
+
+const archiveFile = document.getElementById("archiveFile");
+const restoreButton = document.getElementById("restoreArchive");
+restoreButton.addEventListener("click", () => {
+  archiveFile.value = "";
+  archiveFile.click();
+});
+
+archiveFile.addEventListener("change", async () => {
+  const file = archiveFile.files && archiveFile.files[0];
+  if (!file) return;
+  const approved = window.confirm(
+    "Restore this Bad Watch archive? New records are added. Same-ID sessions merge only " +
+      "when their recorded evidence and edit history are compatible; a conflict stops the " +
+      "restore. Existing records absent from the archive are kept."
+  );
+  if (!approved) return;
+
+  restoreButton.disabled = true;
+  reportTransfer(`Validating ${file.name}…`);
+  try {
+    const response = await apiFetch("api/v1/import/archive", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: file
+    });
+    if (!response.ok) {
+      let detail = `Restore failed (HTTP ${response.status})`;
+      try {
+        const payload = await response.json();
+        if (payload.error) detail = payload.error;
+      } catch (_) { /* Keep the status-only error. */ }
+      throw new Error(detail);
+    }
+    const result = await response.json();
+    const changed = result.sessions.created + result.sessions.replaced +
+      result.captures.created + result.captures.replaced;
+    reportTransfer(
+      `Restore complete: ${changed} changed, ` +
+        `${result.sessions.unchanged + result.captures.unchanged} already current.`
+    );
+    sessionCache.clear();
+    window.__data = await apiJson("api/v1/dashboard");
+    location.hash = "#/";
+    route();
+  } catch (error) {
+    reportTransfer(error.message || "Restore failed.", true);
+  } finally {
+    restoreButton.disabled = false;
+  }
+});
+
 const tooltip = document.getElementById("tooltip");
 function showTip(evt, html) {
   tooltip.innerHTML = html;
@@ -363,6 +538,11 @@ function escapeHtml(value) {
 
 const fmtInt = n => Math.round(n).toLocaleString();
 const fmt1 = n => (Math.round(n * 10) / 10).toLocaleString(undefined, { minimumFractionDigits: 1 });
+function hasConfiguredHeartRateReserve(profile) {
+  return !!profile &&
+    !!profile.restingHeartRateSource && profile.restingHeartRateSource !== "Unconfigured" &&
+    !!profile.maxHeartRateSource && profile.maxHeartRateSource !== "Unconfigured";
+}
 function fmtDuration(ms) {
   const h = Math.floor(ms / 3600000), m = Math.round((ms % 3600000) / 60000);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
@@ -688,7 +868,7 @@ function render(data) {
       <div class="value">${latestHasHrLoad ? fmt1(latest.cardiovascularLoad) : "—"}</div>
       <div class="foot">${latestHasHrLoad
         ? `HRR-min · ${Math.round(latest.heartRateCoverage * 100)}% signal coverage`
-        : "requires measured optical heart rate"}</div>
+        : "requires optical HR and a configured HR profile"}</div>
     </div>`;
   content.appendChild(tiles);
 
@@ -772,9 +952,10 @@ function render(data) {
   const table = document.createElement("div");
   table.className = "card full";
   table.innerHTML = `
-    <div class="card-head"><h2>Sessions</h2>
+      <div class="card-head"><h2>Sessions</h2>
       <p class="card-note">Estimated active:quiet comes from gaps between your detected hits.
-      HR load is elapsed minutes x mean heart-rate reserve and appears only with measured optical HR.
+      HR load is elapsed minutes x mean heart-rate reserve and appears only with measured optical HR
+      plus configured resting and maximum heart rate.
       Open a row for the full detected-exchange timeline.</p></div>
     <div class="chart-scroll">
       <table>
@@ -830,7 +1011,7 @@ function card(title, note, draw) {
 
 /* ---------- Session detail view ---------- */
 
-// Detail payloads are small and sessions are immutable once uploaded, so cache them.
+// Detail envelopes are small. Diary saves replace the cached reviewed/raw envelope.
 const sessionCache = new Map();
 const sessionInFlight = new Set();
 
@@ -870,12 +1051,7 @@ function renderSessionDetail(id) {
     sessionErrorHtml("Loading…", "Fetching the session from the server.");
   if (sessionInFlight.has(id)) return; // route() can fire again while a fetch is out
   sessionInFlight.add(id);
-  apiFetch("api/v1/sessions/" + encodeURIComponent(id))
-    .then(r => {
-      if (r.status === 404) throw Object.assign(new Error("No such session"), { status: 404 });
-      if (!r.ok) throw Object.assign(new Error("HTTP " + r.status), { status: r.status });
-      return r.json();
-    })
+  fetchSessionDetail(id)
     .then(data => {
       sessionInFlight.delete(id);
       sessionCache.set(id, data);
@@ -899,50 +1075,377 @@ function renderSessionDetail(id) {
     });
 }
 
+function fetchSessionDetail(id) {
+  return apiFetch("api/v1/sessions/" + encodeURIComponent(id) + "/detail")
+    .then(r => {
+      if (r.status === 404) throw Object.assign(new Error("No such session"), { status: 404 });
+      if (!r.ok) throw Object.assign(new Error("HTTP " + r.status), { status: r.status });
+      return r.json();
+    });
+}
+
+const ACTIVITY_MODE_OPTIONS = [
+  ["Unspecified", "Not reported"], ["SinglesMatch", "Singles match"],
+  ["DoublesMatch", "Doubles match"], ["ConditionedGame", "Conditioned game"],
+  ["Drill", "Drill"], ["Shadow", "Shadow"], ["FreePlay", "Free play"],
+  ["Conditioning", "Conditioning"]
+];
+const COMPLETION_OPTIONS = [
+  ["Unreported", "Not reported"], ["Completed", "Completed"],
+  ["StoppedEarly", "Stopped early"]
+];
+const RECORDING_QUALITY_OPTIONS = [
+  ["Unreviewed", "Not reviewed"], ["Complete", "Complete recording"],
+  ["Partial", "Partial recording"], ["Unusable", "Unusable recording"]
+];
+const DRAFT_OPTIONS = [
+  ["Unreported", "Not reported"], ["None", "No noticeable draft"],
+  ["Light", "Light"], ["Noticeable", "Noticeable"], ["Strong", "Strong"]
+];
+
+function diaryOptions(options, selected) {
+  return options.map(([value, label]) =>
+    `<option value="${value}"${value === selected ? " selected" : ""}>${label}</option>`
+  ).join("");
+}
+
+function diaryValue(value) {
+  return value == null ? "" : escapeHtml(value);
+}
+
+function humanizeDiaryValue(value) {
+  if (!value) return "Not reported";
+  return String(value).replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/^./, c => c.toUpperCase());
+}
+
+function buildDiaryEditor(data) {
+  const raw = data.raw;
+  const context = raw.context || {};
+  const report = raw.report || {};
+  const equipment = context.equipment || {};
+  const conditions = context.conditions || {};
+  const soreness = report.soreness || [];
+  const shell = document.createElement("div");
+  shell.className = "card full diary-card";
+  shell.innerHTML = `
+    <div class="diary-title-row">
+      <div><h2>Session diary</h2>
+        <p class="card-note">Add the context you remember. Saving changes only this diary;
+        immutable detector evidence and correction history stay untouched. Reviewed metrics may
+        refresh when your context changes which sessions are comparable.</p></div>
+      <span class="diary-state">${escapeHtml(humanizeDiaryValue(context.diaryReviewStatus || "Unreviewed"))}</span>
+    </div>
+    <form id="sessionDiaryForm">
+      <fieldset class="diary-section">
+        <legend>Session</legend>
+        <div class="diary-grid">
+          <div class="diary-field">
+            <label for="diaryActivity">Activity</label>
+            <select id="diaryActivity" name="activityMode">${diaryOptions(ACTIVITY_MODE_OPTIONS, context.activityMode || "Unspecified")}</select>
+          </div>
+          <div class="diary-field">
+            <label for="diaryTag">Comparison tag</label>
+            <input id="diaryTag" name="comparisonTag" maxlength="64" value="${diaryValue(context.comparisonTag)}"
+                   placeholder="e.g. rear-court multishuttle">
+            <span class="hint">Use the same short tag for sessions you want compared like for like.</span>
+          </div>
+          <div class="diary-field">
+            <label for="diaryCompletion">Plan completion</label>
+            <select id="diaryCompletion" name="completion">${diaryOptions(COMPLETION_OPTIONS, context.completion || "Unreported")}</select>
+          </div>
+          <div class="diary-field">
+            <label for="diaryQuality">Recording coverage</label>
+            <select id="diaryQuality" name="recordingQuality">${diaryOptions(RECORDING_QUALITY_OPTIONS, context.recordingQuality || "Unreviewed")}</select>
+          </div>
+          <div class="diary-field">
+            <label for="diaryOpponent">Opponent</label>
+            <input id="diaryOpponent" name="opponent" maxlength="120" value="${diaryValue(context.opponent)}">
+          </div>
+          <div class="diary-field">
+            <label for="diaryPartner">Partner</label>
+            <input id="diaryPartner" name="partner" maxlength="120" value="${diaryValue(context.partner)}">
+          </div>
+          <div class="diary-field">
+            <label for="diaryHall">Hall</label>
+            <input id="diaryHall" name="hall" maxlength="160" value="${diaryValue(context.hall)}">
+          </div>
+          <div class="diary-field">
+            <label for="diaryGoal">Goal</label>
+            <input id="diaryGoal" name="goal" maxlength="280" value="${diaryValue(context.goal)}"
+                   placeholder="What were you working on?">
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="diary-section">
+        <legend>How it felt</legend>
+        <div class="diary-grid">
+          <div class="diary-field">
+            <label for="diaryRpe">Reported effort (RPE 0–10)</label>
+            <input id="diaryRpe" name="rpe" type="number" min="0" max="10" step="1"
+                   value="${report.rpe == null ? "" : escapeHtml(report.rpe)}" placeholder="Not reported">
+          </div>
+          <div class="diary-field">
+            <span class="hint">RPE is your own whole-session rating, not inferred from heart rate.</span>
+            <div class="diary-check">
+              <input id="diarySorenessReviewed" name="sorenessReviewed" type="checkbox"
+                     ${report.sorenessReviewed || soreness.length ? "checked" : ""} ${soreness.length ? "disabled" : ""}>
+              <label for="diarySorenessReviewed">I reviewed the soreness question</label>
+            </div>
+            ${soreness.length ? `<div class="diary-existing">Existing entries retained: ${soreness.map(item => {
+              const side = item.side && item.side !== "Unspecified" ? humanizeDiaryValue(item.side) + " " : "";
+              return escapeHtml(side + humanizeDiaryValue(item.bodyArea) + " " + item.severity + "/10");
+            }).join(" · ")}</div>` : ""}
+          </div>
+          <div class="diary-field wide">
+            <label for="diaryNotes">Notes</label>
+            <textarea id="diaryNotes" name="notes" maxlength="2000"
+                      placeholder="What mattered, changed, or should be remembered next time?">${diaryValue(report.notes)}</textarea>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="diary-section">
+        <legend>Equipment snapshot</legend>
+        <div class="diary-grid">
+          <div class="diary-field">
+            <label for="diaryRacket">Racket</label>
+            <input id="diaryRacket" name="racket" maxlength="120" value="${diaryValue(equipment.racket)}">
+          </div>
+          <div class="diary-field">
+            <label for="diaryString">String</label>
+            <input id="diaryString" name="string" maxlength="120" value="${diaryValue(equipment.string)}">
+          </div>
+          <div class="diary-field">
+            <label for="diaryTension">String tension (lb)</label>
+            <input id="diaryTension" name="stringTensionLbs" type="number" min="10" max="50"
+                   step="0.1" value="${equipment.stringTensionLbs == null ? "" : escapeHtml(equipment.stringTensionLbs)}"
+                   placeholder="Not reported">
+          </div>
+          <div class="diary-field">
+            <label for="diaryShoes">Shoes</label>
+            <input id="diaryShoes" name="shoes" maxlength="120" value="${diaryValue(equipment.shoes)}">
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="diary-section">
+        <legend>Court conditions snapshot</legend>
+        <div class="diary-grid">
+          <div class="diary-field">
+            <label for="diaryShuttleBrand">Shuttle brand / model</label>
+            <input id="diaryShuttleBrand" name="shuttleBrand" maxlength="120"
+                   value="${diaryValue(conditions.shuttleBrand)}">
+          </div>
+          <div class="diary-field">
+            <label for="diaryShuttleSpeed">Shuttle speed</label>
+            <input id="diaryShuttleSpeed" name="shuttleSpeed" maxlength="40"
+                   value="${diaryValue(conditions.shuttleSpeed)}" placeholder="e.g. 77 or medium">
+          </div>
+          <div class="diary-field">
+            <label for="diaryTemperature">Temperature (°C)</label>
+            <input id="diaryTemperature" name="temperatureCelsius" type="number" min="-30" max="60"
+                   step="0.1" value="${conditions.temperatureCelsius == null ? "" : escapeHtml(conditions.temperatureCelsius)}"
+                   placeholder="Not reported">
+          </div>
+          <div class="diary-field">
+            <label for="diaryDraft">Draft</label>
+            <select id="diaryDraft" name="draft">${diaryOptions(DRAFT_OPTIONS, conditions.draft || "Unreported")}</select>
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="diary-actions">
+        <div class="diary-status" id="diaryStatus" role="status" aria-live="polite">
+          Saving marks this diary reviewed.
+        </div>
+        <button class="diary-save" type="submit">Save diary</button>
+      </div>
+    </form>`;
+
+  const form = shell.querySelector("#sessionDiaryForm");
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    const status = form.querySelector("#diaryStatus");
+    const button = form.querySelector(".diary-save");
+    const optionalText = name => {
+      const value = form.elements[name].value.trim();
+      return value === "" ? null : value;
+    };
+    const optionalNumber = name => {
+      const value = form.elements[name].value.trim();
+      return value === "" ? null : Number(value);
+    };
+    const payload = {
+      baseDiaryRevision: raw.diaryRevision || 0,
+      activityMode: form.elements.activityMode.value,
+      comparisonTag: optionalText("comparisonTag"),
+      opponent: optionalText("opponent"),
+      partner: optionalText("partner"),
+      hall: optionalText("hall"),
+      goal: optionalText("goal"),
+      completion: form.elements.completion.value,
+      recordingQuality: form.elements.recordingQuality.value,
+      rpe: optionalNumber("rpe"),
+      sorenessReviewed: form.elements.sorenessReviewed.checked,
+      notes: optionalText("notes"),
+      equipment: {
+        racket: optionalText("racket"),
+        string: optionalText("string"),
+        stringTensionLbs: optionalNumber("stringTensionLbs"),
+        shoes: optionalText("shoes")
+      },
+      conditions: {
+        shuttleBrand: optionalText("shuttleBrand"),
+        shuttleSpeed: optionalText("shuttleSpeed"),
+        temperatureCelsius: optionalNumber("temperatureCelsius"),
+        draft: form.elements.draft.value
+      }
+    };
+
+    button.disabled = true;
+    status.classList.remove("error");
+    status.textContent = "Saving diary…";
+    let diarySaved = false;
+    try {
+      const response = await apiFetch(
+        "api/v1/sessions/" + encodeURIComponent(raw.session.id) + "/diary",
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }
+      );
+      if (!response.ok) {
+        let message = `Save failed (HTTP ${response.status})`;
+        try {
+          const error = await response.json();
+          if (error.error) message = error.error;
+        } catch (_) { /* Keep status-only message. */ }
+        throw new Error(message);
+      }
+      await response.json();
+      diarySaved = true;
+      sessionCache.delete(raw.session.id);
+      const updated = await fetchSessionDetail(raw.session.id);
+      sessionCache.set(raw.session.id, updated);
+      renderSession(updated);
+      const savedStatus = document.getElementById("diaryStatus");
+      if (savedStatus) savedStatus.textContent = "Diary saved. Recorded session data is unchanged.";
+      apiJson("api/v1/dashboard").then(value => { window.__data = value; }).catch(() => {});
+    } catch (error) {
+      status.textContent = diarySaved
+        ? "Diary saved, but the reviewed detail could not refresh. Reload to see it."
+        : error.message || "Could not save diary.";
+      status.classList.add("error");
+      button.disabled = false;
+    }
+  });
+  return shell;
+}
+
 function renderSession(data) {
   const content = document.getElementById("content");
   const subtitle = document.getElementById("subtitle");
-  const session = data.session, sum = session.summary, rp = data.rallyProfile;
+  const raw = data.raw;
+  const reviewed = data.reviewed;
+  const metrics = reviewed.effectiveMetrics;
+  const session = reviewed.session, sum = session.summary, rp = reviewed.rallyProfile;
+  const rawSession = raw.session, rawSum = rawSession.summary;
+  const rawProfile = raw.rallyProfile || {};
   const rallies = (rp && rp.rallies) || [];
+  const rawRallies = rawProfile.rallies || [];
   const shots = session.shots || [];
-  const work = (rp && rp.totalWorkMillis) || 0, rest = (rp && rp.totalRestMillis) || 0;
-  const density = work + rest > 0 ? work / (work + rest) : null;
+  const work = (rp && rp.totalWorkMillis) || 0;
+  const activeShare = sum.durationMillis > 0 ? work / sum.durationMillis : null;
   const longest = rallies.reduce((a, r) => Math.max(a, r.shotCount), 0);
   const avgRally = rallies.length
     ? rallies.reduce((a, r) => a + r.shotCount, 0) / rallies.length : 0;
-  const hasHrLoad = sum.cardiovascularLoad != null &&
+  const hasHrLoad = hasConfiguredHeartRateReserve(raw.profile) &&
+    sum.cardiovascularLoad != null &&
     sum.heartRateSampleCount > 0 && sum.heartRateCoverage >= 0.6;
+  const hitRevisions = (raw.corrections && raw.corrections.hitRevisions) || [];
+  const trimRevisions = (raw.corrections && raw.corrections.trimRevisions) || [];
+  const currentHit = hitRevisions.length ? hitRevisions[hitRevisions.length - 1] : {};
+  const correctionRevisionCount = hitRevisions.length + trimRevisions.length;
 
-  subtitle.textContent = `Session · ${fmtDate(session.startedAtMillis)}`;
+  subtitle.textContent = `Session · ${fmtDate(rawSession.startedAtMillis)}`;
   content.innerHTML = "";
 
-  const device = String(data.deviceId || "");
+  const device = String(raw.deviceId || "");
   const head = document.createElement("div");
   head.className = "detail-head";
   head.innerHTML = `
     <a class="backlink" href="#/">← All sessions</a>
-    <div class="detail-title">${fmtDateTimeLong(session.startedAtMillis)}</div>
+    <div class="detail-title">${fmtDateTimeLong(rawSession.startedAtMillis)}</div>
     <div class="detail-meta">Device ${escapeHtml(device.length > 12 ? device.slice(0, 8) + "…" : device)}
-      · app ${escapeHtml(String(data.appVersion || ""))}</div>`;
+      · app ${escapeHtml(String(raw.appVersion || ""))}</div>`;
   content.appendChild(head);
+
+  const appliedParts = [];
+  if (metrics.window.trimFromStartMillis || metrics.window.trimFromEndMillis) {
+    appliedParts.push(
+      `${fmtDuration(metrics.window.trimFromStartMillis)} trimmed from the start and ` +
+      `${fmtDuration(metrics.window.trimFromEndMillis)} from the end ` +
+      `(${fmtInt(metrics.trimExcludedDetectedHitCount)} hit events outside the review window)`
+    );
+  }
+  if (metrics.falseHitCount || (currentHit.falseHitIds || []).length) {
+    appliedParts.push(
+      `${fmtInt(metrics.falseHitCount)} resolved false ${metrics.falseHitCount === 1 ? "hit" : "hits"} removed ` +
+      `from ${fmtInt((currentHit.falseHitIds || []).length)} referenced event IDs`
+    );
+  }
+  if (metrics.reportedMissedHitCount) {
+    appliedParts.push(
+      `${fmtInt(metrics.reportedMissedHitCount)} reported missed ${metrics.reportedMissedHitCount === 1 ? "hit" : "hits"} ` +
+      "added only to the effective total"
+    );
+  }
+  const banner = document.createElement("div");
+  banner.className = "review-banner" + (metrics.hasCorrections ? "" : " clean");
+  banner.innerHTML = metrics.hasCorrections ? `
+    <div class="kicker">Reviewed view · corrections applied</div>
+    <strong>Primary metrics and charts below are reviewed values, not raw model output.</strong>
+    <p>${escapeHtml(appliedParts.length
+      ? appliedParts.join("; ") + "."
+      : "Correction history exists, but its latest revisions do not change the current metrics.")}
+      Reported missed hits have no timestamps, so they never enter detected-hit counts,
+      exchange timing, provisional shot mix, or charts.</p>` : `
+    <div class="kicker">Reviewed view · no corrections</div>
+    <strong>Primary metrics currently match the raw detector evidence.</strong>
+    <p>No trim, false-hit, or missed-hit revision is applied. Raw evidence is still retained
+    in the audit section below.</p>`;
+  content.appendChild(banner);
 
   const tiles = document.createElement("div");
   tiles.className = "tiles";
   tiles.innerHTML = `
     <div class="tile">
-      <div class="label">Detected hits</div>
+      <div class="label">Reviewed detected hits</div>
       <div class="value">${fmtInt(sum.totalShots)}</div>
-      <div class="foot">${rallies.length ? fmt1(avgRally) + " per exchange" : "no exchanges"}</div>
+      <div class="foot">timestamped hits used by exchanges and charts</div>
     </div>
     <div class="tile">
-      <div class="label">Detected exchanges</div>
+      <div class="label">Reviewed detected exchanges</div>
       <div class="value">${fmtInt(rallies.length)}</div>
-      <div class="foot">${longest ? "longest " + fmtInt(longest) + " hits" : "—"}</div>
+      <div class="foot">${longest
+        ? fmt1(avgRally) + " hits average · longest " + fmtInt(longest)
+        : "no multi-hit exchange after review"}</div>
     </div>
     <div class="tile">
-      <div class="label">Duration</div>
+      <div class="label">Reviewed duration</div>
       <div class="value">${fmtDuration(sum.durationMillis)}</div>
-      <div class="foot">${fmtDuration(work)} estimated active · ${fmtDuration(rest)} quiet</div>
+      <div class="foot">effective recording window after edge trims</div>
+    </div>
+    <div class="tile">
+      <div class="label">Estimated active</div>
+      <div class="value">${fmtDuration(work)}</div>
+      <div class="foot">${activeShare != null
+        ? Math.round(activeShare * 100) + "% of reviewed duration"
+        : "no reviewed duration"}</div>
     </div>
     <div class="tile">
       <div class="label">Avg heart rate</div>
@@ -955,29 +1458,50 @@ function renderSession(data) {
       <div class="foot">${sum.maxHeartRate > 0 ? "bpm" : "no readings"}</div>
     </div>
     <div class="tile">
-      <div class="label">Estimated active</div>
-      <div class="value">${density != null ? Math.round(density * 100) + "%" : "—"}</div>
-      <div class="foot">${work > 0 ? "1:" + fmt1(rest / work) + " active : quiet" : "of elapsed time"}</div>
-    </div>
-    <div class="tile">
       <div class="label">HR load</div>
       <div class="value">${hasHrLoad ? fmt1(sum.cardiovascularLoad) : "—"}</div>
       <div class="foot">${hasHrLoad
         ? `HRR-min · ${Math.round(sum.heartRateCoverage * 100)}% signal coverage`
-        : "requires measured optical heart rate"}</div>
-    </div>`;
+        : "requires optical HR and a configured HR profile"}</div>
+    </div>
+    ${metrics.reportedMissedHitCount ? `<div class="tile">
+      <div class="label">Effective hit total</div>
+      <div class="value">${fmtInt(metrics.effectiveHitCount)}</div>
+      <div class="foot">${fmtInt(metrics.correctedDetectedHitCount)} detected +
+        ${fmtInt(metrics.reportedMissedHitCount)} player-reported, untimed</div>
+    </div>` : ""}`;
   content.appendChild(tiles);
 
   const grid = document.createElement("div");
   grid.className = "grid";
   content.appendChild(grid);
 
+  grid.appendChild(buildDiaryEditor(data));
+
+  if ((reviewed.insights || []).length) {
+    const insightCard = document.createElement("div");
+    insightCard.className = "card full";
+    insightCard.innerHTML = `
+      <div class="card-head"><h2>Reviewed observations</h2>
+        <p class="card-note">Generated from the corrected exchange structure and comparable,
+        earlier reviewed sessions only.</p></div>
+      <div class="insights">${reviewed.insights.map(insight => `
+        <div class="insight ${insight.severity.toLowerCase()}">
+          <div class="body">
+            <h3>${escapeHtml(insight.headline)}</h3>
+            <p>${escapeHtml(insight.detail)}</p>
+            <div class="evidence">${escapeHtml(insight.evidence)}</div>
+          </div>
+        </div>`).join("")}</div>`;
+    grid.appendChild(insightCard);
+  }
+
   if (rallies.length) {
     const timelineCard = card(
       "Detected exchange timeline",
       "Each band is a burst inferred from your racket-wrist hits. Ticks are detected hits, " +
         "coloured by provisional type; empty gaps are quiet time.",
-      host => rallyTimelineChart(host, data)
+      host => rallyTimelineChart(host, reviewed)
     );
     timelineCard.classList.add("full");
     const types = [...new Set(shots.map(s => s.type))]
@@ -1011,6 +1535,41 @@ function renderSession(data) {
       host => shotMixChart(host, slices)
     ));
   }
+
+  const rawEvents = rawSession.shots || [];
+  const unknownFalseIds = metrics.unknownFalseHitIds || [];
+  const rawSummaryMismatch = rawSum.totalShots !== rawEvents.length
+    ? ` The stored raw summary reports ${fmtInt(rawSum.totalShots)} hits while the immutable event list contains ` +
+      `${fmtInt(rawEvents.length)}; reviewed analysis uses timestamped event records.`
+    : "";
+  const audit = document.createElement("div");
+  audit.className = "card full audit-card";
+  audit.innerHTML = `
+    <div class="card-head"><h2>Raw detector evidence · audit and corrections</h2>
+      <p class="card-note">Audit only. These original model values are immutable and do not
+      drive the reviewed cards, observations, shot mix, or timeline above.</p></div>
+    <div class="audit-grid">
+      <div class="audit-stat"><div class="k">Raw hit events</div>
+        <div class="v">${fmtInt(rawEvents.length)}</div></div>
+      <div class="audit-stat"><div class="k">Raw stored exchanges</div>
+        <div class="v">${fmtInt(rawRallies.length)}</div></div>
+      <div class="audit-stat"><div class="k">Raw elapsed</div>
+        <div class="v">${fmtDuration(rawSum.durationMillis)}</div></div>
+      <div class="audit-stat"><div class="k">Raw estimated active</div>
+        <div class="v">${fmtDuration(rawProfile.totalWorkMillis || 0)}</div></div>
+      <div class="audit-stat"><div class="k">Correction revisions</div>
+        <div class="v">${fmtInt(correctionRevisionCount)}</div></div>
+    </div>
+    <p class="audit-notes">
+      Current applied correction: trim ${fmtDuration(metrics.window.trimFromStartMillis)} from
+      start / ${fmtDuration(metrics.window.trimFromEndMillis)} from end; ${fmtInt(metrics.falseHitCount)}
+      resolved false-hit ${metrics.falseHitCount === 1 ? "event" : "events"};
+      ${fmtInt(metrics.reportedMissedHitCount)} reported missed ${metrics.reportedMissedHitCount === 1 ? "hit" : "hits"}.
+      ${unknownFalseIds.length
+        ? `Unresolved false-hit references retained for audit: ${escapeHtml(unknownFalseIds.join(", "))}.`
+        : "All current false-hit references resolve to raw event IDs."}${rawSummaryMismatch}
+    </p>`;
+  grid.appendChild(audit);
 }
 
 document.getElementById("themeToggle").addEventListener("click", () => {

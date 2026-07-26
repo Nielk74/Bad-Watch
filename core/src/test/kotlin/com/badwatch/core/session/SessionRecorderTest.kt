@@ -4,6 +4,7 @@ import com.badwatch.core.model.PlayerProfile
 import com.badwatch.core.model.SensorSample
 import com.badwatch.core.model.ShotType
 import com.badwatch.core.model.Vector3
+import com.badwatch.core.sync.BadWatchJson
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
@@ -93,6 +94,39 @@ class SessionRecorderTest {
         assertThat(recorder.isRunning).isFalse()
         assertThat(recorder.shotCount).isEqualTo(0)
         assertThat(recorder.finish(START + 1_000L)).isNull()
+    }
+
+    @Test
+    fun serializedCheckpointRestoresStableIdentityAndAccumulatorState() {
+        val original = SessionRecorder(
+            profile = PlayerProfile(),
+            sessionId = "stable-session"
+        )
+        original.start(START)
+        var clock = START
+        repeat(3) {
+            clock = feedSmash(original, clock) + REST_BETWEEN_SHOTS
+        }
+        val before = original.checkpoint()!!
+        val encoded = BadWatchJson.encodeToString(
+            SessionRecorderCheckpoint.serializer(),
+            before
+        )
+        val decoded = BadWatchJson.decodeFromString(
+            SessionRecorderCheckpoint.serializer(),
+            encoded
+        )
+
+        val restored = SessionRecorder.restore(decoded)
+        repeat(3) {
+            clock = feedSmash(restored, clock) + REST_BETWEEN_SHOTS
+        }
+        val recorded = restored.finish(clock)!!
+
+        assertThat(recorded.session.id).isEqualTo("stable-session")
+        assertThat(recorded.session.startedAtMillis).isEqualTo(START)
+        assertThat(recorded.session.shots.size).isGreaterThan(before.aggregator.shots.size)
+        assertThat(restored.samplesProcessed).isGreaterThan(before.samplesProcessed)
     }
 
     /** Feeds one smash-shaped swing; returns the clock after the swing. */

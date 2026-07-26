@@ -28,17 +28,24 @@ class ServerAuthenticationTest {
         testApplication {
             application { badWatchModule(repository, token = "s3cret", captureRepository = captures) }
 
-            assertThat(client.get("/").status).isEqualTo(HttpStatusCode.OK)
-            assertThat(client.get("/").bodyAsText()).contains("Bad Watch")
+            val shell = client.get("/")
+            assertThat(shell.status).isEqualTo(HttpStatusCode.OK)
+            val shellBody = shell.bodyAsText()
+            assertThat(shellBody).contains("Bad Watch")
+            assertThat(shellBody).contains("Same-ID sessions merge only")
+            assertThat(shellBody).doesNotContain("same id are replaced")
             assertThat(client.get("/api/v1/health").status).isEqualTo(HttpStatusCode.OK)
 
             val protectedPaths = listOf(
                 "/api/v1/sessions",
                 "/api/v1/sessions/${export.session.id}",
                 "/api/v1/dashboard",
+                "/api/v1/status",
                 "/api/v1/captures",
                 "/api/v1/captures/summary",
-                "/api/v1/captures/evaluation"
+                "/api/v1/captures/evaluation",
+                "/api/v1/export/archive",
+                "/api/v1/export/sessions.csv"
             )
 
             protectedPaths.forEach { path ->
@@ -70,6 +77,8 @@ class ServerAuthenticationTest {
 
             assertThat(client.get("/api/v1/sessions").status).isEqualTo(HttpStatusCode.OK)
             assertThat(client.get("/api/v1/dashboard").status).isEqualTo(HttpStatusCode.OK)
+            assertThat(client.get("/api/v1/status").status).isEqualTo(HttpStatusCode.OK)
+            assertThat(client.get("/api/v1/status").bodyAsText()).contains("\"schemaVersion\":1")
         }
     }
 
@@ -87,6 +96,7 @@ class ServerAuthenticationTest {
 
             assertThat(response.status).isEqualTo(HttpStatusCode.OK)
             assertThat(response.headers[HttpHeaders.AccessControlAllowOrigin]).isNull()
+            assertThat(response.headers[HttpHeaders.CacheControl]).isEqualTo("no-store")
         }
     }
 }

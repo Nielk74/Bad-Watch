@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_confirm">Compris</string>
+    <string name="onboarding_tagline">Le badminton depuis le poignet de votre raquette</string>
+
+    <string name="home_start_session">Démarrer une séance</string>
+    <string name="home_start_session_subtitle">Frappes détectées · fréquence cardiaque</string>
+    <string name="home_practice">Entraînement</string>
+    <string name="home_practice_count">5 exercices</string>
+    <string name="home_practice_subtitle">Shadow guidé par la montre · conseils BWF</string>
+    <string name="home_score_match">Compter un match</string>
+    <string name="home_manual">Manuel</string>
+    <string name="home_match_subtitle">Grandes zones de score · service · temps de pause</string>
+    <string name="home_last_session">Dernière séance</string>
+    <string name="home_history">Historique</string>
+    <string name="home_progress">Progression</string>
+    <string name="home_settings">Réglages</string>
+    <string name="home_detection_lab">Labo de détection</string>
+    <string name="home_optional">Facultatif</string>
+    <string name="home_detection_lab_subtitle">Étiquetez des gestes pour améliorer la détection.</string>
+    <string name="home_ready">Prête au poignet de votre raquette</string>
+    <string name="home_this_week">Cette semaine</string>
+    <string name="home_first_recap">Votre premier récapitulatif apparaîtra ici après l’enregistrement d’une séance.</string>
+    <string name="home_estimated_active_short">Activité est.</string>
+    <string name="home_recent_hits">Frappes détectées · %1$d dernières séances</string>
+    <plurals name="home_hits_trend">
+        <item quantity="one">Évolution des frappes détectées sur %1$d séance, de %2$d à %3$d</item>
+        <item quantity="many">Évolution des frappes détectées sur %1$d séances, de %2$d à %3$d</item>
+        <item quantity="other">Évolution des frappes détectées sur %1$d séances, de %2$d à %3$d</item>
+    </plurals>
+
+    <string name="history_title">Historique</string>
+    <string name="history_empty">Aucun enregistrement. Vos 30 dernières séances apparaîtront ici.</string>
+    <string name="history_synced">Synchronisée</string>
+    <string name="history_on_watch">Sur la montre</string>
+    <string name="history_action_needed">Action requise</string>
+    <string name="history_rejected_default">Le tableau de bord n’a pas accepté cet enregistrement précis. Modifiez-le pour réessayer.</string>
+    <string name="history_rejected_schema">Les versions de données de la montre et du tableau de bord diffèrent. Mettez à jour l’ancienne application.</string>
+    <string name="history_rejected_edit_conflict">Cette révision a changé ailleurs. Ouvrez le tableau de bord avant de la modifier à nouveau.</string>
+    <string name="history_rejected_identity_conflict">Un autre enregistrement utilise déjà cet identifiant. Exportez l’archive pour résoudre le conflit sans perte.</string>
+    <string name="history_rejected_invalid">Cet enregistrement doit être réparé avant la synchronisation. Gardez-le sur la montre et exportez-le pour l’inspecter.</string>
+    <string name="history_delete_question">Supprimer la séance ?</string>
+    <string name="history_delete_body">Supprimer définitivement la séance du %1$s ?</string>
+
+    <string name="loading_brand">Chargement de Bad Watch</string>
+    <string name="error_session_stopped">Séance interrompue</string>
+
+    <string name="dashboard_setup_title">Configuration du tableau de bord</string>
+    <string name="dashboard_setup_intro">Facultatif et auto-hébergé. Les séances restent sur cette montre si le serveur est absent ou hors ligne.</string>
+    <string name="dashboard_server_url">URL du serveur</string>
+    <string name="dashboard_server_placeholder">https://badwatch.example</string>
+    <string name="dashboard_bearer_token">Jeton d’accès</string>
+    <string name="dashboard_optional">Facultatif</string>
+    <string name="dashboard_keep_token">Laisser vide pour conserver le jeton enregistré</string>
+    <string name="dashboard_connection">Connexion</string>
+    <string name="dashboard_not_checked">Non vérifiée</string>
+    <string name="dashboard_checking">Vérification…</string>
+    <string name="dashboard_connected">Connecté · schéma compatible</string>
+    <string name="dashboard_save_test">Enregistrer et tester</string>
+    <string name="dashboard_save_test_subtitle">Vérification authentifiée</string>
+    <string name="dashboard_remove_server">Supprimer le serveur</string>
+    <string name="dashboard_http_warning">HTTP n’est pas chiffré : le jeton d’accès et les données de séance peuvent être lus pendant le transit. Utilisez-le uniquement sur un réseau local privé de confiance ; préférez HTTPS.</string>
+</resources>

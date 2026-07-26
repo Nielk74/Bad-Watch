@@ -1,0 +1,8 @@
+{
+  "criteriaVersion": 1,
+  "minimumExamplesPerClass": 300,
+  "minimumMacroF1": 0.8,
+  "minimumParticipants": 5,
+  "minimumPerClassRecall": 0.75,
+  "note": "Offline isolated-drill candidate gate only. Real-play event detection and subgroup validation remain mandatory before product use."
+}

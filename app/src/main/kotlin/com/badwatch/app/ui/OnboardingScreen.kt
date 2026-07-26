@@ -53,7 +53,7 @@ fun OnboardingScreen(onConfirm: (Handedness) -> Unit) {
                     modifier = Modifier.size(EdgeButtonDefaults.SmallIconSize)
                 )
                 Spacer(modifier = Modifier.size(6.dp))
-                Text("Got it")
+                Text(stringResource(R.string.onboarding_confirm))
             }
         }
     ) {
@@ -65,13 +65,13 @@ fun OnboardingScreen(onConfirm: (Handedness) -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "BAD WATCH",
+                    text = stringResource(R.string.brand_wordmark),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
                     textAlign = TextAlign.Center
                 )
                 Text(
-                    text = "Badminton, from your racket wrist",
+                    text = stringResource(R.string.onboarding_tagline),
                     style = MaterialTheme.typography.bodyExtraSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
@@ -98,7 +98,7 @@ fun OnboardingScreen(onConfirm: (Handedness) -> Unit) {
                 selected = handedness == Handedness.Right,
                 onSelect = { handedness = Handedness.Right },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Right handed") }
+                label = { Text(stringResource(R.string.handedness_right)) }
             )
         }
         item {
@@ -106,7 +106,7 @@ fun OnboardingScreen(onConfirm: (Handedness) -> Unit) {
                 selected = handedness == Handedness.Left,
                 onSelect = { handedness = Handedness.Left },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Left handed") }
+                label = { Text(stringResource(R.string.handedness_left)) }
             )
         }
 

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="live_discard_question">Abandonner la séance ?</string>
+    <string name="live_discard_body">L’enregistrement s’arrête et aucune donnée n’est conservée.</string>
+    <string name="live_hits_upper">FRAPPES</string>
+    <string name="live_heart_rate_line">%1$s bpm · %2$s</string>
+    <string name="live_heart_rate_only">%1$s bpm</string>
+    <string name="live_heart_rate_duration">%1$s bpm · %2$s</string>
+    <string name="live_stop_save">Arrêter et enregistrer</string>
+    <string name="live_detected_play">Jeu détecté</string>
+    <string name="live_rally_bursts">Échanges détectés</string>
+    <string name="live_average_hits">Frappes moy.</string>
+    <string name="live_active_quiet">Activité est. : calme</string>
+    <string name="live_activity_distribution">Temps d’activité estimé %1$d pour cent, temps calme %2$d pour cent</string>
+    <string name="live_heart_rate_reserve">Réserve cardiaque</string>
+    <string name="live_last_hit">Dernière frappe détectée</string>
+    <string name="live_waiting_swing">En attente de votre premier geste</string>
+    <string name="format_radians_per_second">%1$.1f rad/s</string>
+    <string name="capture_title">Collecte de données</string>
+    <string name="capture_intro_empty">Choisissez une frappe, puis réalisez-la vingt fois. Les mouvements bruts restent locaux sauf si le partage est activé dans les réglages.</string>
+    <plurals name="capture_intro_existing">
+        <item quantity="one">%d geste étiqueté sur cette montre. Le partage est désactivé par défaut.</item>
+        <item quantity="many">%d gestes étiquetés sur cette montre. Le partage est désactivé par défaut.</item>
+        <item quantity="other">%d gestes étiquetés sur cette montre. Le partage est désactivé par défaut.</item>
+    </plurals>
+    <string name="capture_reps_recommended">20 répétitions conseillées</string>
+    <string name="capture_swing_unit_one">geste</string>
+    <string name="capture_swing_unit_other">gestes</string>
+    <string name="capture_waiting_swing">En attente de votre premier geste</string>
+    <string name="capture_last_peak">Dernier maximum %1$.1f rad/s</string>
+    <string name="capture_drop_last">Retirer le dernier</string>
+    <string name="capture_save_drill">Enregistrer l’exercice</string>
+    <string name="capture_cancel_question">Annuler l’exercice ?</string>
+    <string name="capture_cancel_body">Les gestes collectés jusqu’ici seront perdus.</string>
+    <string name="capture_saved">Exercice enregistré</string>
+    <string name="capture_rate">Fréquence</string>
+    <string name="capture_sync_eligible">Cette collecte peut être synchronisée avec votre tableau de bord auto-hébergé selon le consentement donné pour cet exercice.</string>
+    <string name="capture_saved_local">Enregistré localement. Cet enregistrement de mouvements bruts ne peut pas être envoyé.</string>
+</resources>

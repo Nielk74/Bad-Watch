@@ -8,7 +8,9 @@ import com.badwatch.core.model.ShotType
 import com.badwatch.core.model.Vector3
 import com.badwatch.core.sync.BadWatchJson
 import com.badwatch.core.sync.CaptureEnvelope
+import com.badwatch.core.sync.CaptureDataUse
 import com.badwatch.core.sync.CaptureExport
+import com.badwatch.core.sync.CaptureProtocol
 import com.badwatch.core.sync.SyncResponse
 import com.google.common.truth.Truth.assertThat
 import io.ktor.client.request.get
@@ -73,6 +75,7 @@ class CaptureIngestTest {
             assertThat(summary.drillCount).isEqualTo(3)
             assertThat(summary.totalSwings).isEqualTo(25)
             assertThat(summary.contributingDevices).isEqualTo(2)
+            assertThat(summary.contributingParticipants).isEqualTo(2)
             assertThat(summary.swingsPerLabel.first { it.label == "Smash" }.swings).isEqualTo(17)
         }
     }
@@ -91,19 +94,96 @@ class CaptureIngestTest {
     }
 
     @Test
-    fun rejectsAnUnknownSchemaVersion() = runBlocking {
+    fun rejectsEveryCaptureInAnUnknownEnvelopeSchemaWithoutCreatingARetryLoop() = runBlocking {
         val sessions = SessionRepository(temporaryFolder.newFolder("sessions"))
         val captures = CaptureRepository(temporaryFolder.newFolder("captures"))
+        val export = capture(ShotType.Smash, swings = 2, deviceId = "schema-player")
 
         testApplication {
             application { badWatchModule(sessions, token = null, captureRepository = captures) }
 
             val response = client.post("/api/v1/captures") {
                 contentType(ContentType.Application.Json)
-                setBody("""{"schemaVersion":99,"captures":[]}""")
+                setBody(
+                    BadWatchJson.encodeToString(
+                        CaptureEnvelope.serializer(),
+                        CaptureEnvelope(schemaVersion = 99, captures = listOf(export))
+                    )
+                )
+            }
+
+            assertThat(response.status).isEqualTo(HttpStatusCode.OK)
+            val acknowledgement = BadWatchJson.decodeFromString(
+                SyncResponse.serializer(),
+                response.bodyAsText()
+            )
+            assertThat(acknowledgement.accepted).isEmpty()
+            assertThat(acknowledgement.rejected[export.capture.id])
+                .contains("Unsupported envelope schema 99")
+            assertThat(captures.all()).isEmpty()
+        }
+    }
+
+    @Test
+    fun malformedCaptureSyncJsonReturnsBadRequestWithoutWriting() = runBlocking {
+        val sessions = SessionRepository(temporaryFolder.newFolder("malformed-sessions"))
+        val captures = CaptureRepository(temporaryFolder.newFolder("malformed-captures"))
+
+        testApplication {
+            application { badWatchModule(sessions, token = null, captureRepository = captures) }
+
+            val response = client.post("/api/v1/captures") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"schemaVersion":1,"captures":[""")
             }
 
             assertThat(response.status).isEqualTo(HttpStatusCode.BadRequest)
+            assertThat(response.bodyAsText()).contains("Invalid capture sync JSON")
+            assertThat(captures.all()).isEmpty()
+        }
+    }
+
+    @Test
+    fun rejectsLocalOnlyLegacyAndIncompleteRawCapturesPerRecord() = runBlocking {
+        val sessions = SessionRepository(temporaryFolder.newFolder("consent-sessions"))
+        val captures = CaptureRepository(temporaryFolder.newFolder("consent-captures"))
+        val eligible = capture(ShotType.Smash, swings = 2, deviceId = "player-a")
+        val localOnly = eligible.copy(
+            capture = eligible.capture.copy(id = UUID.randomUUID().toString()),
+            dataUse = CaptureDataUse.LocalOnly
+        )
+        val legacy = eligible.copy(
+            capture = eligible.capture.copy(id = UUID.randomUUID().toString()),
+            participantId = null,
+            protocol = null
+        )
+        val missingProtocol = eligible.copy(
+            capture = eligible.capture.copy(id = UUID.randomUUID().toString()),
+            protocol = null
+        )
+
+        testApplication {
+            application { badWatchModule(sessions, token = null, captureRepository = captures) }
+
+            val response = client.post("/api/v1/captures") {
+                contentType(ContentType.Application.Json)
+                setBody(
+                    BadWatchJson.encodeToString(
+                        CaptureEnvelope.serializer(),
+                        CaptureEnvelope(captures = listOf(localOnly, legacy, missingProtocol))
+                    )
+                )
+            }
+
+            assertThat(response.status).isEqualTo(HttpStatusCode.OK)
+            val result = BadWatchJson.decodeFromString(
+                SyncResponse.serializer(),
+                response.bodyAsText()
+            )
+            assertThat(result.accepted).isEmpty()
+            assertThat(result.rejected[localOnly.capture.id]).contains("not consented")
+            assertThat(result.rejected[legacy.capture.id]).contains("participant id")
+            assertThat(result.rejected[missingProtocol.capture.id]).contains("protocol")
             assertThat(captures.all()).isEmpty()
         }
     }
@@ -132,6 +212,7 @@ class CaptureIngestTest {
         }
         return CaptureExport(
             deviceId = deviceId,
+            participantId = deviceId,
             appVersion = "test",
             profile = PlayerProfile(),
             capture = CaptureSession(
@@ -141,7 +222,9 @@ class CaptureIngestTest {
                 label = label,
                 swings = labelled
             ),
-            samplingRateHz = 100
+            samplingRateHz = 100,
+            dataUse = CaptureDataUse.SelfHostedModelTraining,
+            protocol = CaptureProtocol()
         )
     }
 }

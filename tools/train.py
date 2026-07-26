@@ -14,6 +14,8 @@ Requires scikit-learn:  pip install scikit-learn pandas
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import sys
 from pathlib import Path
 
@@ -35,23 +37,85 @@ FEATURES = [
 ]
 
 
+def evaluate_candidate_gate(
+    class_counts: dict[str, int],
+    participant_count: int,
+    report: dict,
+    grouping_name: str,
+    criteria: dict,
+) -> dict:
+    """Evaluate pre-registered offline gates without implying field-event validation."""
+    class_recalls = {
+        label: float(report.get(label, {}).get("recall", 0.0))
+        for label in sorted(class_counts)
+    }
+    checks = {
+        "participant_grouping": grouping_name == "participant",
+        "minimum_participants": participant_count >= criteria["minimumParticipants"],
+        "minimum_examples_per_class": bool(class_counts)
+        and min(class_counts.values()) >= criteria["minimumExamplesPerClass"],
+        "minimum_macro_f1": float(report.get("macro avg", {}).get("f1-score", 0.0))
+        >= criteria["minimumMacroF1"],
+        "minimum_per_class_recall": bool(class_recalls)
+        and min(class_recalls.values()) >= criteria["minimumPerClassRecall"],
+    }
+    return {
+        "criteriaVersion": criteria["criteriaVersion"],
+        "checks": checks,
+        "offlineGatePassed": all(checks.values()),
+        # Pre-segmented drill windows cannot measure real-play event precision/recall.
+        "fieldEventValidationPassed": False,
+        "deploymentReady": False,
+        "classRecall": class_recalls,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", type=Path, default=Path("dataset.csv"))
     parser.add_argument("--min-per-class", type=int, default=20)
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("build/model-candidate"),
+        help="directory for the fitted offline model and deterministic evaluation manifest",
+    )
+    parser.add_argument(
+        "--acceptance",
+        type=Path,
+        default=Path(__file__).with_name("model_acceptance.json"),
+        help="pre-registered offline candidate criteria",
+    )
+    parser.add_argument(
+        "--allow-device-groups-smoke",
+        action="store_true",
+        help="allow legacy/device-grouped smoke tests; never report them as player validation",
+    )
     args = parser.parse_args()
 
     try:
+        import joblib
         import pandas as pd
+        import sklearn
         from sklearn.ensemble import RandomForestClassifier
         from sklearn.metrics import classification_report, confusion_matrix
-        from sklearn.model_selection import GroupKFold, cross_val_predict
+        from sklearn.model_selection import StratifiedGroupKFold, cross_val_predict
     except ImportError:
         print("Install dependencies first:  pip install scikit-learn pandas", file=sys.stderr)
         return 1
 
     if not args.dataset.exists():
         print(f"No dataset at {args.dataset}. Run tools/ingest.py first.", file=sys.stderr)
+        return 1
+
+    if not args.acceptance.exists():
+        print(f"No acceptance criteria at {args.acceptance}.", file=sys.stderr)
+        return 1
+
+    try:
+        criteria = json.loads(args.acceptance.read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        print(f"Could not read acceptance criteria: {error}", file=sys.stderr)
         return 1
 
     frame = pd.read_csv(args.dataset)
@@ -62,30 +126,69 @@ def main() -> int:
         print(f"Dropping classes with under {args.min_per_class} examples: {list(too_few.index)}")
         frame = frame[~frame["label"].isin(too_few.index)]
 
+    counts = frame["label"].value_counts()
+
     if frame["label"].nunique() < 2:
         print("Need at least two stroke types with enough examples.", file=sys.stderr)
         return 1
 
+    missing_features = [feature for feature in FEATURES if feature not in frame.columns]
+    if missing_features:
+        print(f"Dataset is missing feature columns: {missing_features}", file=sys.stderr)
+        return 1
+
     features = frame[FEATURES].fillna(0.0)
     labels = frame["label"]
-    groups = frame["device_id"]
 
-    n_devices = groups.nunique()
-    if n_devices < 2:
+    participant_ids_present = (
+        "participant_id" in frame.columns
+        and frame["participant_id"].fillna("").astype(str).str.strip().ne("").all()
+    )
+    if participant_ids_present:
+        groups = frame["participant_id"].astype(str)
+        grouping_name = "participant"
+    elif args.allow_device_groups_smoke and "device_id" in frame.columns:
+        groups = frame["device_id"].astype(str)
+        grouping_name = "device smoke-test"
         print()
-        print("!! Only one device in the dataset. Cross-validation below is grouped by")
-        print("!! device, so with a single group it degrades to ordinary k-fold and the")
-        print("!! scores will be optimistic. Treat them as a smoke test, not an estimate.")
+        print("!! LEGACY SMOKE MODE: participant IDs are missing. Device IDs are not")
+        print("!! people, so every score below is pipeline-only and says nothing about")
+        print("!! generalisation to unseen players.")
+        print()
+    else:
+        print(
+            "Participant IDs are missing. Re-ingest versioned captures; device IDs are not "
+            "valid player groups. Use --allow-device-groups-smoke only to test the pipeline.",
+            file=sys.stderr,
+        )
+        return 1
+
+    n_groups = groups.nunique()
+    if n_groups < 2 and not args.allow_device_groups_smoke:
+        print(
+            "Need at least two participant IDs for held-out evaluation. Collect from more "
+            "players, or use --allow-device-groups-smoke for a non-validating pipeline run.",
+            file=sys.stderr,
+        )
+        return 1
+
+    if n_groups < 2:
+        print()
+        print("!! ONE-GROUP SMOKE MODE: ordinary stratified folds reuse the same contributor.")
+        print("!! Scores are optimistic and must not be used as model-acceptance evidence.")
         print()
         from sklearn.model_selection import StratifiedKFold
 
         splitter = StratifiedKFold(n_splits=min(5, counts.min()), shuffle=True, random_state=0)
         split_args = {"cv": splitter}
     else:
-        # Group by device so a player never appears in both train and test: the score we
-        # care about is "does this work for someone the model has never seen", and
-        # random splits leak swing-level similarity between folds badly.
-        splitter = GroupKFold(n_splits=min(n_devices, 5))
+        # A participant never appears in both train and test. Random swing-level splits leak
+        # repeated-window similarity badly and device grouping is not a player substitute.
+        splitter = StratifiedGroupKFold(
+            n_splits=min(n_groups, 5),
+            shuffle=True,
+            random_state=0,
+        )
         split_args = {"cv": splitter, "groups": groups}
 
     model = RandomForestClassifier(
@@ -98,8 +201,12 @@ def main() -> int:
 
     predicted = cross_val_predict(model, features, labels, **split_args)
 
-    print(f"Dataset: {len(frame)} swings, {frame['label'].nunique()} classes, {n_devices} device(s)")
+    print(
+        f"Dataset: {len(frame)} swings, {frame['label'].nunique()} classes, "
+        f"{n_groups} {grouping_name} group(s)"
+    )
     print()
+    report = classification_report(labels, predicted, digits=3, zero_division=0, output_dict=True)
     print(classification_report(labels, predicted, digits=3, zero_division=0))
 
     print("Confusion matrix (rows = true, columns = predicted)")
@@ -118,9 +225,61 @@ def main() -> int:
         bar = "█" * int(importance * 60)
         print(f"  {feature:<24} {importance:.3f} {bar}")
 
+    gate = evaluate_candidate_gate(
+        class_counts={str(label): int(count) for label, count in counts.items()},
+        participant_count=int(n_groups),
+        report=report,
+        grouping_name=grouping_name,
+        criteria=criteria,
+    )
+    dataset_sha256 = hashlib.sha256(args.dataset.read_bytes()).hexdigest()
+    manifest = {
+        "format": "bad-watch-offline-model-candidate",
+        "formatVersion": 1,
+        "datasetSha256": dataset_sha256,
+        "featureOrder": FEATURES,
+        "labelOrder": order,
+        "sampleCount": int(len(frame)),
+        "classCounts": {str(label): int(count) for label, count in counts.items()},
+        "grouping": grouping_name,
+        "groupCount": int(n_groups),
+        "crossValidation": {
+            "kind": "StratifiedGroupKFold" if n_groups >= 2 else "StratifiedKFoldSmoke",
+            "folds": int(min(n_groups, 5) if n_groups >= 2 else min(5, counts.min())),
+            "randomSeed": 0,
+        },
+        "classificationReport": report,
+        "confusionMatrix": matrix.tolist(),
+        "featureImportance": {feature: float(value) for feature, value in ranked},
+        "gate": gate,
+        "toolVersions": {
+            "pandas": pd.__version__,
+            "scikitLearn": sklearn.__version__,
+        },
+        "limitations": [
+            "Labels come from player-selected isolated drill context.",
+            "This pipeline does not evaluate hit-event precision or recall in real play.",
+            "A passing offline gate never authorizes automatic deployment.",
+        ],
+    }
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    joblib.dump(model, args.output_dir / "random-forest.joblib", compress=3)
+    (args.output_dir / "evaluation.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+    )
+
     print()
-    print("Next: once per-class recall clears ~0.85 across held-out players, port the")
-    print("model to TFLite and wire it into :core with the heuristics as fallback.")
+    print(f"Candidate artifacts: {args.output_dir}")
+    print(f"Offline gate: {'PASS' if gate['offlineGatePassed'] else 'NOT PASSED'}")
+    print("Deployment gate: BLOCKED — real-play event validation is a separate requirement.")
+
+    print()
+    if grouping_name == "participant" and n_groups >= 2:
+        print("Next: inspect the held-out-participant confusion matrix and pre-register a")
+        print("field acceptance threshold before considering any on-watch model change.")
+    else:
+        print("Next: collect consented, versioned captures from multiple participants.")
+        print("This smoke run cannot justify an on-watch model change.")
     return 0
 
 

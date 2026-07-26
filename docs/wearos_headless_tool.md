@@ -1,125 +1,85 @@
-# Wear OS Headless Automation Tool
+# Wear OS headless automation
 
-This document explains the helper CLI under `isolate/` that automates a Wear OS emulator without Android Studio. It also records the current host limitation discovered during verification (`/dev/kvm` missing) and how to resolve it.
+`isolate/wearos_tool.py` is a host-neutral, JSON-emitting wrapper around `emulator` and `adb`.
+It can boot a Wear OS AVD without Android Studio, install and launch Bad Watch, drive input, inspect
+the UI, collect logs, and retain screenshots. It is useful for repeatable UI development; it does
+not replace the Pixel Watch 4 release matrix in [`device-validation.md`](device-validation.md).
 
-## What was added
-- `isolate/wearos_tool.py` — JSON-emitting command line helper to start/stop a Wear OS AVD, install APKs, launch activities, capture screenshots/UI XML, send input gestures, collect logcat, or run arbitrary `adb` subcommands.
-- `isolate/README.md` — quick start guide and feature list for the tool.
+## Prerequisites
 
-These scripts depend only on the Android CLI stack (`emulator`, `adb`, `sdkmanager`, `avdmanager`) plus Python 3 and can be orchestrated by an LLM-style agent.
+- Python 3.9 or newer; the helper itself uses only the standard library.
+- Android SDK `platform-tools` and `emulator` packages.
+- A compatible Wear OS system image and AVD.
+- Hardware virtualization available to the Android emulator.
 
-## Installing the emulator toolchain
-1. Point `sdk.dir` in `local.properties` to the Android SDK root (already set to `/home/antoine/android-sdk`).
-2. Install/update the emulator binaries:
-   ```bash
-   ${SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --install "emulator"
-   ```
-3. Install a Wear OS system image (example uses API 34 x86_64):
-   ```bash
-   ${SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --install \
-     "system-images;android-34;android-wear;x86_64"
-   ```
-4. Create an AVD for the image (here we use the large round Wear profile):
-   ```bash
-   yes | ${SDK_ROOT}/cmdline-tools/latest/bin/avdmanager create avd \
-     -n Pixel_Watch_API_34 \
-     -d wearos_large_round \
-     -k "system-images;android-34;android-wear;x86_64" \
-     --force
-   ```
+Point the shell at the SDK explicitly instead of relying on a machine-specific `local.properties`:
 
-## Running the helper CLI
-Add `emulator` and `platform-tools` to the `PATH` so the script can find `adb` and `emulator`:
 ```bash
-export PATH=${SDK_ROOT}/emulator:${SDK_ROOT}/platform-tools:$PATH
+export BADWATCH_ANDROID_SDK=/absolute/path/to/android-sdk
+export PATH="$BADWATCH_ANDROID_SDK/cmdline-tools/latest/bin:$BADWATCH_ANDROID_SDK/emulator:$BADWATCH_ANDROID_SDK/platform-tools:$PATH"
+sdkmanager --list
+avdmanager list avd
+```
+
+Install a Wear image shown by `sdkmanager --list`, then create an AVD with `avdmanager` or Android
+Studio's Device Manager. Bad Watch compiles and targets API 36; use a Wear image compatible with
+the behavior being tested. Keep the physical Pixel Watch 4 running Android 17 / API 37 as the
+release authority, and record its exact build fingerprint with every retained run.
+
+Android Emulator acceleration uses the host's supported backend: Hypervisor Framework on macOS,
+KVM on Linux, or the configured Windows hypervisor. Diagnose acceleration with
+`emulator -accel-check`; a missing Linux `/dev/kvm` is a host setup issue, not a repository state.
+
+## End-to-end loop
+
+Run from the repository root after building the debug APK:
+
+```bash
+./gradlew :app:assembleDebug
 cd isolate
-./wearos_tool.py start-emulator --avd Pixel_Watch_API_34 --gpu swiftshader_indirect --wait
+./wearos_tool.py start-emulator --avd Pixel_Watch_API_36 --gpu swiftshader_indirect --wait
+./wearos_tool.py install-apk --apk ../app/build/outputs/apk/debug/app-debug.apk
+./wearos_tool.py launch-activity \
+  --component com.badwatch.badwatch/com.badwatch.app.MainActivity
+./wearos_tool.py screenshot --output artifacts/screenshots/home.png
+./wearos_tool.py dump-ui --parse
 ```
 
-Subcommands return JSON. For example, to capture a screenshot and dump the UI:
+Replace `Pixel_Watch_API_36` with the name reported by `avdmanager list avd`. If more than one
+device is connected, put the global selector before the subcommand:
+
 ```bash
-./wearos_tool.py screenshot --output /tmp/watch.png --base64
-./wearos_tool.py dump-ui --parse > /tmp/watch_ui.json
+./wearos_tool.py --serial emulator-5554 screenshot \
+  --output artifacts/screenshots/home-480.png
+./wearos_tool.py --serial emulator-5554 dump-ui --parse
+./wearos_tool.py stop-emulator --serial emulator-5554
 ```
-If multiple devices are connected, prepend `--serial <device-id>` before the subcommand to target a specific emulator.
 
-Artifacts captured without explicit paths are stored under `isolate/artifacts/`:
-- Emulator boot logs → `isolate/artifacts/logs/<avd>_<timestamp>.log`
-- Screenshots → `isolate/artifacts/screenshots/<serial>_<timestamp>.png`
+All non-server subcommands return a JSON object with either `"ok": true` and structured data or
+`"ok": false` and an error. Run `./wearos_tool.py --help` and the subcommand help for the full
+interface.
 
-## Current host limitation (`/dev/kvm` missing)
-While verifying the tool the emulator failed to boot because hardware acceleration is disabled:
-```
-ERROR | x86_64 emulation currently requires hardware acceleration!
-CPU acceleration status: /dev/kvm is not found: VT disabled in BIOS or KVM kernel module not loaded
-```
-(See `/tmp/Pixel_Watch_API_34_emulator.log` for the full log.)
+## Commands and artifacts
 
-### How to fix
-1. **If running directly on bare metal Linux:**
-   - Enable virtualization in BIOS/UEFI (Intel VT-x/AMD-V).
-   - Install KVM modules, e.g. on Ubuntu:
-     ```bash
-     sudo apt install qemu-kvm libvirt-daemon-system
-     sudo adduser $USER kvm
-     sudo adduser $USER libvirt
-     ```
-   - Log out/in to refresh group membership.
-2. **If running inside a VM (e.g., WSL2, cloud runner):**
-   - Ensure nested virtualization is enabled on the host hypervisor.
-   - For WSL2: `wsl --update` and enable nested virtualization via Hyper-V settings.
-3. Reboot the host or VM, then confirm `/dev/kvm` exists:
-   ```bash
-   ls -l /dev/kvm
-   ```
+- `start-emulator`, `wait-for-boot`, and `stop-emulator` manage the AVD lifecycle.
+- `install-apk` and `launch-activity` install and open a build.
+- `tap`, `swipe`, `input-text`, and `keyevent` provide deterministic input primitives.
+- `screenshot` and `dump-ui --parse` capture visual and accessibility-tree state.
+- `logcat --clear` retrieves logs; `adb` passes an arbitrary subcommand through.
+- `serve-artifacts` exposes a chosen directory over HTTP until interrupted.
 
-Once `/dev/kvm` is present the emulator should boot successfully when you rerun:
+Without explicit output paths, emulator logs are written to `isolate/artifacts/logs/` and
+screenshots to `isolate/artifacts/screenshots/`. The repository does not currently contain a
+checked-in release screenshot suite. Generated files count as release evidence only when retained
+under a named release-candidate directory and referenced from the validation ledger.
+
+The artifact server defaults to loopback:
+
 ```bash
-PATH=${SDK_ROOT}/emulator:${SDK_ROOT}/platform-tools:$PATH \
-./wearos_tool.py start-emulator --avd Pixel_Watch_API_34 --gpu swiftshader_indirect --wait
+./wearos_tool.py serve-artifacts --port 8080
 ```
 
-## Verification after enabling KVM
-With `/dev/kvm` available we ran the full loop:
-
-1. Booted the headless emulator (command above) — it reported success and logged output to `/tmp/Pixel_Watch_API_34_emulator.log`.
-2. Confirmed the device was visible via `adb devices` (`emulator-5554	device`).
-3. Captured a screenshot:
-   ```bash
-   ./wearos_tool.py --serial emulator-5554 screenshot --output /tmp/watch.png --base64
-   ```
-   The JSON response included `bytes: 7906` and `saved_to: /tmp/watch.png`.
-4. Dumped the UI hierarchy with parsing:
-   ```bash
-   ./wearos_tool.py --serial emulator-5554 dump-ui --parse
-   ```
-   The tool normalises the XML (trims `uiautomator` footer lines) and returns a `nodes` array containing bounds/text metadata for each element.
-5. Stopped the emulator cleanly:
-   ```bash
-   ./wearos_tool.py stop-emulator --serial emulator-5554
-   ```
-
-This confirms the helper works end-to-end when hardware acceleration is enabled.
-
-## Serving artifacts via HTTP
-To browse logs or screenshots quickly, start the built-in file server (runs until you press Ctrl+C):
-```bash
-./wearos_tool.py serve-artifacts --host 0.0.0.0 --port 8080
-```
-The command prints the URL in JSON (`http://0.0.0.0:8080/`) and serves the `isolate/artifacts/` directory. Use `--directory <path>` to serve a different folder.
-
-## Suggested verification flow (after enabling KVM)
-1. Boot the emulator with `start-emulator --wait`.
-2. Use `wait-for-boot` if invoking `start-emulator` without `--wait`.
-3. Install and launch the app:
-   ```bash
-   ./wearos_tool.py install-apk --apk ../app/build/outputs/apk/debug/app-debug.apk
-   ./wearos_tool.py launch-activity --component com.badwatch.badwatch/.BadWatchActivity
-   ```
-4. Capture state via `screenshot` and `dump-ui`.
-5. After tests, terminate with:
-   ```bash
-   ./wearos_tool.py stop-emulator --serial emulator-5554
-   ```
-
-This workflow gives agents or scripts full control over the Wear OS app lifecycle without opening Android Studio.
+Use `--host 0.0.0.0` only when deliberate LAN exposure is appropriate; the helper has no
+authentication. Emulator evidence can catch clipping, navigation, and basic accessibility-tree
+regressions, but it cannot establish real-watch touch comfort, ambient behavior, Health Services
+compatibility, or battery endurance.

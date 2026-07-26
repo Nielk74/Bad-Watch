@@ -21,6 +21,12 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v3
 
+      - name: Verify data tooling
+        run: |
+          python3 -m unittest discover -s tools -p 'test_*.py' -v
+          python3 -m py_compile tools/ingest.py tools/train.py \
+            tooling/wear_session_probe.py tooling/wear_recovery_probe.py
+
       # Keep this identical to the release gate: app JVM tests are easy to accidentally
       # skip when only :core and :server are named explicitly.
       - name: Release-quality gate

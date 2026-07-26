@@ -26,6 +26,10 @@ else
   printf '\n## [%s] - %s\n- Describe changes.\n' "$VERSION" "$(date +%Y-%m-%d)" >> CHANGELOG.md
 fi
 
+python3 -m unittest discover -s tools -p 'test_*.py' -v
+python3 -m py_compile tools/ingest.py tools/train.py \
+  tooling/wear_session_probe.py tooling/wear_recovery_probe.py
+
 ./gradlew test :app:lintDebug :app:assembleDebug :app:assembleRelease \
   --stacktrace --no-daemon
 

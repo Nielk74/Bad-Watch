@@ -1,6 +1,7 @@
 package com.badwatch.core.insight
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /**
  * One observation about a session.
@@ -21,7 +22,9 @@ data class Insight(
     val detail: String,
     val severity: InsightSeverity,
     /** The measurement behind the claim, e.g. "1:3.8 estimated active:rest". */
-    val evidence: String
+    val evidence: String,
+    /** Runtime-only structured values used to localize the same evidenced claim on-device. */
+    @Transient val localizationArgs: Map<String, String> = emptyMap()
 )
 
 @Serializable
@@ -32,16 +35,15 @@ enum class InsightSeverity {
     /** Stands out against this player's own history or against the sport's norms. */
     Notable,
 
-    /** Suggests backing off — fatigue, or a load spike. */
+    /** A directly observed caution; never a fatigue, readiness, or injury diagnosis. */
     Caution
 }
 
 /**
  * What "normal" looks like for this player, derived from their previous sessions.
  *
- * Comparisons against a player's own history are far more meaningful than against
- * population norms, so most rules prefer this and fall back to sport-wide ranges only when
- * there is not enough history yet.
+ * Comparisons against a player's own like-for-like history are more meaningful than mixed
+ * population norms, so rules prefer this and otherwise stay descriptive.
  */
 @Serializable
 data class InsightBaseline(

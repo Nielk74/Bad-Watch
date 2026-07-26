@@ -75,15 +75,32 @@ estimate remains an estimate.
 
 **Heart-rate coverage**
 : The approximate share of elapsed seconds for which the optical sensor supplied a distinct
-  reading. Average, peak, reserve, drift, and recovery interpretations must be withheld when
-  coverage is insufficient for the relevant window. Repeating one optical reading across
-  100 Hz motion samples does not create 100 heart-rate observations.
+  reading. Recorded average and peak BPM may still be shown with their sample count and
+  coverage; reserve, drift, and recovery interpretations must be withheld when coverage is
+  insufficient for the relevant window. Repeating one optical reading across 100 Hz motion
+  samples does not create 100 heart-rate observations.
+
+**Heart-rate profile provenance**
+: Resting and maximum heart rate each carry an explicit source. Legacy numeric defaults are
+  compatibility placeholders, not player configuration. Zones require a configured maximum;
+  reserve-based metrics require both configured resting and maximum values. With no configured
+  profile, Bad Watch keeps the measured BPM trace, average, and peak but withholds personalized
+  physiology. An optional adult age (18–100) supplies the population estimate
+  `208 − 0.7 × age` from [Tanaka et al.](https://pubmed.ncbi.nlm.nih.gov/11153730/); it is labelled
+  estimated, not measured, and an exact entered maximum overrides it.
 
 **Cardiovascular load**
 : The currently transparent internal-load proxy: session minutes multiplied by mean
-  heart-rate reserve. It is withheld below 60% optical-signal coverage rather than
-  extrapolated from a sparse reading. It is not calories, training effect, readiness,
-  tissue load, or injury risk. Its inputs and missing-data state must remain visible.
+  heart-rate reserve. It requires explicitly sourced resting and maximum heart rate and is
+  withheld below 60% optical-signal coverage rather than extrapolated from a sparse reading.
+  It is not calories, training effect, readiness, tissue load, or injury risk. Its inputs and
+  missing-data state must remain visible.
+
+**Legacy recovery, fatigue, and effort scores**
+: `TrainingSummary.recoveryScore`, `fatigueScore`, and `effortScore` remain in schema 1 only
+  so stored sessions continue to decode. They never had validated definitions and must not be
+  interpreted, displayed, or used as model inputs. Current live and synthetic producers write
+  zero. Measured HR reserve and player-reported RPE remain separate, explicitly named signals.
 
 ## What one racket-wrist watch can and cannot know
 
@@ -194,8 +211,8 @@ Recommended profile dimensions are:
 - **Detected-play volume:** hits and kept exchanges, with detector coverage caveats;
 - **Exchange persistence:** median and upper-quartile detected hits per exchange;
 - **Tempo:** detected-hit rate inside estimated active spans;
-- **Cardiovascular response:** HR reserve and between-burst recovery only with adequate HR
-  coverage and comparable session structure;
+- **Cardiovascular response:** HR reserve and between-burst recovery only with configured
+  physiological inputs, adequate HR coverage, and comparable session structure;
 - **Repeatability:** session-to-session variability within one context;
 - **Late-session change:** change in observed tempo or motion intensity, described without
   claiming the cause is fatigue;
@@ -260,7 +277,8 @@ store complementary signals instead of collapsing them into a magic readiness sc
 
 - **External diary:** duration, estimated active span, detected-hit volume, drill repetitions,
   and manually entered match/drill structure;
-- **Internal response:** heart-rate trace and transparent HR-reserve load when coverage allows;
+- **Internal response:** measured heart-rate trace, plus transparent HR-reserve load only when
+  the physiological profile is explicitly configured and coverage allows;
 - **Player report:** post-session RPE on a 0–10 scale, soreness/pain location and severity,
   sleep/wellbeing if entered, and a note;
 - **Context:** discipline, session mode, completion, and equipment/environment changes.
@@ -372,3 +390,4 @@ better product than a precise-looking fiction.
 | Badminton injuries | [2025 systematic review](https://bmjopensem.bmj.com/content/11/1/e002127) | Injury patterns and evidence uncertainty | Personal injury prediction |
 | ACWR limits | [conceptual critique](https://pubmed.ncbi.nlm.nih.gov/32502973/) | Avoid causal zones and alarms | Universal safe workload bands |
 | Wearable calories | [systematic review](https://pubmed.ncbi.nlm.nih.gov/35060915/) | Energy estimates have material error | Precision calorie claims |
+| Age-estimated maximum HR | [Tanaka et al.](https://pubmed.ncbi.nlm.nih.gov/11153730/) | Adult population estimate `208 − 0.7 × age` | An individual's measured maximum |

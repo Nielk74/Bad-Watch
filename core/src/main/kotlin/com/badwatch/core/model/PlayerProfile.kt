@@ -33,28 +33,84 @@ enum class WristPlacement {
 }
 
 /**
- * Per-player calibration inputs. Defaults are reasonable for a club-level adult player.
+ * The player's own description of their badminton background.
+ *
+ * A single wrist cannot infer global playing level: coaching, movement, tactics and match
+ * context are largely outside its view. Keeping this self-reported prevents sensor-derived
+ * activity from being presented as a skill ranking.
+ */
+@Serializable
+enum class SelfReportedExperience {
+    Unspecified,
+    NewPlayer,
+    Recreational,
+    Club,
+    Competitive
+}
+
+/**
+ * Provenance for one physiological profile value.
+ *
+ * Numeric compatibility defaults remain present in [PlayerProfile], but [Unconfigured] makes
+ * it explicit that they are placeholders and cannot authorize personalized zones or reserve
+ * calculations. Sources other than [Unconfigured] require an affirmative configuration or
+ * import action by the player/application.
+ */
+@Serializable
+enum class HeartRateValueSource {
+    Unconfigured,
+    UserEntered,
+    AgeEstimated,
+    HealthPlatform,
+    /** Explicit developer/demo data; never inferred for a real player. */
+    Synthetic;
+
+    val isConfigured: Boolean get() = this != Unconfigured
+}
+
+/**
+ * Per-player calibration inputs. The numeric physiological defaults retain wire/source
+ * compatibility, but their provenance defaults to [HeartRateValueSource.Unconfigured]. They
+ * must not be used for personalized physiology until the corresponding source is configured.
+ * Experience likewise remains explicitly unspecified until the player reports it.
  *
  * @property handedness Racket hand, used to mirror motion features.
- * @property restingHeartRate Baseline used for load and effort normalisation.
- * @property maxHeartRate Estimated max HR. Defaults to the 208 - 0.7*age formula at age 30.
+ * @property restingHeartRate Compatibility placeholder or configured baseline BPM.
+ * @property maxHeartRate Compatibility placeholder or configured/estimated maximum BPM.
  * @property wristPlacement Always [WristPlacement.Dominant]; see the enum docs.
+ * @property experience Player-reported background, never inferred from watch motion.
  */
 @Serializable
 data class PlayerProfile(
     val handedness: Handedness = Handedness.Right,
     val restingHeartRate: Float = 60f,
     val maxHeartRate: Float = 187f,
-    val wristPlacement: WristPlacement = WristPlacement.Dominant
+    val wristPlacement: WristPlacement = WristPlacement.Dominant,
+    val experience: SelfReportedExperience = SelfReportedExperience.Unspecified,
+    val restingHeartRateSource: HeartRateValueSource = HeartRateValueSource.Unconfigured,
+    val maxHeartRateSource: HeartRateValueSource = HeartRateValueSource.Unconfigured
 ) {
     init {
         require(maxHeartRate > restingHeartRate) {
             "maxHeartRate ($maxHeartRate) must exceed restingHeartRate ($restingHeartRate)"
         }
+        require(restingHeartRateSource != HeartRateValueSource.AgeEstimated) {
+            "Resting heart rate cannot be age-estimated"
+        }
     }
 
+    val hasConfiguredRestingHeartRate: Boolean
+        get() = restingHeartRateSource.isConfigured
+
+    val hasConfiguredMaxHeartRate: Boolean
+        get() = maxHeartRateSource.isConfigured
+
+    /** Both endpoints are configured, so heart-rate reserve calculations are meaningful. */
+    val hasConfiguredHeartRateReserve: Boolean
+        get() = hasConfiguredRestingHeartRate && hasConfiguredMaxHeartRate
+
     companion object {
-        /** Age-based max HR estimate (Tanaka et al.), the standard used by most wearables. */
+        /** Tanaka et al. age-based maximum-HR estimate for healthy adults. */
         fun maxHeartRateForAge(ageYears: Int): Float = 208f - 0.7f * ageYears
     }
 }

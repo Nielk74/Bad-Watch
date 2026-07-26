@@ -1,11 +1,23 @@
 package com.badwatch.server
 
 import com.badwatch.core.insight.Insight
-import com.badwatch.core.insight.InsightBaselineBuilder
 import com.badwatch.core.insight.SessionInsightEngine
 import com.badwatch.core.model.ShotType
 import com.badwatch.core.model.MINIMUM_CARDIOVASCULAR_LOAD_COVERAGE
+import com.badwatch.core.model.RallyProfile
+import com.badwatch.core.model.TrainingSession
+import com.badwatch.core.sync.ActivityMode
+import com.badwatch.core.sync.EffectiveSessionMetrics
+import com.badwatch.core.sync.PostSessionReport
+import com.badwatch.core.sync.RecordingQuality
+import com.badwatch.core.sync.ReviewedSessionAnalysis
+import com.badwatch.core.sync.SessionComparisonKey
+import com.badwatch.core.sync.SessionCompletion
+import com.badwatch.core.sync.SessionContext
 import com.badwatch.core.sync.SessionExport
+import com.badwatch.core.sync.comparisonKey
+import com.badwatch.core.sync.reviewedAnalysis
+import com.badwatch.core.sync.reviewedInsightBaseline
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
 
@@ -28,7 +40,31 @@ data class DashboardData(
     val shotDistribution: List<ShotSlice>,
     val rallyHistogram: List<HistogramBucket>,
     val sessions: List<SessionCard>,
-    val volumeTrend: List<VolumePoint>
+    val volumeTrend: List<VolumePoint>,
+    /** The selection used to produce every aggregate above. */
+    val appliedFilter: SessionAnalyticsFilter = SessionAnalyticsFilter(),
+    /** Available like-for-like groups across the unfiltered input corpus. */
+    val comparisonGroups: List<SessionComparisonGroup> = emptyList()
+)
+
+/**
+ * Optional server-side diary selection. Empty sets mean "all"; [comparisonTag] is matched
+ * after trimming and case-folding with the same rules used by [SessionComparisonKey].
+ */
+@Serializable
+data class SessionAnalyticsFilter(
+    val activityModes: Set<ActivityMode> = emptySet(),
+    val comparisonTag: String? = null,
+    val completions: Set<SessionCompletion> = emptySet(),
+    val recordingQualities: Set<RecordingQuality> = emptySet()
+)
+
+/** Count of sessions that can be considered together without crossing activity contexts. */
+@Serializable
+data class SessionComparisonGroup(
+    val key: SessionComparisonKey,
+    val sessionCount: Int,
+    val baselineEligible: Boolean
 )
 
 @Serializable
@@ -54,14 +90,42 @@ data class SessionCard(
     val estimatedActiveMillis: Long,
     /** Share of elapsed seconds represented by a distinct optical heart-rate reading. */
     val heartRateCoverage: Float,
-    /** Elapsed minutes x mean heart-rate reserve; null unless optical HR was measured. */
+    /**
+     * Elapsed minutes x mean heart-rate reserve; null unless optical HR was measured and
+     * both physiological profile inputs have explicit provenance.
+     */
     val cardiovascularLoad: Float?,
     val shotDistribution: List<ShotSlice>,
     /**
      * Derived by the same `:core` engine the watch uses, so a session never carries two
      * different readings depending on where you look at it.
      */
-    val insights: List<Insight> = emptyList()
+    val insights: List<Insight> = emptyList(),
+    /** Reported context and subjective feedback are never inferred by server analytics. */
+    val context: SessionContext = SessionContext(),
+    val report: PostSessionReport = PostSessionReport(),
+    /** Transparent view of edits while raw session/model output remains available by id. */
+    val effectiveMetrics: EffectiveSessionMetrics? = null,
+    val comparisonKey: SessionComparisonKey = SessionComparisonKey(ActivityMode.Unspecified),
+    val correctionRevisionCount: Int = 0
+)
+
+/**
+ * Browser detail envelope: reviewed values lead, while [raw] remains the immutable audit record.
+ */
+@Serializable
+data class SessionDetailData(
+    val raw: SessionExport,
+    val reviewed: ReviewedSessionDetail
+)
+
+/** Timestamp-backed reviewed values safe to use for detail metrics, charts, and insights. */
+@Serializable
+data class ReviewedSessionDetail(
+    val session: TrainingSession,
+    val rallyProfile: RallyProfile,
+    val effectiveMetrics: EffectiveSessionMetrics,
+    val insights: List<Insight>
 )
 
 /**
@@ -92,8 +156,13 @@ object Analytics {
 
     private const val DAY_MILLIS = 24L * 60 * 60 * 1000
 
-    fun build(sessions: List<SessionExport>): DashboardData {
-        if (sessions.isEmpty()) {
+    fun build(
+        sessions: List<SessionExport>,
+        filter: SessionAnalyticsFilter = SessionAnalyticsFilter()
+    ): DashboardData {
+        val comparisonGroups = buildComparisonGroups(sessions)
+        val selectedSessions = sessions.filter { matchesFilter(it, filter) }
+        if (selectedSessions.isEmpty()) {
             return DashboardData(
                 sessionCount = 0,
                 totalShots = 0,
@@ -105,25 +174,32 @@ object Analytics {
                 shotDistribution = emptyList(),
                 rallyHistogram = emptyList(),
                 sessions = emptyList(),
-                volumeTrend = emptyList()
+                volumeTrend = emptyList(),
+                appliedFilter = canonicalize(filter),
+                comparisonGroups = comparisonGroups
             )
         }
 
-        val cards = sessions
-            .map { toCard(it, sessions) }
+        val reviewedSessions = selectedSessions.map { export ->
+            export to export.reviewedAnalysis()
+        }
+        val cards = reviewedSessions
+            .map { (export, analysis) -> toCard(export, sessions, analysis) }
             .sortedByDescending { it.startedAtMillis }
 
-        val allRallies = sessions.flatMap { it.rallyProfile.rallies }
-        val distribution = sessions
-            .flatMap { it.session.summary.shotCounts.entries }
-            .groupBy({ it.key }, { it.value })
-            .mapValues { (_, counts) -> counts.sum() }
+        val allRallies = reviewedSessions.flatMap { (_, analysis) ->
+            analysis.rallyProfile.rallies
+        }
+        val distribution = reviewedSessions
+            .flatMap { (_, analysis) -> analysis.detectedHits }
+            .groupingBy { event -> event.type }
+            .eachCount()
 
         return DashboardData(
-            sessionCount = sessions.size,
-            totalShots = sessions.sumOf { it.session.summary.totalShots },
-            totalPlayingMillis = sessions.sumOf { it.rallyProfile.totalWorkMillis },
-            totalElapsedMillis = sessions.sumOf { it.session.summary.durationMillis },
+            sessionCount = selectedSessions.size,
+            totalShots = cards.sumOf { it.totalShots },
+            totalPlayingMillis = cards.sumOf { it.estimatedActiveMillis },
+            totalElapsedMillis = cards.sumOf { it.durationMillis },
             averageRestRatio = cards.map { it.restRatio }.filter { it > 0f }.averageOrZero(),
             averageRallyShots = if (allRallies.isEmpty()) 0f else
                 allRallies.sumOf { it.shotCount }.toFloat() / allRallies.size,
@@ -134,7 +210,27 @@ object Analytics {
                 },
             rallyHistogram = buildRallyHistogram(allRallies.map { it.shotCount }),
             sessions = cards,
-            volumeTrend = buildVolumeTrend(cards)
+            volumeTrend = buildVolumeTrend(cards),
+            appliedFilter = canonicalize(filter),
+            comparisonGroups = comparisonGroups
+        )
+    }
+
+    fun detail(export: SessionExport, history: List<SessionExport>): SessionDetailData {
+        val analysis = export.reviewedAnalysis()
+        val baseline = export.reviewedInsightBaseline(history)
+        return SessionDetailData(
+            raw = export,
+            reviewed = ReviewedSessionDetail(
+                session = analysis.session,
+                rallyProfile = analysis.rallyProfile,
+                effectiveMetrics = analysis.metrics,
+                insights = insightEngine.generate(
+                    session = analysis.session,
+                    rallyProfile = analysis.rallyProfile,
+                    baseline = baseline
+                )
+            )
         )
     }
 
@@ -149,40 +245,81 @@ object Analytics {
 
     private val insightEngine = SessionInsightEngine()
 
-    private fun toCard(export: SessionExport, history: List<SessionExport>): SessionCard {
-        val summary = export.session.summary
-        // Baseline uses only sessions that came *before* this one: judging a session against
-        // data from its own future would make the same session read differently over time.
-        val baseline = InsightBaselineBuilder.build(
-            history
-                .filter { it.session.startedAtMillis < export.session.startedAtMillis }
-                .map { it.rallyProfile }
-        )
+    private fun toCard(
+        export: SessionExport,
+        history: List<SessionExport>,
+        analysis: ReviewedSessionAnalysis
+    ): SessionCard {
+        val summary = analysis.session.summary
+        val rallies = analysis.rallyProfile
+        val baseline = export.reviewedInsightBaseline(history)
+        val effectiveMetrics = analysis.metrics
         return SessionCard(
             id = export.session.id,
             startedAtMillis = export.session.startedAtMillis,
             durationMillis = summary.durationMillis,
             totalShots = summary.totalShots,
-            rallyCount = export.rallyProfile.rallyCount,
-            averageRallyShots = export.rallyProfile.averageShotsPerRally,
-            restRatio = export.rallyProfile.restRatio,
-            workDensity = export.rallyProfile.workDensity,
+            rallyCount = rallies.rallyCount,
+            averageRallyShots = rallies.averageShotsPerRally,
+            restRatio = rallies.restRatio,
+            workDensity = rallies.workDensity,
             averageHeartRate = summary.averageHeartRate,
             maxHeartRate = summary.maxHeartRate,
-            estimatedActiveMillis = export.rallyProfile.totalWorkMillis,
+            estimatedActiveMillis = rallies.totalWorkMillis,
             heartRateCoverage = summary.heartRateCoverage.coerceIn(0f, 1f),
             // Old sessions can contain contact-time HR values but no distinct optical-sensor
-            // record. Only expose internal load when the recorder proves it measured HR.
+            // record. Numeric profile defaults also used to look configured. Only expose
+            // internal load when both the measurement and profile provenance are explicit.
             cardiovascularLoad = summary.cardiovascularLoad?.takeIf {
-                summary.heartRateSampleCount > 0 &&
+                export.profile.hasConfiguredHeartRateReserve &&
+                    summary.heartRateSampleCount > 0 &&
                     summary.heartRateCoverage >= MINIMUM_CARDIOVASCULAR_LOAD_COVERAGE
             },
             shotDistribution = shotOrder.mapNotNull { type ->
                 summary.shotCounts[type]?.takeIf { it > 0 }?.let { ShotSlice(type.name, it) }
             },
-            insights = insightEngine.generate(export.session, export.rallyProfile, baseline)
+            insights = insightEngine.generate(analysis.session, rallies, baseline),
+            context = export.context,
+            report = export.report,
+            effectiveMetrics = effectiveMetrics,
+            comparisonKey = export.context.comparisonKey(),
+            correctionRevisionCount = export.corrections.hitRevisions.size +
+                export.corrections.trimRevisions.size
         )
     }
+
+    private fun buildComparisonGroups(
+        sessions: List<SessionExport>
+    ): List<SessionComparisonGroup> = sessions
+        .groupingBy { it.context.comparisonKey() }
+        .eachCount()
+        .map { (key, count) ->
+            SessionComparisonGroup(
+                key = key,
+                sessionCount = count,
+                baselineEligible = key.baselineEligible
+            )
+        }
+        .sortedWith(compareBy({ it.key.activityMode.ordinal }, { it.key.comparisonTag.orEmpty() }))
+
+    private fun matchesFilter(
+        export: SessionExport,
+        filter: SessionAnalyticsFilter
+    ): Boolean {
+        val context = export.context
+        val canonicalTag = canonicalTag(filter.comparisonTag)
+        return (filter.activityModes.isEmpty() || context.activityMode in filter.activityModes) &&
+            (canonicalTag == null || context.comparisonKey().comparisonTag == canonicalTag) &&
+            (filter.completions.isEmpty() || context.completion in filter.completions) &&
+            (filter.recordingQualities.isEmpty() ||
+                context.recordingQuality in filter.recordingQualities)
+    }
+
+    private fun canonicalize(filter: SessionAnalyticsFilter): SessionAnalyticsFilter =
+        filter.copy(comparisonTag = canonicalTag(filter.comparisonTag))
+
+    private fun canonicalTag(value: String?): String? =
+        value?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
 
     private fun buildRallyHistogram(shotCounts: List<Int>): List<HistogramBucket> {
         if (shotCounts.isEmpty()) return emptyList()

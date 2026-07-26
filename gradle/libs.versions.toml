@@ -13,10 +13,13 @@ androidxWearCompose = "1.6.2"
 androidxWearTiles = "1.3.0"
 androidxWear = "1.4.0"
 androidxFragment = "1.8.5"
+androidxHealthServices = "1.1.0-rc02"
+androidxWatchface = "1.2.1"
 composeBom = "2026.01.01"
 coroutines = "1.8.1"
 coroutinesTest = "1.8.1"
 dokka = "1.9.20"
+guava = "32.0.1-android"
 junit = "4.13.2"
 kotlin = "2.2.21"
 kotlinSerialization = "1.6.3"
@@ -49,6 +52,8 @@ androidx-wear-tiles = { group = "androidx.wear.tiles", name = "tiles", version.r
 androidx-protolayout-material = { group = "androidx.wear.protolayout", name = "protolayout-material", version.ref = "androidxProtolayout" }
 androidx-wear = { group = "androidx.wear", name = "wear", version.ref = "androidxWear" }
 androidx-fragment = { group = "androidx.fragment", name = "fragment", version.ref = "androidxFragment" }
+androidx-health-services = { group = "androidx.health", name = "health-services-client", version.ref = "androidxHealthServices" }
+androidx-watchface-complications-data-source-ktx = { group = "androidx.wear.watchface", name = "watchface-complications-data-source-ktx", version.ref = "androidxWatchface" }
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 compose-ui = { group = "androidx.compose.ui", name = "ui" }
 compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
@@ -69,6 +74,7 @@ androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit-ktx", ver
 espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version = "3.5.1" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 google-truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
+guava-android = { group = "com.google.guava", name = "guava", version.ref = "guava" }
 
 [bundles]
 compose = ["compose-ui", "compose-ui-tooling-preview", "compose-material3", "compose-material-icons"]

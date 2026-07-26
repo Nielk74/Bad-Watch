@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Réglages</string>
+    <string name="settings_left_handed">Gaucher</string>
+    <string name="settings_hit_haptics">Vibrations sur les frappes</string>
+    <string name="settings_hit_haptics_on">Vibrer à chaque frappe détectée</string>
+    <string name="settings_hit_haptics_off">Désactivées · aucune vibration en jeu</string>
+    <string name="settings_playing_background">Expérience de jeu</string>
+    <string name="settings_experience_caveat">Uniquement déclarée par vous. Le mouvement du poignet ne détermine pas votre niveau global.</string>
+    <string name="settings_hr_profile">Profil de fréquence cardiaque</string>
+    <string name="settings_hr_explanation">Les zones personnalisées nécessitent l’âge ou une FC maximale. La réserve cardiaque nécessite une FC maximale et une FC au repos.</string>
+    <string name="settings_age_endpoint">Âge pour la FC max.</string>
+    <plurals name="settings_age_configured">
+        <item quantity="one">%1$d an · max. estimée %2$d bpm</item>
+        <item quantity="many">%1$d ans · max. estimée %2$d bpm</item>
+        <item quantity="other">%1$d ans · max. estimée %2$d bpm</item>
+    </plurals>
+    <plurals name="settings_age_overridden">
+        <item quantity="one">%1$d an · estimation remplacée par la FC max. exacte</item>
+        <item quantity="many">%1$d ans · estimation remplacée par la FC max. exacte</item>
+        <item quantity="other">%1$d ans · estimation remplacée par la FC max. exacte</item>
+    </plurals>
+    <string name="settings_resting_endpoint">FC au repos</string>
+    <string name="settings_max_endpoint">FC maximale exacte</string>
+    <string name="settings_not_configured">Non configuré</string>
+    <string name="settings_set_age_default">Définir l’âge à 30 ans</string>
+    <string name="settings_set_resting_default">Définir la FC au repos à 60</string>
+    <string name="settings_set_max_default">Définir la FC max. exacte à 187</string>
+    <plurals name="settings_age_value">
+        <item quantity="one">%1$d an</item>
+        <item quantity="many">%1$d ans</item>
+        <item quantity="other">%1$d ans</item>
+    </plurals>
+    <string name="settings_resting_value">%1$d bpm</string>
+    <string name="settings_max_value">%1$d bpm · remplace l’estimation par âge</string>
+    <string name="settings_clear_hr_profile">Effacer le profil cardiaque</string>
+    <string name="settings_dashboard">Tableau de bord</string>
+    <string name="settings_dashboard_not_configured">Non configuré</string>
+    <string name="settings_dashboard_intro">Touchez pour configurer et tester. Les séances restent sur la montre tant que votre serveur auto-hébergé est inaccessible.</string>
+    <string name="settings_share_drills">Partager les exercices de détection</string>
+    <string name="settings_share_drills_on">Les nouvelles fenêtres de mouvements bruts peuvent être synchronisées avec votre serveur auto-hébergé</string>
+    <string name="settings_share_drills_off">Désactivé · les mouvements bruts restent sur cette montre</string>
+    <string name="settings_raw_motion">Mouvements bruts</string>
+    <string name="settings_raw_motion_caveat">Désactivé par défaut. L’activation s’applique uniquement aux nouveaux exercices étiquetés ; les anciennes captures locales ne seront jamais envoyées ultérieurement.</string>
+    <string name="settings_wrist">Poignet</string>
+    <string name="settings_wrist_caveat">Uniquement la main de la raquette. Bad Watch lit le geste ; l’autre poignet ne peut donc pas produire de données de frappe.</string>
+    <string name="tile_empty">Aucune séance · démarrez-en une sur la montre</string>
+    <string name="tile_last">Dernière : %1$s · %2$s · %3$s</string>
+    <string name="tile_this_week">Cette semaine : %1$s · %2$s</string>
+    <string name="tile_start">Démarrer</string>
+    <string name="complication_no_play">AUCUN JEU</string>
+    <string name="complication_short_title">FRAPPES 7 J</string>
+    <string name="complication_long_title">BAD WATCH · FRAPPES SUR 7 JOURS</string>
+    <string name="complication_no_sessions">Aucune séance au cours des 7 derniers jours</string>
+    <string name="complication_long_text">%1$s · %2$s · 7 jours</string>
+    <string name="complication_empty_description">Aucune séance de badminton enregistrée au cours des 7 derniers jours</string>
+    <string name="complication_description">%1$s sur %2$s au cours des 7 derniers jours</string>
+    <plurals name="complication_corrected_hits">
+        <item quantity="one">%d frappe détectée corrigée</item>
+        <item quantity="many">%d frappes détectées corrigées</item>
+        <item quantity="other">%d frappes détectées corrigées</item>
+    </plurals>
+</resources>

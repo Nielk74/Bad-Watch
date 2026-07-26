@@ -11,6 +11,12 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.badwatch.app.BadWatchApplication
+import com.badwatch.app.data.CaptureStore
+import com.badwatch.app.data.SessionStore
+import com.badwatch.core.sync.CaptureExport
+import com.badwatch.core.sync.SessionExport
+import com.badwatch.core.sync.SyncResponse
+import com.badwatch.core.sync.isEligibleForModelTrainingUpload
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
@@ -32,47 +38,32 @@ class SyncWorker(
             ?: return Result.success() // No dashboard configured; nothing to do.
         val token = container.settingsStore.dashboardToken.first()
 
-        // Captures upload separately and are strictly secondary: a failure here must not
-        // hold up session sync, which is the thing the player actually sees.
-        val pendingCaptures = container.captureStore.unsynced()
-        if (pendingCaptures.isNotEmpty()) {
-            container.dashboardClient.uploadCaptures(
-                baseUrl = baseUrl,
-                token = token,
-                captures = pendingCaptures.map { it.export }
-            ).fold(
-                onSuccess = { container.captureStore.markSynced(it.accepted) },
-                onFailure = { Log.w(TAG, "Capture upload failed; will retry", it) }
-            )
-        }
-
-        val pending = container.sessionStore.unsynced()
-        if (pending.isEmpty()) return Result.success()
-
-        val outcome = container.dashboardClient.upload(
-            baseUrl = baseUrl,
-            token = token,
-            sessions = pending.map { it.export }
-        )
-
-        return outcome.fold(
-            onSuccess = { response ->
-                container.sessionStore.markSynced(response.accepted)
-                // A session the server explicitly rejected will never succeed on retry, so
-                // only an empty acknowledgement (partial/failed delivery) warrants one.
-                if (response.accepted.isEmpty() && response.rejected.isEmpty()) {
-                    Result.retry()
-                } else {
-                    Result.success()
-                }
+        val outcome = syncPendingRecords(
+            captureStore = container.captureStore,
+            sessionStore = container.sessionStore,
+            uploadCaptures = { captures ->
+                container.dashboardClient.uploadCaptures(baseUrl, token, captures)
             },
-            onFailure = { cause ->
-                // Without this the only symptom of a misconfigured dashboard is a silent
-                // RETRY in the WorkManager log, which is close to undebuggable.
-                Log.w(TAG, "Sync to $baseUrl failed (attempt $runAttemptCount)", cause)
-                if (runAttemptCount >= MAX_ATTEMPTS) Result.failure() else Result.retry()
+            uploadSessions = { sessions ->
+                container.dashboardClient.upload(baseUrl, token, sessions)
+            },
+            onCaptureFailure = { cause ->
+                // Captures are secondary: their transport/storage failure never blocks the
+                // player's session diary from syncing in the same pass.
+                Log.w(TAG, "Capture upload failed; remains pending", cause)
             }
         )
+
+        return when (outcome) {
+            PendingSyncOutcome.Complete -> Result.success()
+            PendingSyncOutcome.EmptyAcknowledgement -> Result.retry()
+            is PendingSyncOutcome.Failed -> {
+                // Without this the only symptom of a misconfigured dashboard is a silent
+                // RETRY in the WorkManager log, which is close to undebuggable.
+                Log.w(TAG, "Sync to $baseUrl failed (attempt $runAttemptCount)", outcome.cause)
+                if (runAttemptCount >= MAX_ATTEMPTS) Result.failure() else Result.retry()
+            }
+        }
     }
 
     companion object {
@@ -98,4 +89,62 @@ class SyncWorker(
             )
         }
     }
+}
+
+internal sealed interface PendingSyncOutcome {
+    data object Complete : PendingSyncOutcome
+    data object EmptyAcknowledgement : PendingSyncOutcome
+    data class Failed(val cause: Throwable) : PendingSyncOutcome
+}
+
+/**
+ * Platform-free sync pass used by [SyncWorker] and its JVM regressions.
+ *
+ * Explicit rejections are persisted against the uploaded payload snapshot. They therefore
+ * leave future [SessionStore.unsynced] and [CaptureStore.unsynced] batches until that exact
+ * payload changes, rather than being posted again on every WorkManager enqueue.
+ */
+internal suspend fun syncPendingRecords(
+    captureStore: CaptureStore,
+    sessionStore: SessionStore,
+    uploadCaptures: suspend (List<CaptureExport>) -> Result<SyncResponse>,
+    uploadSessions: suspend (List<SessionExport>) -> Result<SyncResponse>,
+    onCaptureFailure: (Throwable) -> Unit = {}
+): PendingSyncOutcome {
+    // Consent is immutable metadata on each capture. Enabling sharing today must never
+    // retroactively send raw motion recorded under the local-only default.
+    val pendingCaptures = captureStore.unsynced()
+        .filter { it.export.isEligibleForModelTrainingUpload }
+    if (pendingCaptures.isNotEmpty()) {
+        uploadCaptures(pendingCaptures.map { it.export }).fold(
+            onSuccess = { response ->
+                try {
+                    captureStore.applySyncResponse(pendingCaptures, response)
+                } catch (cause: Throwable) {
+                    onCaptureFailure(cause)
+                }
+            },
+            onFailure = onCaptureFailure
+        )
+    }
+
+    val pendingSessions = sessionStore.unsynced()
+    if (pendingSessions.isEmpty()) return PendingSyncOutcome.Complete
+
+    return uploadSessions(pendingSessions.map { it.export }).fold(
+        onSuccess = { response ->
+            runCatching { sessionStore.applySyncResponse(pendingSessions, response) }.fold(
+                onSuccess = {
+                    // Only a response which acknowledges no ID at all warrants a retry.
+                    if (response.accepted.isEmpty() && response.rejected.isEmpty()) {
+                        PendingSyncOutcome.EmptyAcknowledgement
+                    } else {
+                        PendingSyncOutcome.Complete
+                    }
+                },
+                onFailure = PendingSyncOutcome::Failed
+            )
+        },
+        onFailure = PendingSyncOutcome::Failed
+    )
 }

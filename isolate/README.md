@@ -1,38 +1,53 @@
-# Wear OS Agent Tooling
+# Wear OS agent tooling
 
-This folder contains a minimal, script-first toolkit for driving a Wear OS AVD without Android Studio. It wraps the Android command line tools in a JSON-speaking CLI so an LLM agent or shell script can launch an emulator, control the app, and capture visual/UI state.
+`wearos_tool.py` is a small JSON-speaking CLI for driving a Wear OS AVD without Android Studio.
+It wraps the Android command-line tools so scripts and agents can reproduce navigation, input,
+screenshots, UI-tree inspection, and log collection.
 
 ## Prerequisites
-- Android SDK with `platform-tools`, `emulator`, and a Wear OS system image installed
-- `adb` and `emulator` binaries on your `PATH`
-- Python 3.9+ (standard library only)
-- A Wear OS AVD created via `avdmanager` or the Device Manager (e.g. `Pixel_Watch_API_34`)
+
+- Python 3.9 or newer;
+- Android SDK `adb` and `emulator` on `PATH`;
+- a configured Wear OS AVD and working host acceleration.
+
+The app compiles and targets API 36. Use an emulator image appropriate to the scenario, while
+treating the 480×480 Pixel Watch 4 on Android 16 / API 36 as the physical release target.
 
 ## Quick start
+
+Build at the repository root, then run the helper from this directory:
+
 ```bash
+./gradlew :app:assembleDebug
 cd isolate
-./wearos_tool.py start-emulator --avd Pixel_Watch_API_34 --gpu swiftshader_indirect --wait
+./wearos_tool.py start-emulator --avd Pixel_Watch_API_36 --gpu swiftshader_indirect --wait
 ./wearos_tool.py install-apk --apk ../app/build/outputs/apk/debug/app-debug.apk
-./wearos_tool.py launch-activity --component com.badwatch.badwatch/.BadWatchActivity
-./wearos_tool.py screenshot --output latest.png --base64
+./wearos_tool.py launch-activity \
+  --component com.badwatch.badwatch/com.badwatch.app.MainActivity
+./wearos_tool.py screenshot --output artifacts/screenshots/home.png
 ./wearos_tool.py dump-ui --parse
 ```
 
-All commands emit JSON so downstream automation can parse structured results. See `./wearos_tool.py --help` for the full command list.
+Replace `Pixel_Watch_API_36` with an AVD reported by `avdmanager list avd`. With multiple devices,
+place the global serial selector before the subcommand:
 
-## Features
-- Headless emulator control (`start-emulator`, `stop-emulator`, `wait-for-boot`)
-- APK install and activity launch helpers
-- Input primitives (`tap`, `swipe`, `input-text`, `keyevent`)
-- UI inspection (`screenshot`, `dump-ui --parse`)
-- Log retrieval (`logcat --clear`)
-- HTTP file server for collected artifacts (`serve-artifacts`)
-- Escape hatch for arbitrary adb sub-commands (`adb <args>`).
+```bash
+./wearos_tool.py --serial emulator-5554 screenshot
+./wearos_tool.py --serial emulator-5554 logcat --output artifacts/logs/app.txt
+./wearos_tool.py stop-emulator --serial emulator-5554
+```
 
-Screenshots captured without `--output` are saved under `isolate/artifacts/screenshots/`, and emulator logs land in `isolate/artifacts/logs/` for easy inspection.
+## Available operations
 
-## Tips
-- `start-emulator` pipes emulator stdout/stderr to a log file in the OS temp directory for debugging boot issues.
-- Pass `--serial` to target a specific emulator/device (default is the first `adb` device).
-- Combine with OCR by feeding the base64 PNG into your vision model or an external `tesseract` invocation.
-- To script the full loop in CI, call `start-emulator --wait`, run your scenario with the other sub-commands, then finish with `stop-emulator`.
+- AVD lifecycle: `start-emulator`, `wait-for-boot`, `stop-emulator`
+- App lifecycle: `install-apk`, `launch-activity`
+- Input: `tap`, `swipe`, `input-text`, `keyevent`
+- Inspection: `screenshot`, `dump-ui --parse`, `logcat`
+- Escape hatch: `adb`
+- Local artifact browser: `serve-artifacts`
+
+Run `./wearos_tool.py --help` for the complete interface. Default logs and screenshots land under
+`isolate/artifacts/`; no release screenshot matrix is currently checked in. Retain and name any
+files used as evidence. Emulator output does not satisfy the physical-device, ambient, accessibility,
+Health Services, or 180-minute battery gates in
+[`docs/device-validation.md`](../docs/device-validation.md).

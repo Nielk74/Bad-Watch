@@ -18,9 +18,12 @@ import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
 import com.badwatch.app.MainActivity
+import com.badwatch.app.R
 import com.badwatch.app.data.SessionStore
 import com.badwatch.app.data.StoredSession
 import com.badwatch.app.ui.components.formatDuration
+import com.badwatch.core.sync.effectiveMetrics
+import com.badwatch.core.sync.reviewedAnalysis
 import com.google.common.util.concurrent.ListenableFuture
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -107,27 +110,56 @@ class BadWatchTileService : TileService() {
         deviceParameters: DeviceParameters,
         sessions: List<StoredSession>
     ): LayoutElementBuilders.LayoutElement {
-        // refresh() sorts newest first, matching what HomeScreen treats as "last session".
-        val last = sessions.firstOrNull()
-        val weekStart = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(7)
-        val week = sessions.filter { it.export.session.startedAtMillis >= weekStart }
+        // Home and Tile deliberately promote the same newest usable recording. Unusable
+        // evidence remains available in History but cannot become a trusted headline.
+        val selection = selectTileSessions(sessions, System.currentTimeMillis())
+        val last = selection.latest
+        val week = selection.rollingWeek
 
         val content: LayoutElementBuilders.LayoutElement = if (last == null) {
-            bodyText("No sessions yet — start one on the watch", color = COLOR_TEXT_DIM)
+            bodyText(getString(R.string.tile_empty), color = COLOR_TEXT_DIM)
         } else {
-            val summary = last.export.session.summary
+            val reviewed = last.export.reviewedAnalysis()
+            val hits = reviewed.metrics.correctedDetectedHitCount
+            val exchanges = reviewed.rallyProfile.rallyCount
             LayoutElementBuilders.Column.Builder()
                 .addContent(
                     bodyText(
-                        "Last: ${plural(summary.totalShots, "hit", "hits")} · " +
-                            plural(last.export.rallyProfile.rallyCount, "burst", "bursts") +
-                            " · ${formatDuration(summary.durationMillis)}"
+                        getString(
+                            R.string.tile_last,
+                            resources.getQuantityString(
+                                R.plurals.common_detected_hits_count,
+                                hits,
+                                hits
+                            ),
+                            resources.getQuantityString(
+                                R.plurals.common_exchanges_count,
+                                exchanges,
+                                exchanges
+                            ),
+                            formatDuration(reviewed.window.durationMillis)
+                        )
                     )
                 )
                 .addContent(
                     bodyText(
-                        "This week: ${plural(week.size, "session", "sessions")} · " +
-                            plural(week.sumOf { it.export.session.summary.totalShots }, "hit", "hits"),
+                        getString(
+                            R.string.tile_this_week,
+                            resources.getQuantityString(
+                                R.plurals.common_sessions_count,
+                                week.size,
+                                week.size
+                            ),
+                            week.sumOf {
+                                it.export.effectiveMetrics().correctedDetectedHitCount
+                            }.let { hitsThisWeek ->
+                                resources.getQuantityString(
+                                    R.plurals.common_detected_hits_count,
+                                    hitsThisWeek,
+                                    hitsThisWeek
+                                )
+                            }
+                        ),
                         color = COLOR_TEXT_DIM
                     )
                 )
@@ -136,14 +168,19 @@ class BadWatchTileService : TileService() {
 
         val primaryLayout = PrimaryLayout.Builder(deviceParameters)
             .setPrimaryLabelTextContent(
-                Text.Builder(this, "BAD WATCH")
+                Text.Builder(this, getString(R.string.brand_wordmark))
                     .setTypography(Typography.TYPOGRAPHY_TITLE3)
                     .setColor(ColorBuilders.argb(COLOR_MINT))
                     .build()
             )
             .setContent(content)
             .setPrimaryChipContent(
-                CompactChip.Builder(this, "Start", startSessionClickable(), deviceParameters)
+                CompactChip.Builder(
+                    this,
+                    getString(R.string.tile_start),
+                    startSessionClickable(),
+                    deviceParameters
+                )
                     .setChipColors(ChipColors(COLOR_MINT, COLOR_ON_MINT))
                     .build()
             )
@@ -194,9 +231,6 @@ class BadWatchTileService : TileService() {
                     .build()
             )
             .build()
-
-    private fun plural(count: Int, singular: String, plural: String): String =
-        "$count ${if (count == 1) singular else plural}"
 
     companion object {
         /**

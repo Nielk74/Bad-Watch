@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="brand_wordmark">BAD WATCH</string>
+
+    <string name="action_back">Back</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_discard">Discard</string>
+    <string name="action_dismiss">Dismiss</string>
+    <string name="action_done">Done</string>
+    <string name="action_pause">Pause</string>
+    <string name="action_save">Save</string>
+    <string name="action_undo">Undo</string>
+
+    <string name="label_activity">Activity</string>
+    <string name="label_average">Average</string>
+    <string name="label_current">Current</string>
+    <string name="label_detected_hits">Detected hits</string>
+    <string name="label_estimated_active">Estimated active</string>
+    <string name="label_evidence">Evidence</string>
+    <string name="label_exchanges">Detected exchanges</string>
+    <string name="label_fastest">Fastest</string>
+    <string name="label_heart_rate">Heart rate</string>
+    <string name="label_longest">Longest</string>
+    <string name="label_median">Median</string>
+    <string name="label_peak">Peak</string>
+    <string name="label_recording">Recording</string>
+    <string name="label_reviewed_hits">Reviewed hits</string>
+    <string name="label_sessions">Sessions</string>
+    <string name="label_signal_coverage">Signal coverage</string>
+    <string name="label_stroke">Stroke</string>
+    <string name="label_swings">Swings</string>
+    <string name="label_time">Time</string>
+    <string name="label_type">Type</string>
+
+    <string name="format_bpm">%1$s bpm</string>
+    <string name="format_hertz">%1$d Hz</string>
+    <string name="format_minutes">%1$d min</string>
+    <string name="format_minutes_rpe">%1$.0f min·RPE</string>
+    <string name="format_rpe">%1$d / 10</string>
+    <string name="format_seconds_decimal">%1$.1f s</string>
+
+    <plurals name="common_days_count">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
+    <plurals name="common_detected_hits_count">
+        <item quantity="one">%d detected hit</item>
+        <item quantity="other">%d detected hits</item>
+    </plurals>
+    <plurals name="common_exchanges_count">
+        <item quantity="one">%d detected exchange</item>
+        <item quantity="other">%d detected exchanges</item>
+    </plurals>
+    <plurals name="common_hits_count">
+        <item quantity="one">%d hit</item>
+        <item quantity="other">%d hits</item>
+    </plurals>
+    <plurals name="common_points_count">
+        <item quantity="one">%d point</item>
+        <item quantity="other">%d points</item>
+    </plurals>
+    <plurals name="common_sessions_count">
+        <item quantity="one">%d session</item>
+        <item quantity="other">%d sessions</item>
+    </plurals>
+
+    <string name="a11y_loading">Loading</string>
+    <string name="a11y_decrease">Decrease %1$s</string>
+    <string name="a11y_increase">Increase %1$s</string>
+
+    <string name="handedness_right">Right handed</string>
+    <string name="handedness_left">Left handed</string>
+
+    <string name="experience_not_set">Not set</string>
+    <string name="experience_new_player">New player</string>
+    <string name="experience_recreational">Recreational</string>
+    <string name="experience_club">Club player</string>
+    <string name="experience_competitive">Competitive</string>
+
+    <string name="shot_smash">Smash</string>
+    <string name="shot_clear">Clear</string>
+    <string name="shot_drop">Drop</string>
+    <string name="shot_drive">Drive</string>
+    <string name="shot_backhand_drive">Backhand drive</string>
+    <string name="shot_unclassified">Unclassified</string>
+
+    <string name="activity_not_specified">Not specified</string>
+    <string name="activity_singles_match">Singles match</string>
+    <string name="activity_doubles_match">Doubles match</string>
+    <string name="activity_conditioned_game">Conditioned game</string>
+    <string name="activity_drill">Drill</string>
+    <string name="activity_shadow">Shadow</string>
+    <string name="activity_free_play">Free play</string>
+    <string name="activity_conditioning">Conditioning</string>
+
+    <string name="recording_not_reviewed">Not reviewed</string>
+    <string name="recording_complete">Complete</string>
+    <string name="recording_partial">Partial</string>
+    <string name="recording_unusable">Unusable</string>
+
+    <string name="completion_completed">Completed</string>
+    <string name="completion_stopped_early">Stopped early</string>
+    <string name="completion_unreported">Not reported</string>
+
+    <string name="body_area_general">General</string>
+    <string name="body_area_shoulder">Shoulder</string>
+    <string name="body_area_upper_arm">Upper arm</string>
+    <string name="body_area_elbow">Elbow</string>
+    <string name="body_area_forearm">Forearm</string>
+    <string name="body_area_wrist">Wrist</string>
+    <string name="body_area_hand">Hand</string>
+    <string name="body_area_upper_back">Upper back</string>
+    <string name="body_area_lower_back">Lower back</string>
+    <string name="body_area_hip">Hip</string>
+    <string name="body_area_thigh">Thigh</string>
+    <string name="body_area_knee">Knee</string>
+    <string name="body_area_lower_leg">Lower leg</string>
+    <string name="body_area_ankle">Ankle</string>
+    <string name="body_area_foot">Foot</string>
+    <string name="body_area_other">Other</string>
+
+    <string name="insight_severity_info">Noticed</string>
+    <string name="insight_severity_notable">Stands out</string>
+    <string name="insight_severity_caution">Worth watching</string>
+    <string name="error_sensor_stream_stopped">The sensor stream stopped unexpectedly.</string>
+    <string name="error_capture_metadata">Capture metadata was not available.</string>
+    <string name="error_capture_start">The Detection Lab could not start.</string>
+    <string name="error_capture_save">The Detection Lab capture could not be saved.</string>
+    <string name="error_session_start">The session could not start.</string>
+    <string name="error_session_save">The session could not be saved.</string>
+    <string name="error_session_pending_save">The previous session still needs to be saved.</string>
+    <string name="error_session_checkpoint">The recovery checkpoint could not be created.</string>
+    <string name="error_session_checkpoint_update">The recovery checkpoint could not be updated.</string>
+    <string name="error_match_unreadable">The saved match could not be read.</string>
+    <string name="error_match_close">The saved match could not be closed.</string>
+    <string name="error_match_start_save">The match was not started because it could not be saved. Try again.</string>
+    <string name="error_match_change_save">That score change was not applied because it could not be saved. Try again.</string>
+    <string name="error_match_remove">The damaged match file could not be removed.</string>
+    <string name="error_match_unsafe">The score is visible but not safely saved.</string>
+    <string name="error_routine_unreadable">The saved shadow routine could not be read.</string>
+    <string name="error_routine_close">The saved routine could not be closed.</string>
+    <string name="error_routine_start_save">The routine was not started because it could not be saved. Try again.</string>
+    <string name="error_routine_change_save">That routine change was not applied because it could not be saved. Try again.</string>
+    <string name="error_routine_restore_pause">The restored routine could not be paused safely.</string>
+    <string name="error_routine_remove">The damaged shadow routine could not be removed.</string>
+    <string name="error_routine_unsafe">The routine is visible but not safely saved.</string>
+    <string name="error_dashboard_url">Enter a server URL.</string>
+    <string name="error_dashboard_connection">Connection failed.</string>
+    <string name="error_dashboard_http">Dashboard connection failed: HTTP %1$s</string>
+    <string name="error_gyroscope_missing">This watch has no gyroscope, so a session cannot be recorded.</string>
+    <string name="error_gyroscope_start">The gyroscope could not start. No session was recorded.</string>
+    <string name="error_unexpected">Something went wrong. Try again.</string>
+</resources>

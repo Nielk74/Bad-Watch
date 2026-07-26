@@ -13,6 +13,9 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.CircularProgressIndicator
@@ -20,6 +23,8 @@ import androidx.wear.compose.material3.EdgeButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
+import com.badwatch.app.R
+import com.badwatch.app.localization.localizedUiMessage
 import com.badwatch.app.ui.components.WatchScreen
 
 /**
@@ -29,12 +34,17 @@ import com.badwatch.app.ui.components.WatchScreen
  */
 @Composable
 fun LoadingScreen() {
+    val loadingDescription = stringResource(R.string.loading_brand)
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
+            CircularProgressIndicator(
+                modifier = Modifier.semantics {
+                    contentDescription = loadingDescription
+                }
+            )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "BAD WATCH",
+                text = stringResource(R.string.brand_wordmark),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -52,7 +62,7 @@ fun ErrorScreen(message: String, onDismiss: () -> Unit) {
     WatchScreen(
         edgeButton = {
             EdgeButton(onClick = onDismiss) {
-                Text("Dismiss")
+                Text(stringResource(R.string.action_dismiss))
             }
         }
     ) {
@@ -71,7 +81,7 @@ fun ErrorScreen(message: String, onDismiss: () -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Session stopped",
+                    text = stringResource(R.string.error_session_stopped),
                     modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.error,
@@ -79,7 +89,7 @@ fun ErrorScreen(message: String, onDismiss: () -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = message,
+                    text = localizedUiMessage(message),
                     modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

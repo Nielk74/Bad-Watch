@@ -258,9 +258,9 @@ class SessionInsightEngineTest {
             durationMillis = durationMillis,
             averageHeartRate = 150f,
             maxHeartRate = 178f,
-            recoveryScore = 0.5f,
-            fatigueScore = 0.5f,
-            effortScore = 0.5f,
+            recoveryScore = 0f,
+            fatigueScore = 0f,
+            effortScore = 0f,
             heartRateZoneHistogram = mapOf(HeartRateZone.Tempo to 100),
             heartRateSampleCount = (durationMillis / 1_000L).toInt(),
             heartRateCoverage = heartRateCoverage

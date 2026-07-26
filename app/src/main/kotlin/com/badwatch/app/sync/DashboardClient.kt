@@ -8,6 +8,9 @@ import com.badwatch.core.sync.SyncEnvelope
 import com.badwatch.core.sync.SyncResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -24,6 +27,43 @@ class DashboardClient(
     private val connectTimeoutMillis: Int = 15_000,
     private val readTimeoutMillis: Int = 30_000
 ) {
+
+    /** Authenticated, read-only setup handshake used by the on-watch configuration UI. */
+    suspend fun checkConnection(baseUrl: String, token: String?): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val url = endpoint(baseUrl, STATUS_PATH)
+                val connection = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = connectTimeoutMillis
+                    readTimeout = readTimeoutMillis
+                    // Never carry the user's bearer token through an HTTP redirect to a
+                    // different origin. Dashboard setup must name the canonical endpoint.
+                    instanceFollowRedirects = false
+                    setRequestProperty("Accept", "application/json")
+                    token?.takeIf { it.isNotBlank() }?.let {
+                        setRequestProperty("Authorization", "Bearer $it")
+                    }
+                }
+                try {
+                    val code = connection.responseCode
+                    if (code !in 200..299) {
+                        throw IOException("Dashboard connection failed: HTTP $code")
+                    }
+                    val body = connection.inputStream.bufferedReader().use { it.readText() }
+                    val status = BadWatchJson.parseToJsonElement(body).jsonObject
+                    require(status["status"]?.jsonPrimitive?.content == "ok") {
+                        "Dashboard returned an invalid status"
+                    }
+                    require(status["schemaVersion"]?.jsonPrimitive?.int == SessionExport.SCHEMA_VERSION) {
+                        "Dashboard uses an incompatible data schema"
+                    }
+                    Unit
+                } finally {
+                    connection.disconnect()
+                }
+            }
+        }
 
     /**
      * @param baseUrl Root of the dashboard server, e.g. `https://badwatch.example.com`.
@@ -76,11 +116,12 @@ class DashboardClient(
         body: String
     ): Result<SyncResponse> = withContext(Dispatchers.IO) {
         runCatching {
-            val url = URL(baseUrl.trimEnd('/') + path)
+            val url = endpoint(baseUrl, path)
             val connection = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 connectTimeout = connectTimeoutMillis
                 readTimeout = readTimeoutMillis
+                instanceFollowRedirects = false
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json; charset=utf-8")
                 setRequestProperty("Accept", "application/json")
@@ -105,8 +146,18 @@ class DashboardClient(
         }
     }
 
+    private fun endpoint(baseUrl: String, path: String): URL {
+        val url = URL(baseUrl.trim().trimEnd('/') + path)
+        require(url.protocol == "https" || url.protocol == "http") {
+            "Dashboard URL must use https:// or http://"
+        }
+        require(url.userInfo.isNullOrBlank()) { "Put the token in its own field" }
+        return url
+    }
+
     private companion object {
         const val SESSIONS_PATH = "/api/v1/sessions"
         const val CAPTURES_PATH = "/api/v1/captures"
+        const val STATUS_PATH = "/api/v1/status"
     }
 }

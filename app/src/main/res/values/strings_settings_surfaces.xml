@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Settings</string>
+    <string name="settings_left_handed">Left handed</string>
+    <string name="settings_hit_haptics">Hit haptics</string>
+    <string name="settings_hit_haptics_on">Buzz on each detected hit</string>
+    <string name="settings_hit_haptics_off">Off · no in-play buzz</string>
+    <string name="settings_playing_background">Playing background</string>
+    <string name="settings_experience_caveat">Self-reported only. Wrist motion cannot determine your overall level.</string>
+    <string name="settings_hr_profile">Heart-rate profile</string>
+    <string name="settings_hr_explanation">Personalized zones need age or a maximum HR. Heart-rate reserve needs both a maximum and a resting HR.</string>
+    <string name="settings_age_endpoint">Age for max HR</string>
+    <plurals name="settings_age_configured">
+        <item quantity="one">%1$d year · estimated max %2$d bpm</item>
+        <item quantity="other">%1$d years · estimated max %2$d bpm</item>
+    </plurals>
+    <plurals name="settings_age_overridden">
+        <item quantity="one">%1$d year · estimate overridden by exact max</item>
+        <item quantity="other">%1$d years · estimate overridden by exact max</item>
+    </plurals>
+    <string name="settings_resting_endpoint">Resting HR</string>
+    <string name="settings_max_endpoint">Exact max HR</string>
+    <string name="settings_not_configured">Not configured</string>
+    <string name="settings_set_age_default">Set age to 30</string>
+    <string name="settings_set_resting_default">Set resting HR to 60</string>
+    <string name="settings_set_max_default">Set exact max HR to 187</string>
+    <plurals name="settings_age_value">
+        <item quantity="one">%1$d year</item>
+        <item quantity="other">%1$d years</item>
+    </plurals>
+    <string name="settings_resting_value">%1$d bpm</string>
+    <string name="settings_max_value">%1$d bpm · overrides age estimate</string>
+    <string name="settings_clear_hr_profile">Clear HR profile</string>
+    <string name="settings_dashboard">Dashboard</string>
+    <string name="settings_dashboard_not_configured">Not configured</string>
+    <string name="settings_dashboard_intro">Tap to configure and test. Sessions stay on the watch until your self-hosted server is reachable.</string>
+    <string name="settings_share_drills">Share detection drills</string>
+    <string name="settings_share_drills_on">New raw motion windows can sync to your self-hosted server</string>
+    <string name="settings_share_drills_off">Off · raw motion stays on this watch</string>
+    <string name="settings_raw_motion">Raw motion</string>
+    <string name="settings_raw_motion_caveat">Off by default. Enabling only applies to new labelled drills; older local-only captures are never uploaded later.</string>
+    <string name="settings_wrist">Wrist</string>
+    <string name="settings_wrist_caveat">Racket hand only. Bad Watch reads the swing, so the other wrist cannot produce shot data.</string>
+    <string name="tile_empty">No sessions yet — start one on the watch</string>
+    <string name="tile_last">Last: %1$s · %2$s · %3$s</string>
+    <string name="tile_this_week">This week: %1$s · %2$s</string>
+    <string name="tile_start">Start</string>
+    <string name="complication_no_play">NO PLAY</string>
+    <string name="complication_short_title">7D HITS</string>
+    <string name="complication_long_title">BAD WATCH · 7-DAY HITS</string>
+    <string name="complication_no_sessions">No sessions in the last 7 days</string>
+    <string name="complication_long_text">%1$s · %2$s · 7 days</string>
+    <string name="complication_empty_description">No recorded badminton sessions in the last 7 days</string>
+    <string name="complication_description">%1$s across %2$s in the last 7 days</string>
+    <plurals name="complication_corrected_hits">
+        <item quantity="one">%d corrected detected hit</item>
+        <item quantity="other">%d corrected detected hits</item>
+    </plurals>
+</resources>

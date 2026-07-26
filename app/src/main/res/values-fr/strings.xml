@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Bad Watch</string>
+    <string name="weekly_hits_complication_name">Frappes détectées sur 7 jours</string>
+
+    <string name="session_notification_channel">Séance d’entraînement</string>
+    <string name="session_notification_channel_description">Maintient l’enregistrement de votre séance lorsque l’écran est éteint.</string>
+    <string name="session_notification_title">Séance en cours</string>
+    <string name="session_notification_body">%1$s · %2$s</string>
+    <plurals name="session_notification_hits">
+        <item quantity="one">%d frappe détectée</item>
+        <item quantity="many">%d frappes détectées</item>
+        <item quantity="other">%d frappes détectées</item>
+    </plurals>
+    <plurals name="capture_notification_swings">
+        <item quantity="one">%d geste</item>
+        <item quantity="many">%d gestes</item>
+        <item quantity="other">%d gestes</item>
+    </plurals>
+    <plurals name="session_notification_minutes">
+        <item quantity="one">%d min</item>
+        <item quantity="many">%d min</item>
+        <item quantity="other">%d min</item>
+    </plurals>
+    <string name="session_notification_stop">Arrêter</string>
+
+    <string name="capture_notification_title">Collecte de données d’entraînement</string>
+    <string name="capture_notification_body">%1$s · exercice %2$s</string>
+
+    <string name="onboarding_wrist_title">Portez-la sur la main qui tient la raquette</string>
+    <string name="onboarding_wrist_body">Bad Watch détecte au poignet des gestes susceptibles d’être des frappes. Sur l’autre poignet, elle mesurerait le mauvais bras.</string>
+</resources>

@@ -1,6 +1,7 @@
 package com.badwatch.core.sync
 
 import com.badwatch.core.model.CaptureSession
+import com.badwatch.core.model.HeartRateValueSource
 import com.badwatch.core.model.LabeledSwing
 import com.badwatch.core.model.PlayerProfile
 import com.badwatch.core.model.SensorSample
@@ -27,6 +28,7 @@ class SerializationTest {
     fun aCaptureWithNoHeartRateReadingsRoundTrips() {
         val export = CaptureExport(
             deviceId = "device",
+            participantId = "participant",
             appVersion = "test",
             profile = PlayerProfile(),
             capture = CaptureSession(
@@ -51,7 +53,10 @@ class SerializationTest {
                     )
                 )
             ),
-            samplingRateHz = 100
+            samplingRateHz = 100,
+            dataUse = CaptureDataUse.SelfHostedModelTraining,
+            protocol = CaptureProtocol(),
+            watch = CaptureWatch("Google", "Pixel Watch", 36)
         )
 
         val encoded = BadWatchJson.encodeToString(CaptureExport.serializer(), export)
@@ -60,6 +65,122 @@ class SerializationTest {
         assertThat(encoded).doesNotContain("NaN")
         assertThat(decoded).isEqualTo(export)
         assertThat(decoded.capture.swings.single().samples.first().heartRateBpm).isNull()
+        assertThat(decoded.isEligibleForModelTrainingUpload).isTrue()
+    }
+
+    @Test
+    fun aLegacyCaptureDefaultsToLocalOnlyAndCannotUpload() {
+        val legacy = """
+            {
+              "schemaVersion": 1,
+              "deviceId": "legacy-device",
+              "appVersion": "0.2.0",
+              "profile": {
+                "handedness": "Right",
+                "restingHeartRate": 60.0,
+                "maxHeartRate": 190.0
+              },
+              "capture": {
+                "id": "legacy-capture",
+                "startedAtMillis": 0,
+                "endedAtMillis": 1000,
+                "label": "Smash",
+                "swings": []
+              },
+              "samplingRateHz": 100
+            }
+        """.trimIndent()
+
+        val decoded = BadWatchJson.decodeFromString(CaptureExport.serializer(), legacy)
+
+        assertThat(decoded.participantId).isNull()
+        assertThat(decoded.dataUse).isEqualTo(CaptureDataUse.LocalOnly)
+        assertThat(decoded.protocol).isNull()
+        assertThat(decoded.watch).isNull()
+        assertThat(decoded.isEligibleForModelTrainingUpload).isFalse()
+        assertThat(decoded.profile.restingHeartRate).isEqualTo(60f)
+        assertThat(decoded.profile.maxHeartRate).isEqualTo(190f)
+        assertThat(decoded.profile.restingHeartRateSource)
+            .isEqualTo(HeartRateValueSource.Unconfigured)
+        assertThat(decoded.profile.maxHeartRateSource)
+            .isEqualTo(HeartRateValueSource.Unconfigured)
+        assertThat(decoded.profile.hasConfiguredHeartRateReserve).isFalse()
+    }
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun aSchemaOneSessionRetainsLegacyScoresWhenDecodingStoredJson() {
+        val stored = """
+            {
+              "schemaVersion": 1,
+              "deviceId": "legacy-device",
+              "appVersion": "0.1.0",
+              "profile": {
+                "handedness": "Right",
+                "restingHeartRate": 60.0,
+                "maxHeartRate": 190.0
+              },
+              "session": {
+                "id": "legacy-session",
+                "startedAtMillis": 1000,
+                "endedAtMillis": 2000,
+                "summary": {
+                  "totalShots": 0,
+                  "shotCounts": {},
+                  "durationMillis": 1000,
+                  "averageHeartRate": null,
+                  "maxHeartRate": null,
+                  "recoveryScore": 0.6,
+                  "fatigueScore": 0.7,
+                  "effortScore": 0.8,
+                  "heartRateZoneHistogram": {}
+                },
+                "shots": []
+              },
+              "rallyProfile": {
+                "rallies": [],
+                "totalWorkMillis": 0,
+                "totalRestMillis": 1000
+              }
+            }
+        """.trimIndent()
+
+        val decoded = BadWatchJson.decodeFromString(SessionExport.serializer(), stored)
+
+        assertThat(decoded.schemaVersion).isEqualTo(1)
+        assertThat(decoded.session.summary.recoveryScore).isEqualTo(0.6f)
+        assertThat(decoded.session.summary.fatigueScore).isEqualTo(0.7f)
+        assertThat(decoded.session.summary.effortScore).isEqualTo(0.8f)
+        assertThat(decoded.profile.hasConfiguredHeartRateReserve).isFalse()
+        assertThat(decoded.diaryRevision).isEqualTo(0L)
+        assertThat(decoded.diaryBaseRevision).isNull()
+        val roundTripped = BadWatchJson.decodeFromString(
+            SessionExport.serializer(),
+            BadWatchJson.encodeToString(SessionExport.serializer(), decoded)
+        )
+        assertThat(roundTripped).isEqualTo(decoded)
+    }
+
+    @Test
+    fun consentWithoutContributorOrProtocolIsStillNotUploadable() {
+        val base = CaptureExport(
+            deviceId = "device",
+            appVersion = "test",
+            profile = PlayerProfile(),
+            capture = CaptureSession(
+                id = "capture",
+                startedAtMillis = 0L,
+                endedAtMillis = 1L,
+                label = ShotType.Clear,
+                swings = emptyList()
+            ),
+            samplingRateHz = 100,
+            dataUse = CaptureDataUse.SelfHostedModelTraining
+        )
+
+        assertThat(base.isEligibleForModelTrainingUpload).isFalse()
+        assertThat(base.copy(participantId = "person", protocol = CaptureProtocol())
+            .isEligibleForModelTrainingUpload).isTrue()
     }
 
     @Test

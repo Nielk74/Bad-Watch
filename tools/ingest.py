@@ -33,7 +33,15 @@ class SwingRow:
     """
 
     label: str
+    participant_id: str
     device_id: str
+    data_use: str
+    protocol_name: str
+    protocol_version: int
+    capture_context: str
+    watch_manufacturer: str
+    watch_model: str
+    watch_sdk_int: int
     handedness: str
     sample_count: int
     duration_ms: int
@@ -89,9 +97,20 @@ def swing_to_row(swing: dict, export: dict) -> SwingRow | None:
         if s.get("heartRateBpm") is not None and s["heartRateBpm"] == s["heartRateBpm"]
     ]
 
+    protocol = export.get("protocol") or {}
+    watch = export.get("watch") or {}
+
     return SwingRow(
         label=swing["label"],
+        participant_id=export.get("participantId") or "",
         device_id=export["deviceId"],
+        data_use=export.get("dataUse", "LocalOnly"),
+        protocol_name=protocol.get("name", "legacy-unversioned"),
+        protocol_version=int(protocol.get("version", 0)),
+        capture_context=protocol.get("context", "Unknown"),
+        watch_manufacturer=watch.get("manufacturer", ""),
+        watch_model=watch.get("model", ""),
+        watch_sdk_int=int(watch.get("sdkInt", 0)),
         handedness=export["profile"]["handedness"],
         sample_count=len(samples),
         duration_ms=times[-1] - times[0],
@@ -170,12 +189,13 @@ def main() -> int:
     per_label: dict[str, int] = {}
     for row in rows:
         per_label[row.label] = per_label.get(row.label, 0) + 1
-    devices = len({row.device_id for row in rows})
+    participants = {row.participant_id for row in rows if row.participant_id}
+    devices = {row.device_id for row in rows}
 
     print(f"Wrote {len(rows)} swings to {args.output}")
     if skipped:
         print(f"  skipped {skipped} windows that were too short to describe a stroke")
-    print(f"  {devices} contributing device(s)")
+    print(f"  {len(participants)} identified participant(s), {len(devices)} device(s)")
     for label, count in sorted(per_label.items(), key=lambda item: -item[1]):
         print(f"  {label:<16} {count}")
 
@@ -183,9 +203,9 @@ def main() -> int:
     if thin:
         print(f"\n  Under 100 examples for: {', '.join(sorted(thin))}.")
         print("  Expect poor recall on those classes until you collect more.")
-    if devices < 2:
-        print("\n  All data is from one device/player. A model trained on this will not")
-        print("  generalise — collect from several players before trusting held-out scores.")
+    if len(participants) < 2:
+        print("\n  Fewer than two participant IDs are present. Device IDs are not people;")
+        print("  training will refuse cross-participant claims until more contributors exist.")
 
     return 0
 

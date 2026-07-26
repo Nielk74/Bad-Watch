@@ -1,6 +1,7 @@
 package com.badwatch.server
 
 import com.badwatch.core.model.HeartRateZone
+import com.badwatch.core.model.HeartRateValueSource
 import com.badwatch.core.model.PlayerProfile
 import com.badwatch.core.model.ShotEvent
 import com.badwatch.core.model.ShotType
@@ -90,9 +91,11 @@ object SyntheticSessions {
             durationMillis = endedAt - startedAtMillis,
             averageHeartRate = heartRates.average().toFloat(),
             maxHeartRate = heartRates.max(),
-            recoveryScore = 0.4f + random.nextFloat() * 0.4f,
-            fatigueScore = 0.3f + random.nextFloat() * 0.5f,
-            effortScore = 0.4f + random.nextFloat() * 0.4f,
+            // Retained schema-1 fields with no validated definition. Synthetic data must not
+            // make them look meaningful either.
+            recoveryScore = 0f,
+            fatigueScore = 0f,
+            effortScore = 0f,
             heartRateZoneHistogram = mapOf(
                 HeartRateZone.Tempo to (shots.size * 0.5f).roundToInt(),
                 HeartRateZone.Threshold to (shots.size * 0.35f).roundToInt(),
@@ -111,7 +114,10 @@ object SyntheticSessions {
         return SessionExport(
             deviceId = "synthetic-device",
             appVersion = "dev",
-            profile = PlayerProfile(),
+            profile = PlayerProfile(
+                restingHeartRateSource = HeartRateValueSource.Synthetic,
+                maxHeartRateSource = HeartRateValueSource.Synthetic
+            ),
             session = session,
             rallyProfile = rallySegmenter.segment(shots, sessionEndMillis = endedAt),
             notes = mapOf("source" to "synthetic")

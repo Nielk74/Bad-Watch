@@ -11,7 +11,8 @@ drill), a way to get them off the watch (dashboard sync, or `adb pull`), and thi
 
 ```bash
 # 1. Record drills on the watch: Collect data → pick a stroke → hit twenty → Save drill.
-#    Repeat per stroke type, ideally with several different players.
+#    Repeat per stroke type and participant. Raw windows remain local unless the player
+#    explicitly enables Share detection drills in Settings.
 
 # 2. Get the captures. Either from the dashboard server…
 ./tools/ingest.py --server http://localhost:8080 --output dataset.csv
@@ -20,17 +21,19 @@ drill), a way to get them off the watch (dashboard sync, or `adb pull`), and thi
 ./tools/ingest.py --server https://badwatch.example.com \
   --token "$BADWATCH_TOKEN" --output dataset.csv
 
-#    …or straight off the watch:
+#    …or, on a debuggable local build only, straight from the app sandbox:
 adb exec-out run-as com.badwatch.badwatch tar c files/captures > captures.tar
 tar xf captures.tar && ./tools/ingest.py --input files/captures --output dataset.csv
 
 # 3. Train and evaluate a baseline.
 python3 -m venv .venv && .venv/bin/pip install scikit-learn pandas
-.venv/bin/python tools/train.py --dataset dataset.csv
+.venv/bin/python tools/train.py --dataset dataset.csv \
+  --output-dir build/model-candidate
 ```
 
 `ingest.py` is standard-library only, so it runs anywhere. Only `train.py` needs
-scikit-learn.
+scikit-learn. `adb run-as` is not a release export path; normal owners use the authenticated
+dashboard archive, whose consent filter excludes local-only raw captures by design.
 
 ## What the scripts do
 
@@ -39,32 +42,48 @@ angular velocity, the vertical/horizontal energy split, a pronation proxy at two
 the stroke, burst shape (rise/fall time, symmetry), and linear acceleration. It refuses
 windows under five samples and skips anything the player marked as discarded.
 
-It also warns about the two things that most often invalidate results: under 100 examples
-for a class, and data from only one device. Both are printed loudly because both produce
-scores that look excellent and mean nothing.
+It preserves the pseudonymous participant id, collection-protocol version, watch model,
+and recording-time data-use choice. Legacy files remain usable for local pipeline smoke
+tests, but they are never assigned an invented participant.
 
-**`train.py`** fits a random forest and evaluates with **`GroupKFold` grouped by device**, so
-a player never appears in both train and test. This matters more than the model choice: a
-random split leaks swing-level similarity between folds and will happily report >0.95 on a
-classifier that fails completely on a new player. If there is only one device in the
-dataset the script says so and downgrades to stratified k-fold with an explicit warning
-that the numbers are a smoke test, not an estimate.
+It also warns about the two things that most often invalidate results: thin classes and
+fewer than two identified participants. Both can produce scores that look excellent and
+mean nothing.
+
+**`train.py`** fits a random forest and evaluates with **stratified group folds by participant**,
+so a contributor never appears in both train and test. This matters more than the model
+choice: a random split leaks swing-level similarity between folds and can report an
+impressive score for a classifier that fails on a new player. Device ids are explicitly
+not treated as people. Missing or single-participant data is refused by default; the
+`--allow-device-groups-smoke` escape hatch exists only to verify that a legacy pipeline
+runs and labels its output as non-validating.
 
 Classical models first, deliberately. They are interpretable, train in seconds, work with a
 few hundred examples per class, and on windowed IMU features they are often competitive
 with deep models. If a random forest cannot beat the current heuristics, the problem is the
 data, not the model capacity.
 
+Every run writes two reviewable artifacts:
+
+- `random-forest.joblib`, the fitted **offline candidate** (never loaded by the watch app);
+- `evaluation.json`, containing the exact feature/label order, dataset SHA-256, class and
+  participant counts, grouped-fold definition, confusion matrix, feature importance,
+  dependency versions, and every acceptance check.
+
+The checks are pre-registered in `tools/model_acceptance.json`. Passing them only means the
+isolated-drill candidate earned a separate field study. `deploymentReady` deliberately
+remains `false` because pre-segmented drill windows cannot establish real-play hit-event
+precision or recall. This prevents a good classifier-on-known-windows score from silently
+becoming a claim that the watch can find strokes in a match.
+
 ## Verifying the pipeline without a watch
 
-The pipeline has been exercised on synthetic captures generated from idealised per-stroke
-signatures. That run reports ~0.99 macro F1.
+The pipeline may be exercised on synthetic captures generated from idealised per-stroke
+signatures.
 
-**That number is not an accuracy claim and must not be quoted as one.** The synthetic data
-was generated from the very axis and pronation biases the features measure, so a high score
-only demonstrates that ingest, feature extraction, grouping and reporting are wired up
-correctly. Real strokes overlap far more, vary by player and fatigue level, and include
-mishits. Expect real first-pass numbers to be dramatically lower.
+**A synthetic score is not an accuracy claim and must not be quoted as one.** Synthetic
+data generated from the same axis and pronation biases the features measure only checks
+the plumbing. Real strokes overlap, vary by player and fatigue, and include mishits.
 
 ## The baseline to beat
 
@@ -81,10 +100,16 @@ and knowing *which* strokes the heuristics miss tells you which drills to priori
 ## Target before shipping a model
 
 - ≥ 300 clean swings per stroke type.
-- ≥ 5 players, both handednesses represented.
-- Per-class recall ≥ 0.85 under device-grouped cross-validation.
-- A held-out player never seen during any tuning.
+- ≥ 5 consented participants, both handednesses represented.
+- A pre-registered per-class recall target under participant-grouped validation.
+- A final held-out participant cohort never seen during tuning.
+- Field captures in realistic drills and play, not only isolated repetitions.
 
-Only then port to TFLite and wire into `:core` behind the existing heuristics as fallback.
-Until all four hold, the rule-based classifier stays the default and stroke labels remain
-documented as provisional.
+Only then consider a TFLite candidate behind the existing detector. Until all gates pass,
+the rule-based classifier stays the default and stroke labels remain explicitly provisional.
+
+The current numeric offline criteria are versioned rather than tuned after seeing results:
+five participants, 300 usable windows per retained class, macro F1 of 0.80, and recall of
+0.75 for every class. These are promotion criteria, not evidence that the current detector
+has achieved them. Field-event criteria and subgroup checks must be defined from an
+independently labelled protocol before any candidate can ship.

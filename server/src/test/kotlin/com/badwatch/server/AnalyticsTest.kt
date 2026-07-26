@@ -1,7 +1,26 @@
 package com.badwatch.server
 
+import com.badwatch.core.model.PlayerProfile
+import com.badwatch.core.model.HeartRateZone
+import com.badwatch.core.model.ShotEvent
 import com.badwatch.core.model.ShotType
+import com.badwatch.core.model.TrainingSession
+import com.badwatch.core.model.TrainingSummary
+import com.badwatch.core.session.RallySegmenter
+import com.badwatch.core.sync.ActivityMode
+import com.badwatch.core.sync.BodyArea
+import com.badwatch.core.sync.CorrectionActor
+import com.badwatch.core.sync.CorrectionProvenance
+import com.badwatch.core.sync.HitCorrectionRevision
+import com.badwatch.core.sync.PostSessionReport
+import com.badwatch.core.sync.RecordingQuality
+import com.badwatch.core.sync.ReportedSoreness
+import com.badwatch.core.sync.SessionCompletion
+import com.badwatch.core.sync.SessionContext
+import com.badwatch.core.sync.SessionCorrections
 import com.badwatch.core.sync.SessionExport
+import com.badwatch.core.sync.TrimCorrectionRevision
+import com.badwatch.core.sync.reviewedAnalysis
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
@@ -33,21 +52,60 @@ class AnalyticsTest {
         )
 
         val dashboard = Analytics.build(sessions)
+        val earlyAnalysis = sessions.first().reviewedAnalysis()
+        val latestAnalysis = sessions.last().reviewedAnalysis()
 
         assertThat(dashboard.volumeTrend).hasSize(35)
         val latest = dashboard.volumeTrend.last()
         assertThat(latest.dailyElapsedMillis).isEqualTo(90 * 60 * 1_000L)
-        assertThat(latest.dailyEstimatedActiveMillis).isEqualTo(70 * 60 * 1_000L)
-        assertThat(latest.dailyDetectedHits).isEqualTo(70)
-        assertThat(latest.rolling7DayEstimatedActiveMillis).isEqualTo(70 * 60 * 1_000L)
-        assertThat(latest.rolling7DayDetectedHits).isEqualTo(70)
-        // The preceding 28 days contain 40 active minutes: a 10-minute weekly average.
+        assertThat(latest.dailyEstimatedActiveMillis)
+            .isEqualTo(latestAnalysis.rallyProfile.totalWorkMillis)
+        assertThat(latest.dailyDetectedHits)
+            .isEqualTo(latestAnalysis.metrics.correctedDetectedHitCount)
+        assertThat(latest.rolling7DayEstimatedActiveMillis)
+            .isEqualTo(latestAnalysis.rallyProfile.totalWorkMillis)
+        assertThat(latest.rolling7DayDetectedHits)
+            .isEqualTo(latestAnalysis.metrics.correctedDetectedHitCount)
+        // The preceding four complete weeks contain the first session's reviewed activity.
         assertThat(latest.previous28DayWeeklyAverageEstimatedActiveMillis)
-            .isEqualTo(10 * 60 * 1_000L)
+            .isEqualTo(earlyAnalysis.rallyProfile.totalWorkMillis / 4L)
 
         assertThat(dashboard.sessions.first().cardiovascularLoad).isNull()
         assertThat(dashboard.sessions.last().cardiovascularLoad).isEqualTo(24f)
         assertThat(dashboard.sessions.last().heartRateCoverage).isEqualTo(0.8f)
+    }
+
+    @Test
+    fun cardsPreserveMeasuredBpmButWithholdLegacyUnconfiguredHeartRateLoad() {
+        val legacy = session(
+            startedAtMillis = 1_000L,
+            elapsedMillis = 10 * 60_000L,
+            estimatedActiveMillis = 4 * 60_000L,
+            detectedHits = 30,
+            cardiovascularLoad = 8f,
+            heartRateSampleCount = 500,
+            heartRateCoverage = 0.8f
+        ).copy(profile = PlayerProfile())
+
+        val card = Analytics.build(listOf(legacy)).sessions.single()
+
+        assertThat(card.averageHeartRate).isEqualTo(legacy.session.summary.averageHeartRate)
+        assertThat(card.maxHeartRate).isEqualTo(legacy.session.summary.maxHeartRate)
+        assertThat(card.cardiovascularLoad).isNull()
+    }
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun syntheticSessionsKeepUndefinedLegacyScoresNeutral() {
+        val summary = SyntheticSessions.session(
+            startedAtMillis = 1_000L,
+            rallies = 4,
+            shotsPerRally = 5
+        ).session.summary
+
+        assertThat(summary.recoveryScore).isEqualTo(0f)
+        assertThat(summary.fatigueScore).isEqualTo(0f)
+        assertThat(summary.effortScore).isEqualTo(0f)
     }
 
     @Test
@@ -62,6 +120,189 @@ class AnalyticsTest {
 
         assertThat(dashboard.volumeTrend.last().previous28DayWeeklyAverageEstimatedActiveMillis)
             .isNull()
+    }
+
+    @Test
+    fun cardsExposeReportedDiaryAndEffectiveCorrectionMetrics() {
+        val base = SyntheticSessions.session(
+            startedAtMillis = 1_000L,
+            rallies = 3,
+            shotsPerRally = 4
+        )
+        val falseHitId = base.session.shots.first().id
+        val corrected = base.copy(
+            context = SessionContext(
+                activityMode = ActivityMode.SinglesMatch,
+                opponent = "Alex",
+                hall = "Local club",
+                goal = "Patient rear court",
+                completion = SessionCompletion.Completed,
+                recordingQuality = RecordingQuality.Complete
+            ),
+            report = PostSessionReport(
+                rpe = 8,
+                soreness = listOf(ReportedSoreness(BodyArea.Forearm, severity = 2)),
+                notes = "Good length in game two"
+            ),
+            corrections = SessionCorrections(
+                hitRevisions = listOf(
+                    HitCorrectionRevision(
+                        falseHitIds = listOf(falseHitId),
+                        missedHitCount = 3,
+                        provenance = CorrectionProvenance(
+                            revisionId = "review-1",
+                            actor = CorrectionActor.Player,
+                            recordedAtMillis = base.session.endedAtMillis + 1_000L
+                        )
+                    )
+                )
+            )
+        )
+
+        val card = Analytics.build(listOf(corrected)).sessions.single()
+
+        assertThat(card.context).isEqualTo(corrected.context)
+        assertThat(card.report).isEqualTo(corrected.report)
+        assertThat(card.comparisonKey.activityMode).isEqualTo(ActivityMode.SinglesMatch)
+        assertThat(card.correctionRevisionCount).isEqualTo(1)
+        assertThat(card.effectiveMetrics?.rawDetectedHitCount)
+            .isEqualTo(base.session.shots.size)
+        assertThat(card.effectiveMetrics?.falseHitCount).isEqualTo(1)
+        assertThat(card.effectiveMetrics?.reportedMissedHitCount).isEqualTo(3)
+        assertThat(card.effectiveMetrics?.effectiveHitCount)
+            .isEqualTo(base.session.shots.size + 2)
+        // Dashboard hit fields remain detected-only; reported misses live only in the explicit
+        // effective total because they have no timestamp or provisional type.
+        assertThat(card.totalShots).isEqualTo(base.session.shots.size - 1)
+    }
+
+    @Test
+    fun reviewedCorrectionsDriveCardsAggregatesAndInsightsWithoutReplacingRawEvidence() {
+        val raw = reviewableSession()
+        val rawDashboard = Analytics.build(listOf(raw))
+        assertThat(rawDashboard.sessions.single().insights.map { it.id })
+            .contains("rest-ratio-high")
+
+        val oneHitFromEveryExchange = raw.rallyProfile.rallies.map { rally ->
+            raw.session.shots.first { it.timestampMillis == rally.endMillis }.id
+        }
+        val reviewed = raw.copy(
+            corrections = SessionCorrections(
+                hitRevisions = listOf(
+                    HitCorrectionRevision(
+                        falseHitIds = oneHitFromEveryExchange + "unknown-id",
+                        missedHitCount = 7,
+                        provenance = CorrectionProvenance(
+                            revisionId = "hits-reviewed",
+                            actor = CorrectionActor.Player,
+                            recordedAtMillis = raw.session.endedAtMillis + 1L
+                        )
+                    )
+                ),
+                trimRevisions = listOf(
+                    TrimCorrectionRevision(
+                        trimFromStartMillis = 500L,
+                        trimFromEndMillis = 5_000L,
+                        provenance = CorrectionProvenance(
+                            revisionId = "edges-reviewed",
+                            actor = CorrectionActor.Player,
+                            recordedAtMillis = raw.session.endedAtMillis + 2L
+                        )
+                    )
+                )
+            )
+        )
+
+        val dashboard = Analytics.build(listOf(reviewed))
+        val card = dashboard.sessions.single()
+
+        assertThat(card.durationMillis).isEqualTo(54_500L)
+        assertThat(card.totalShots).isEqualTo(5)
+        assertThat(card.rallyCount).isEqualTo(0)
+        assertThat(card.estimatedActiveMillis).isEqualTo(0L)
+        assertThat(card.insights).isEmpty()
+        assertThat(card.effectiveMetrics?.effectiveHitCount).isEqualTo(12)
+        assertThat(card.effectiveMetrics?.unknownFalseHitIds).containsExactly("unknown-id")
+        assertThat(dashboard.totalShots).isEqualTo(5)
+        assertThat(dashboard.totalElapsedMillis).isEqualTo(54_500L)
+        assertThat(dashboard.totalPlayingMillis).isEqualTo(0L)
+        assertThat(dashboard.shotDistribution.sumOf { it.count }).isEqualTo(5)
+
+        val detail = Analytics.detail(reviewed, listOf(reviewed))
+        assertThat(detail.raw).isEqualTo(reviewed)
+        assertThat(detail.reviewed.session.summary.totalShots).isEqualTo(5)
+        assertThat(detail.reviewed.session.summary.durationMillis).isEqualTo(54_500L)
+        assertThat(detail.reviewed.rallyProfile.rallyCount).isEqualTo(0)
+        assertThat(detail.reviewed.effectiveMetrics.effectiveHitCount).isEqualTo(12)
+        assertThat(detail.reviewed.insights).isEmpty()
+
+        // The detail/export contract still exposes the immutable raw evidence.
+        assertThat(reviewed.session).isEqualTo(raw.session)
+        assertThat(reviewed.rallyProfile).isEqualTo(raw.rallyProfile)
+        assertThat(reviewed.session.summary.totalShots).isEqualTo(10)
+        assertThat(reviewed.rallyProfile.rallyCount).isEqualTo(5)
+    }
+
+    @Test
+    fun analyticsFiltersAndGroupsOnlyComparableSessionContexts() {
+        fun contextual(
+            start: Long,
+            mode: ActivityMode,
+            tag: String? = null,
+            completion: SessionCompletion = SessionCompletion.Completed,
+            quality: RecordingQuality = RecordingQuality.Complete
+        ) = SyntheticSessions.session(start, rallies = 2, shotsPerRally = 3).copy(
+            context = SessionContext(
+                activityMode = mode,
+                comparisonTag = tag,
+                completion = completion,
+                recordingQuality = quality
+            )
+        )
+
+        val corpus = listOf(
+            contextual(1_000L, ActivityMode.SinglesMatch),
+            contextual(2_000L, ActivityMode.DoublesMatch),
+            contextual(3_000L, ActivityMode.Drill, "Rear court"),
+            contextual(4_000L, ActivityMode.Drill, " rear COURT "),
+            contextual(
+                5_000L,
+                ActivityMode.Drill,
+                "Rear court",
+                completion = SessionCompletion.StoppedEarly,
+                quality = RecordingQuality.Partial
+            ),
+            contextual(6_000L, ActivityMode.Drill)
+        )
+
+        val dashboard = Analytics.build(
+            corpus,
+            SessionAnalyticsFilter(
+                activityModes = setOf(ActivityMode.Drill),
+                comparisonTag = " REAR COURT ",
+                completions = setOf(SessionCompletion.Completed),
+                recordingQualities = setOf(RecordingQuality.Complete)
+            )
+        )
+
+        assertThat(dashboard.sessionCount).isEqualTo(2)
+        assertThat(dashboard.sessions.map { it.startedAtMillis })
+            .containsExactly(3_000L, 4_000L)
+        assertThat(dashboard.appliedFilter.comparisonTag).isEqualTo("rear court")
+
+        val rearCourt = dashboard.comparisonGroups.single {
+            it.key.activityMode == ActivityMode.Drill &&
+                it.key.comparisonTag == "rear court"
+        }
+        assertThat(rearCourt.sessionCount).isEqualTo(3)
+        assertThat(rearCourt.baselineEligible).isTrue()
+
+        val untaggedDrill = dashboard.comparisonGroups.single {
+            it.key.activityMode == ActivityMode.Drill && it.key.comparisonTag == null
+        }
+        assertThat(untaggedDrill.sessionCount).isEqualTo(1)
+        assertThat(untaggedDrill.baselineEligible).isFalse()
+        assertThat(dashboard.comparisonGroups).hasSize(4)
     }
 
     private fun session(
@@ -94,6 +335,55 @@ class AnalyticsTest {
                 totalWorkMillis = estimatedActiveMillis,
                 totalRestMillis = (elapsedMillis - estimatedActiveMillis).coerceAtLeast(0L)
             )
+        )
+    }
+
+    private fun reviewableSession(): SessionExport {
+        val start = 0L
+        val end = 60_000L
+        val shots = buildList {
+            repeat(5) { exchange ->
+                val exchangeStart = 1_000L + exchange * 11_000L
+                repeat(2) { shot ->
+                    val index = exchange * 2 + shot
+                    add(
+                        ShotEvent(
+                            id = "review-hit-$index",
+                            type = ShotType.Unknown,
+                            timestampMillis = exchangeStart + shot * 1_000L,
+                            confidence = 0.5f,
+                            peakAngularVelocity = 5f,
+                            heartRateBpm = null,
+                            swingDurationMillis = 180L
+                        )
+                    )
+                }
+            }
+        }
+        val session = TrainingSession(
+            id = "reviewed-session",
+            startedAtMillis = start,
+            endedAtMillis = end,
+            summary = TrainingSummary(
+                totalShots = shots.size,
+                shotCounts = mapOf(ShotType.Unknown to shots.size),
+                durationMillis = end - start,
+                averageHeartRate = null,
+                maxHeartRate = null,
+                recoveryScore = 0f,
+                fatigueScore = 0f,
+                effortScore = 0f,
+                heartRateZoneHistogram = emptyMap<HeartRateZone, Int>()
+            ),
+            shots = shots
+        )
+        return SessionExport(
+            deviceId = "device",
+            appVersion = "test",
+            profile = PlayerProfile(),
+            session = session,
+            rallyProfile = RallySegmenter().segment(shots, sessionEndMillis = end),
+            context = SessionContext(activityMode = ActivityMode.SinglesMatch)
         )
     }
 }

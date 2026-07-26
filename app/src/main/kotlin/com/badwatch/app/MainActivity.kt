@@ -2,12 +2,15 @@ package com.badwatch.app
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.health.connect.HealthPermissions
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.content.ContextCompat
 import androidx.wear.ambient.AmbientLifecycleObserver
 import com.badwatch.app.service.SessionService
 import com.badwatch.app.sync.SyncWorker
@@ -44,9 +47,18 @@ class MainActivity : ComponentActivity() {
         }
     )
 
+    private var afterPermissionRequest: (() -> Unit)? = null
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { /* Every requested permission is optional; recording works without them. */ }
+    ) {
+        // Every requested permission is optional. Continue motion-only when heart rate or
+        // notifications were denied; Health Services performs its own defensive check too.
+        afterPermissionRequest?.also { continuation ->
+            afterPermissionRequest = null
+            continuation()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -96,8 +108,7 @@ class MainActivity : ComponentActivity() {
      * player putting their wrist down.
      */
     private fun startSession() {
-        requestSessionPermissions()
-        SessionService.start(this)
+        withSessionPermissions { SessionService.start(this) }
     }
 
     private fun stopSession() {
@@ -114,8 +125,7 @@ class MainActivity : ComponentActivity() {
      * swing — which is exactly what happened the first time this was tested on a device.
      */
     private fun startCapture(label: ShotType) {
-        requestSessionPermissions()
-        SessionService.startCapture(this, label)
+        withSessionPermissions { SessionService.startCapture(this, label) }
     }
 
     private fun finishCapture() {
@@ -126,23 +136,31 @@ class MainActivity : ComponentActivity() {
         SessionService.cancelCapture(this)
     }
 
-    private fun requestSessionPermissions() {
-        val permissions = buildList {
+    private fun withSessionPermissions(continuation: () -> Unit) {
+        val missingPermissions = buildList {
             add(
-                if (Build.VERSION.SDK_INT >= 36) READ_HEART_RATE_PERMISSION
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                    HealthPermissions.READ_HEART_RATE
+                }
                 else Manifest.permission.BODY_SENSORS
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 add(Manifest.permission.POST_NOTIFICATIONS)
             }
+        }.filter { permission ->
+            ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED
         }
-        permissionLauncher.launch(permissions.toTypedArray())
+
+        if (missingPermissions.isEmpty()) {
+            continuation()
+        } else {
+            afterPermissionRequest = continuation
+            permissionLauncher.launch(missingPermissions.toTypedArray())
+        }
     }
 
     companion object {
         /** Intent extra set by the watch-face tile's Start chip to auto-start a session. */
         const val EXTRA_START_SESSION = "autostart_session"
-        private const val READ_HEART_RATE_PERMISSION =
-            "android.permission.health.READ_HEART_RATE"
     }
 }

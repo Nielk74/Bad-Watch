@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="brand_wordmark">BAD WATCH</string>
+
+    <string name="action_back">Retour</string>
+    <string name="action_cancel">Annuler</string>
+    <string name="action_delete">Supprimer</string>
+    <string name="action_discard">Abandonner</string>
+    <string name="action_dismiss">Fermer</string>
+    <string name="action_done">Terminé</string>
+    <string name="action_pause">Pause</string>
+    <string name="action_save">Enregistrer</string>
+    <string name="action_undo">Annuler</string>
+
+    <string name="label_activity">Activité</string>
+    <string name="label_average">Moyenne</string>
+    <string name="label_current">Actuelle</string>
+    <string name="label_detected_hits">Frappes détectées</string>
+    <string name="label_estimated_active">Activité estimée</string>
+    <string name="label_evidence">Données</string>
+    <string name="label_exchanges">Échanges détectés</string>
+    <string name="label_fastest">Plus rapide</string>
+    <string name="label_heart_rate">Fréquence cardiaque</string>
+    <string name="label_longest">Plus longue</string>
+    <string name="label_median">Médiane</string>
+    <string name="label_peak">Maximum</string>
+    <string name="label_recording">Enregistrement</string>
+    <string name="label_reviewed_hits">Frappes vérifiées</string>
+    <string name="label_sessions">Séances</string>
+    <string name="label_signal_coverage">Couverture du signal</string>
+    <string name="label_stroke">Frappe</string>
+    <string name="label_swings">Gestes</string>
+    <string name="label_time">Durée</string>
+    <string name="label_type">Type</string>
+
+    <string name="format_bpm">%1$s bpm</string>
+    <string name="format_hertz">%1$d Hz</string>
+    <string name="format_minutes">%1$d min</string>
+    <string name="format_minutes_rpe">%1$.0f min·RPE</string>
+    <string name="format_rpe">%1$d / 10</string>
+    <string name="format_seconds_decimal">%1$.1f s</string>
+
+    <plurals name="common_days_count">
+        <item quantity="one">%d jour</item>
+        <item quantity="many">%d jours</item>
+        <item quantity="other">%d jours</item>
+    </plurals>
+    <plurals name="common_detected_hits_count">
+        <item quantity="one">%d frappe détectée</item>
+        <item quantity="many">%d frappes détectées</item>
+        <item quantity="other">%d frappes détectées</item>
+    </plurals>
+    <plurals name="common_exchanges_count">
+        <item quantity="one">%d échange détecté</item>
+        <item quantity="many">%d échanges détectés</item>
+        <item quantity="other">%d échanges détectés</item>
+    </plurals>
+    <plurals name="common_hits_count">
+        <item quantity="one">%d frappe</item>
+        <item quantity="many">%d frappes</item>
+        <item quantity="other">%d frappes</item>
+    </plurals>
+    <plurals name="common_points_count">
+        <item quantity="one">%d point</item>
+        <item quantity="many">%d points</item>
+        <item quantity="other">%d points</item>
+    </plurals>
+    <plurals name="common_sessions_count">
+        <item quantity="one">%d séance</item>
+        <item quantity="many">%d séances</item>
+        <item quantity="other">%d séances</item>
+    </plurals>
+
+    <string name="a11y_loading">Chargement</string>
+    <string name="a11y_decrease">Diminuer %1$s</string>
+    <string name="a11y_increase">Augmenter %1$s</string>
+
+    <string name="handedness_right">Droitier</string>
+    <string name="handedness_left">Gaucher</string>
+
+    <string name="experience_not_set">Non indiqué</string>
+    <string name="experience_new_player">Débutant</string>
+    <string name="experience_recreational">Loisir</string>
+    <string name="experience_club">Joueur de club</string>
+    <string name="experience_competitive">Compétition</string>
+
+    <string name="shot_smash">Smash</string>
+    <string name="shot_clear">Dégagement</string>
+    <string name="shot_drop">Amorti</string>
+    <string name="shot_drive">Drive</string>
+    <string name="shot_backhand_drive">Drive revers</string>
+    <string name="shot_unclassified">Non classée</string>
+
+    <string name="activity_not_specified">Non précisée</string>
+    <string name="activity_singles_match">Match en simple</string>
+    <string name="activity_doubles_match">Match en double</string>
+    <string name="activity_conditioned_game">Jeu à thème</string>
+    <string name="activity_drill">Exercice</string>
+    <string name="activity_shadow">Shadow</string>
+    <string name="activity_free_play">Jeu libre</string>
+    <string name="activity_conditioning">Préparation physique</string>
+
+    <string name="recording_not_reviewed">Non vérifié</string>
+    <string name="recording_complete">Complet</string>
+    <string name="recording_partial">Partiel</string>
+    <string name="recording_unusable">Inutilisable</string>
+
+    <string name="completion_completed">Terminé</string>
+    <string name="completion_stopped_early">Arrêt anticipé</string>
+    <string name="completion_unreported">Non indiqué</string>
+
+    <string name="body_area_general">Général</string>
+    <string name="body_area_shoulder">Épaule</string>
+    <string name="body_area_upper_arm">Bras</string>
+    <string name="body_area_elbow">Coude</string>
+    <string name="body_area_forearm">Avant-bras</string>
+    <string name="body_area_wrist">Poignet</string>
+    <string name="body_area_hand">Main</string>
+    <string name="body_area_upper_back">Haut du dos</string>
+    <string name="body_area_lower_back">Bas du dos</string>
+    <string name="body_area_hip">Hanche</string>
+    <string name="body_area_thigh">Cuisse</string>
+    <string name="body_area_knee">Genou</string>
+    <string name="body_area_lower_leg">Bas de la jambe</string>
+    <string name="body_area_ankle">Cheville</string>
+    <string name="body_area_foot">Pied</string>
+    <string name="body_area_other">Autre</string>
+
+    <string name="insight_severity_info">Observation</string>
+    <string name="insight_severity_notable">À noter</string>
+    <string name="insight_severity_caution">À surveiller</string>
+    <string name="error_sensor_stream_stopped">Le flux du capteur s’est interrompu de façon inattendue.</string>
+    <string name="error_capture_metadata">Les métadonnées de capture étaient indisponibles.</string>
+    <string name="error_capture_start">Le Labo de détection n’a pas pu démarrer.</string>
+    <string name="error_capture_save">La capture du Labo de détection n’a pas pu être enregistrée.</string>
+    <string name="error_session_start">La séance n’a pas pu démarrer.</string>
+    <string name="error_session_save">La séance n’a pas pu être enregistrée.</string>
+    <string name="error_session_pending_save">La séance précédente doit encore être enregistrée.</string>
+    <string name="error_session_checkpoint">Le point de récupération n’a pas pu être créé.</string>
+    <string name="error_session_checkpoint_update">Le point de récupération n’a pas pu être mis à jour.</string>
+    <string name="error_match_unreadable">Le match enregistré n’a pas pu être lu.</string>
+    <string name="error_match_close">Le match enregistré n’a pas pu être fermé.</string>
+    <string name="error_match_start_save">Le match n’a pas démarré, car il n’a pas pu être enregistré. Réessayez.</string>
+    <string name="error_match_change_save">Cette modification du score n’a pas été appliquée, car elle n’a pas pu être enregistrée. Réessayez.</string>
+    <string name="error_match_remove">Le fichier de match endommagé n’a pas pu être supprimé.</string>
+    <string name="error_match_unsafe">Le score est visible, mais pas enregistré de manière sûre.</string>
+    <string name="error_routine_unreadable">La routine de shadow enregistrée n’a pas pu être lue.</string>
+    <string name="error_routine_close">La routine enregistrée n’a pas pu être fermée.</string>
+    <string name="error_routine_start_save">La routine n’a pas démarré, car elle n’a pas pu être enregistrée. Réessayez.</string>
+    <string name="error_routine_change_save">Cette modification de la routine n’a pas été appliquée, car elle n’a pas pu être enregistrée. Réessayez.</string>
+    <string name="error_routine_restore_pause">La routine restaurée n’a pas pu être mise en pause de façon sûre.</string>
+    <string name="error_routine_remove">La routine de shadow endommagée n’a pas pu être supprimée.</string>
+    <string name="error_routine_unsafe">La routine est visible, mais pas enregistrée de manière sûre.</string>
+    <string name="error_dashboard_url">Saisissez une URL de serveur.</string>
+    <string name="error_dashboard_connection">Échec de la connexion.</string>
+    <string name="error_dashboard_http">Échec de la connexion au tableau de bord : HTTP %1$s</string>
+    <string name="error_gyroscope_missing">Cette montre n’a pas de gyroscope : la séance ne peut pas être enregistrée.</string>
+    <string name="error_gyroscope_start">Le gyroscope n’a pas pu démarrer. Aucune séance n’a été enregistrée.</string>
+    <string name="error_unexpected">Un problème est survenu. Réessayez.</string>
+</resources>

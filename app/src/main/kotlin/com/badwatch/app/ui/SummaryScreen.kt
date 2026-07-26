@@ -13,12 +13,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.EdgeButton
 import androidx.wear.compose.material3.EdgeButtonSize
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
+import androidx.wear.compose.material3.TitleCard
+import com.badwatch.app.R
+import com.badwatch.app.localization.displayNameResource
 import com.badwatch.app.ui.components.DetailRow
 import com.badwatch.app.ui.components.DistributionBar
 import com.badwatch.app.ui.components.DistributionSegment
@@ -35,8 +40,15 @@ import com.badwatch.app.ui.components.formatHeartRate
 import com.badwatch.app.ui.components.formatRestRatio
 import com.badwatch.app.ui.components.hrZoneLabel
 import com.badwatch.core.insight.Insight
+import com.badwatch.core.model.HeartRateZone
+import com.badwatch.core.physiology.PostBurstHeartRateBuilder
 import com.badwatch.core.sync.SessionExport
-import java.util.Locale
+import com.badwatch.core.sync.ActivityMode
+import com.badwatch.core.sync.DiaryReviewStatus
+import com.badwatch.core.sync.RecordingQuality
+import com.badwatch.core.sync.SessionCompletion
+import com.badwatch.core.sync.effectiveMetrics
+import com.badwatch.core.sync.reviewedAnalysis
 
 /**
  * Post-session recap.
@@ -50,42 +62,123 @@ import java.util.Locale
 fun SummaryScreen(
     stored: SessionExport,
     insights: List<Insight>,
-    onDone: () -> Unit
+    onDone: () -> Unit,
+    onEditDiary: (() -> Unit)? = null,
+    onCorrectRecording: (() -> Unit)? = null
 ) {
-    val summary = stored.session.summary
-    val rallies = stored.rallyProfile
+    val reviewed = stored.reviewedAnalysis()
+    val summary = reviewed.session.summary
+    val rallies = reviewed.rallyProfile
+    val effective = reviewed.metrics
+    val postBurstHeartRate = PostBurstHeartRateBuilder.build(stored)
 
     WatchScreen(
         edgeButton = {
             EdgeButton(onClick = onDone, buttonSize = EdgeButtonSize.Medium) {
                 Icon(imageVector = Icons.Default.Check, contentDescription = null)
                 Spacer(modifier = Modifier.size(6.dp))
-                Text("Done")
+                Text(stringResource(R.string.action_done))
             }
         }
     ) {
-        item { ScreenHeader("Session saved") }
+        item { ScreenHeader(stringResource(R.string.summary_saved)) }
 
         item {
             StatRow(
-                Stat("Hits", summary.totalShots.toString()),
-                Stat("Bursts", rallies.rallyCount.toString()),
-                Stat("Time", formatDuration(summary.durationMillis))
+                Stat(
+                    stringResource(
+                        if (effective.hasCorrections) {
+                            R.string.label_reviewed_hits
+                        } else {
+                            R.string.label_detected_hits
+                        }
+                    ),
+                    effective.correctedDetectedHitCount.toString()
+                ),
+                Stat(stringResource(R.string.label_exchanges), rallies.rallyCount.toString()),
+                Stat(
+                    stringResource(
+                        if (effective.hasCorrections) {
+                            R.string.summary_reviewed_time
+                        } else {
+                            R.string.label_time
+                        }
+                    ),
+                    formatDuration(effective.window.durationMillis)
+                )
             )
+        }
+
+        if (stored.context.diaryReviewStatus != DiaryReviewStatus.Unreviewed ||
+            stored.context.activityMode != ActivityMode.Unspecified ||
+            stored.report.rpe != null || stored.report.sorenessReviewed
+        ) {
+            item {
+                InfoCard(title = stringResource(R.string.summary_your_report)) {
+                    DetailRow(
+                        stringResource(R.string.label_activity),
+                        stringResource(stored.context.activityMode.displayNameResource)
+                    )
+                    stored.report.rpe?.let {
+                        DetailRow(
+                            stringResource(R.string.summary_perceived_effort),
+                            stringResource(R.string.format_rpe, it)
+                        )
+                    }
+                    stored.report.rpe?.let { rpe ->
+                        val sessionRpeLoad = effective.window.durationMillis / 60_000f * rpe
+                        DetailRow(
+                            stringResource(R.string.summary_session_rpe_load),
+                            stringResource(R.string.format_minutes_rpe, sessionRpeLoad)
+                        )
+                    }
+                    if (stored.report.sorenessReviewed) {
+                        val sorenessText = if (stored.report.soreness.isEmpty()) {
+                            stringResource(R.string.summary_nothing_logged)
+                        } else {
+                            val localizedReports = mutableListOf<String>()
+                            for (report in stored.report.soreness) {
+                                localizedReports +=
+                                    "${stringResource(report.bodyArea.displayNameResource)} " +
+                                        "${report.severity}/10"
+                            }
+                            localizedReports.joinToString()
+                        }
+                        DetailRow(stringResource(R.string.summary_soreness), sorenessText)
+                    }
+                    if (stored.context.completion != SessionCompletion.Unreported) {
+                        DetailRow(
+                            stringResource(R.string.summary_plan),
+                            stringResource(stored.context.completion.displayNameResource)
+                        )
+                    }
+                    if (stored.context.recordingQuality != RecordingQuality.Unreviewed) {
+                        DetailRow(
+                            stringResource(R.string.label_recording),
+                            stringResource(stored.context.recordingQuality.displayNameResource)
+                        )
+                    }
+                }
+            }
         }
 
         items(insights.size) { index -> InsightCard(insight = insights[index]) }
 
         item {
-            InfoCard(title = "Detected play") {
+            InfoCard(title = stringResource(R.string.summary_detected_play)) {
                 DetailRow(
-                    "Avg rally burst",
-                    String.format(Locale.US, "%.1f hits", rallies.averageShotsPerRally)
+                    stringResource(R.string.summary_average_burst),
+                    String.format(java.util.Locale.getDefault(), "%.1f", rallies.averageShotsPerRally)
                 )
-                DetailRow("Longest", "${rallies.longestRally?.shotCount ?: 0} hits")
-                DetailRow("Est. active : quiet", formatRestRatio(rallies.restRatio))
+                val longestHits = rallies.longestRally?.shotCount ?: 0
+                DetailRow(
+                    stringResource(R.string.label_longest),
+                    pluralStringResource(R.plurals.common_hits_count, longestHits, longestHits)
+                )
+                DetailRow(stringResource(R.string.summary_active_quiet), formatRestRatio(rallies.restRatio))
                 val total = rallies.totalWorkMillis + rallies.totalRestMillis
                 if (total > 0) {
+                    val activePercent = (rallies.workDensity * 100).toInt()
                     DistributionBar(
                         segments = listOf(
                             DistributionSegment(
@@ -96,33 +189,95 @@ fun SummaryScreen(
                                 color = MaterialTheme.colorScheme.secondary,
                                 fraction = rallies.totalRestMillis.toFloat() / total
                             )
+                        ),
+                        contentDescription = stringResource(
+                            R.string.summary_activity_distribution,
+                            activePercent,
+                            100 - activePercent
                         )
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        LegendDot(color = MaterialTheme.colorScheme.primary, label = "Detected")
-                        LegendDot(color = MaterialTheme.colorScheme.secondary, label = "Quiet")
+                        LegendDot(
+                            color = MaterialTheme.colorScheme.primary,
+                            label = stringResource(R.string.summary_detected)
+                        )
+                        LegendDot(
+                            color = MaterialTheme.colorScheme.secondary,
+                            label = stringResource(R.string.summary_quiet)
+                        )
                     }
                 }
-                DetailRow("Estimated active", "${(rallies.workDensity * 100).toInt()}%")
+                DetailRow(
+                    stringResource(R.string.label_estimated_active),
+                    "${(rallies.workDensity * 100).toInt()}%"
+                )
             }
         }
 
         item {
-            InfoCard(title = "Heart rate") {
-                DetailRow("Average", formatHeartRate(summary.averageHeartRate))
+            InfoCard(title = stringResource(R.string.label_heart_rate)) {
                 DetailRow(
-                    "Peak",
-                    formatHeartRate(summary.maxHeartRate),
+                    stringResource(R.string.label_average),
+                    stringResource(R.string.format_bpm, formatHeartRate(summary.averageHeartRate))
+                )
+                DetailRow(
+                    stringResource(R.string.label_peak),
+                    stringResource(R.string.format_bpm, formatHeartRate(summary.maxHeartRate)),
                     valueColor = MaterialTheme.colorScheme.error
                 )
-                DetailRow(
-                    "Peak zone",
-                    hrZoneLabel(summary.maxHeartRate, stored.profile.maxHeartRate)
-                )
+                if (stored.profile.hasConfiguredMaxHeartRate) {
+                    DetailRow(
+                        stringResource(R.string.summary_peak_zone),
+                        hrZoneLabel(summary.maxHeartRate, stored.profile.maxHeartRate)
+                    )
+                }
                 if (summary.heartRateSampleCount > 0) {
                     DetailRow(
-                        "Signal coverage",
+                        stringResource(R.string.label_signal_coverage),
                         "${(summary.heartRateCoverage * 100).toInt()}%"
+                    )
+                }
+                summary.cardiovascularLoad?.let { load ->
+                    DetailRow(
+                        stringResource(R.string.summary_cardio_response),
+                        stringResource(R.string.format_hrr_minutes, load)
+                    )
+                }
+                postBurstHeartRate?.let { change ->
+                    val text = if (change.decreaseBpm >= 0) {
+                        stringResource(
+                            R.string.summary_hr_change_decrease,
+                            change.decreaseBpm
+                        )
+                    } else {
+                        stringResource(
+                            R.string.summary_hr_change_increase,
+                            -change.decreaseBpm
+                        )
+                    }
+                    DetailRow(stringResource(R.string.summary_after_final_burst), text)
+                    Text(
+                        text = stringResource(R.string.summary_optical_hr_caveat),
+                        style = MaterialTheme.typography.bodyExtraSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                val zoneSamples = summary.heartRateZoneHistogram.values.sum()
+                if (stored.profile.hasConfiguredMaxHeartRate && zoneSamples > 0) {
+                    DistributionBar(
+                        segments = HEART_RATE_ZONE_ORDER.map { zone ->
+                            DistributionSegment(
+                                color = zone.color(),
+                                fraction = (summary.heartRateZoneHistogram[zone] ?: 0)
+                                    .toFloat() / zoneSamples
+                            )
+                        },
+                        contentDescription = stringResource(R.string.summary_hr_distribution)
+                    )
+                    Text(
+                        text = stringResource(R.string.summary_hr_zones),
+                        style = MaterialTheme.typography.bodyExtraSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -130,7 +285,7 @@ fun SummaryScreen(
 
         if (summary.shotCounts.isNotEmpty()) {
             item {
-                InfoCard(title = "Provisional stroke mix") {
+                InfoCard(title = stringResource(R.string.summary_stroke_mix)) {
                     val total = summary.shotCounts.values.sum().takeIf { it > 0 } ?: 1
                     val sorted = summary.shotCounts.entries.sortedByDescending { it.value }
                     DistributionBar(
@@ -158,8 +313,89 @@ fun SummaryScreen(
                 }
             }
         }
+
+        if (effective.hasCorrections) {
+            item {
+                InfoCard(title = stringResource(R.string.summary_review_trail)) {
+                    DetailRow(
+                        stringResource(R.string.summary_raw_events),
+                        effective.rawDetectedHitCount.toString()
+                    )
+                    if (effective.trimExcludedDetectedHitCount > 0) {
+                        DetailRow(
+                            stringResource(R.string.summary_outside_time),
+                            effective.trimExcludedDetectedHitCount.toString()
+                        )
+                    }
+                    if (effective.falseHitCount > 0) {
+                        DetailRow(
+                            stringResource(R.string.summary_marked_false),
+                            effective.falseHitCount.toString()
+                        )
+                    }
+                    if (effective.reportedMissedHitCount > 0) {
+                        DetailRow(
+                            stringResource(R.string.summary_reported_missed),
+                            effective.reportedMissedHitCount.toString()
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.summary_review_preserved),
+                        style = MaterialTheme.typography.bodyExtraSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        if (onEditDiary != null) {
+            item {
+                TitleCard(
+                    onClick = onEditDiary,
+                    title = { Text(stringResource(R.string.summary_edit_diary)) }
+                ) {
+                    Text(
+                        stringResource(R.string.summary_edit_diary_subtitle),
+                        style = MaterialTheme.typography.bodyExtraSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        if (onCorrectRecording != null) {
+            item {
+                TitleCard(
+                    onClick = onCorrectRecording,
+                    title = { Text(stringResource(R.string.summary_review_detection)) }
+                ) {
+                    Text(
+                        stringResource(R.string.summary_review_detection_subtitle),
+                        style = MaterialTheme.typography.bodyExtraSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }
+
+@Composable
+private fun HeartRateZone.color(): androidx.compose.ui.graphics.Color = when (this) {
+    HeartRateZone.WarmUp -> com.badwatch.app.ui.theme.CourtColors.Zone1
+    HeartRateZone.Endurance -> com.badwatch.app.ui.theme.CourtColors.Zone2
+    HeartRateZone.Tempo -> com.badwatch.app.ui.theme.CourtColors.Zone3
+    HeartRateZone.Threshold -> com.badwatch.app.ui.theme.CourtColors.Zone4
+    HeartRateZone.VO2Max -> com.badwatch.app.ui.theme.CourtColors.Zone5
+}
+
+private val HEART_RATE_ZONE_ORDER = listOf(
+    HeartRateZone.WarmUp,
+    HeartRateZone.Endurance,
+    HeartRateZone.Tempo,
+    HeartRateZone.Threshold,
+    HeartRateZone.VO2Max
+)
 
 @Composable
 private fun LegendDot(color: androidx.compose.ui.graphics.Color, label: String) {

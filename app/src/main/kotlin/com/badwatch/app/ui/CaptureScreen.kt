@@ -19,6 +19,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.items
@@ -32,6 +34,7 @@ import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TitleCard
+import com.badwatch.app.R
 import com.badwatch.app.domain.CaptureState
 import com.badwatch.app.ui.components.InfoCard
 import com.badwatch.app.ui.components.ScreenHeader
@@ -43,6 +46,7 @@ import com.badwatch.app.ui.components.displayName
 import com.badwatch.app.ui.theme.CourtColors
 import com.badwatch.core.model.ShotType
 import com.badwatch.core.sync.CaptureExport
+import com.badwatch.core.sync.CaptureDataUse
 import java.util.Locale
 
 /** Stroke types offered for labelled drills. `Unknown` is not a thing anyone can hit. */
@@ -69,15 +73,19 @@ fun CapturePickerScreen(
     onBack: () -> Unit
 ) {
     WatchScreen {
-        item { ScreenHeader("Collect data") }
+        item { ScreenHeader(stringResource(R.string.capture_title)) }
 
         item {
             InfoCard {
                 Text(
                     text = if (totalSwings == 0) {
-                        "Pick a stroke, then hit twenty of them. Each swing is saved with your label."
+                        stringResource(R.string.capture_intro_empty)
                     } else {
-                        "$totalSwings labelled swings on this watch."
+                        pluralStringResource(
+                            R.plurals.capture_intro_existing,
+                            totalSwings,
+                            totalSwings
+                        )
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -96,7 +104,7 @@ fun CapturePickerScreen(
                 }
             ) {
                 Text(
-                    text = "20 reps recommended",
+                    text = stringResource(R.string.capture_reps_recommended),
                     style = MaterialTheme.typography.bodyExtraSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -107,7 +115,7 @@ fun CapturePickerScreen(
             CompactButton(
                 onClick = onBack,
                 colors = ButtonDefaults.filledTonalButtonColors(),
-                label = { Text("Back") }
+                label = { Text(stringResource(R.string.action_back)) }
             )
         }
     }
@@ -142,7 +150,7 @@ fun CaptureScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = state.label.displayName().uppercase(),
+                text = state.label.displayName().uppercase(Locale.getDefault()),
                 style = MaterialTheme.typography.labelSmall,
                 color = state.label.color()
             )
@@ -153,16 +161,22 @@ fun CaptureScreen(
                 textAlign = TextAlign.Center
             )
             Text(
-                text = "swings",
+                text = stringResource(
+                    if (state.keptCount == 1) {
+                        R.string.capture_swing_unit_one
+                    } else {
+                        R.string.capture_swing_unit_other
+                    }
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             val lastKept = state.swings.lastOrNull { !it.discarded }
             Text(
                 text = if (lastKept == null) {
-                    "Waiting for your first swing"
+                    stringResource(R.string.capture_waiting_swing)
                 } else {
-                    String.format(Locale.US, "Last peak %.1f rad/s", lastKept.peakAngularVelocity)
+                    stringResource(R.string.capture_last_peak, lastKept.peakAngularVelocity)
                 },
                 style = MaterialTheme.typography.bodyExtraSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -175,7 +189,7 @@ fun CaptureScreen(
                 CompactButton(
                     onClick = onDiscardLast,
                     colors = ButtonDefaults.filledTonalButtonColors(),
-                    label = { Text("Drop last") }
+                    label = { Text(stringResource(R.string.capture_drop_last)) }
                 )
                 CompactButton(
                     onClick = {
@@ -185,7 +199,7 @@ fun CaptureScreen(
                         containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
                         contentColor = MaterialTheme.colorScheme.onErrorContainer
                     ),
-                    label = { Text("Cancel") }
+                    label = { Text(stringResource(R.string.action_cancel)) }
                 )
             }
         }
@@ -195,7 +209,7 @@ fun CaptureScreen(
             modifier = Modifier.align(Alignment.BottomCenter),
             buttonSize = EdgeButtonSize.Small
         ) {
-            Text("Save drill")
+            Text(stringResource(R.string.capture_save_drill))
         }
     }
 
@@ -210,8 +224,8 @@ fun CaptureScreen(
                 }
             )
         },
-        title = { Text("Cancel drill?") },
-        text = { Text("Swings collected so far are lost.") }
+        title = { Text(stringResource(R.string.capture_cancel_question)) },
+        text = { Text(stringResource(R.string.capture_cancel_body)) }
     )
 }
 
@@ -229,7 +243,7 @@ fun CaptureSavedScreen(export: CaptureExport, onDone: () -> Unit) {
             EdgeButton(onClick = onDone) {
                 Icon(imageVector = Icons.Default.Check, contentDescription = null)
                 Spacer(modifier = Modifier.size(6.dp))
-                Text("Done")
+                Text(stringResource(R.string.action_done))
             }
         }
     ) {
@@ -248,7 +262,7 @@ fun CaptureSavedScreen(export: CaptureExport, onDone: () -> Unit) {
                     modifier = Modifier.size(36.dp)
                 )
                 Text(
-                    text = "Drill saved",
+                    text = stringResource(R.string.capture_saved),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary,
                     textAlign = TextAlign.Center
@@ -258,16 +272,23 @@ fun CaptureSavedScreen(export: CaptureExport, onDone: () -> Unit) {
 
         item {
             StatRow(
-                Stat("Swings", export.capture.swingCount.toString()),
-                Stat("Stroke", export.capture.label.displayName()),
-                Stat("Rate", "${export.samplingRateHz} Hz")
+                Stat(stringResource(R.string.label_swings), export.capture.swingCount.toString()),
+                Stat(stringResource(R.string.label_stroke), export.capture.label.displayName()),
+                Stat(
+                    stringResource(R.string.capture_rate),
+                    stringResource(R.string.format_hertz, export.samplingRateHz)
+                )
             )
         }
 
         item {
             InfoCard {
                 Text(
-                    text = "Uploads to your dashboard with the next sync.",
+                    text = if (export.dataUse == CaptureDataUse.SelfHostedModelTraining) {
+                        stringResource(R.string.capture_sync_eligible)
+                    } else {
+                        stringResource(R.string.capture_saved_local)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

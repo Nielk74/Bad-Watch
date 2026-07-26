@@ -8,6 +8,7 @@ import com.badwatch.core.model.ShotEvent
 import com.badwatch.core.model.TrainingSession
 import com.badwatch.core.model.TrainingSessionSnapshot
 import com.badwatch.core.pipeline.ShotDetectionPipeline
+import java.util.UUID
 
 /**
  * The single entry point the app layer drives during a live session.
@@ -20,11 +21,14 @@ import com.badwatch.core.pipeline.ShotDetectionPipeline
  */
 class SessionRecorder(
     private val profile: PlayerProfile = PlayerProfile(),
+    private val sessionId: String = UUID.randomUUID().toString(),
     classifier: ShotClassifier = ShotClassifier(handedness = profile.handedness),
     private val pipeline: ShotDetectionPipeline = ShotDetectionPipeline(classifier),
     private val aggregator: TrainingSessionAggregator = TrainingSessionAggregator(
         baselineHeartRate = profile.restingHeartRate,
-        maxHeartRate = profile.maxHeartRate
+        maxHeartRate = profile.maxHeartRate,
+        restingHeartRateConfigured = profile.hasConfiguredRestingHeartRate,
+        maxHeartRateConfigured = profile.hasConfiguredMaxHeartRate
     ),
     private val rallySegmenter: RallySegmenter = RallySegmenter()
 ) {
@@ -36,6 +40,7 @@ class SessionRecorder(
     val isRunning: Boolean get() = running
     val shotCount: Int get() = shots.size
     val samplesProcessed: Long get() = sampleCount
+    val playerProfile: PlayerProfile get() = profile
 
     fun start(nowMillis: Long) {
         shots.clear()
@@ -68,6 +73,18 @@ class SessionRecorder(
     fun rallyProfile(nowMillis: Long): RallyProfile =
         rallySegmenter.segment(shots, sessionEndMillis = nowMillis)
 
+    /** Immutable compact state suitable for an atomic active-session journal. */
+    fun checkpoint(): SessionRecorderCheckpoint? {
+        if (!running) return null
+        return SessionRecorderCheckpoint(
+            sessionId = sessionId,
+            profile = profile,
+            samplesProcessed = sampleCount,
+            aggregator = aggregator.checkpoint(),
+            pipeline = pipeline.checkpoint()
+        )
+    }
+
     /**
      * Ends the session and produces the persistable record.
      *
@@ -77,7 +94,7 @@ class SessionRecorder(
         if (!running) return null
         running = false
         if (sampleCount == 0L) return null
-        val session = aggregator.buildSession(nowMillis)
+        val session = aggregator.buildSession(nowMillis, sessionId = sessionId)
         return RecordedSession(
             session = session,
             rallyProfile = rallySegmenter.segment(shots, sessionEndMillis = nowMillis),
@@ -90,6 +107,25 @@ class SessionRecorder(
         shots.clear()
         pipeline.reset()
         sampleCount = 0L
+    }
+
+    companion object {
+        fun restore(checkpoint: SessionRecorderCheckpoint): SessionRecorder {
+            require(checkpoint.schemaVersion == SessionRecorderCheckpoint.SCHEMA_VERSION) {
+                "Unsupported recorder checkpoint schema ${checkpoint.schemaVersion}"
+            }
+            val recorder = SessionRecorder(
+                profile = checkpoint.profile,
+                sessionId = checkpoint.sessionId
+            )
+            recorder.shots += checkpoint.aggregator.shots
+            recorder.aggregator.restore(checkpoint.aggregator)
+            recorder.pipeline.restore(checkpoint.pipeline)
+            recorder.startMillis = checkpoint.aggregator.startedAtMillis
+            recorder.sampleCount = checkpoint.samplesProcessed
+            recorder.running = true
+            return recorder
+        }
     }
 }
 

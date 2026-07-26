@@ -23,9 +23,43 @@ data class SessionExport(
     val profile: PlayerProfile,
     val session: TrainingSession,
     val rallyProfile: RallyProfile,
-    /** Optional free-text context: hall, shuttle grade, opponent, string tension. */
-    val notes: Map<String, String> = emptyMap()
+    /**
+     * Legacy extension metadata retained for schema-1 compatibility. New diary data belongs
+     * in [context] and [report], where its meaning and evidence source are explicit.
+     */
+    val notes: Map<String, String> = emptyMap(),
+    val context: SessionContext = SessionContext(),
+    val report: PostSessionReport = PostSessionReport(),
+    /** Append-only edits; [session] and [rallyProfile] always remain the original output. */
+    val corrections: SessionCorrections = SessionCorrections(),
+    /**
+     * Monotonic optimistic-concurrency token for the complete [context]/[report] document.
+     *
+     * Schema-1 payloads written before diary editing default to zero. Every diary save copies
+     * the current value and increments it. A server can therefore merge a stale watch upload or
+     * archive without allowing its older diary snapshot to replace a newer reviewed one.
+     */
+    val diaryRevision: Long = 0L,
+    /**
+     * Server diary revision acknowledged before this local branch was edited.
+     *
+     * A watch can make several offline edits while preserving this base. The server accepts a
+     * differing newer diary only when the base still equals its current revision, which prevents
+     * a stale branch from leapfrogging edits made in the dashboard. Null is retained solely so
+     * stored schema-1 payloads written before lineage tracking continue to decode safely.
+     */
+    val diaryBaseRevision: Long? = null
 ) {
+    init {
+        require(diaryRevision >= 0L) { "Diary revision must not be negative" }
+        require(diaryBaseRevision == null || diaryBaseRevision >= 0L) {
+            "Diary base revision must not be negative"
+        }
+        require(diaryBaseRevision == null || diaryBaseRevision <= diaryRevision) {
+            "Diary base revision must not exceed the diary revision"
+        }
+    }
+
     companion object {
         const val SCHEMA_VERSION: Int = 1
     }

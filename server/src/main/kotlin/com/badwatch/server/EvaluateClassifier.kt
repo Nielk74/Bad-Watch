@@ -9,9 +9,9 @@ import kotlin.math.roundToInt
  *
  * `./gradlew :server:evaluateClassifier -PcaptureDir=badwatch-data/captures`
  *
- * This is the number Phase 2 has to beat. Publishing it — even when it is bad, especially
- * when it is bad — is the difference between "uncalibrated" as an admission and as a
- * measurement.
+ * This is the descriptive heuristic baseline an offline candidate has to beat. Publishing it
+ * does not make a drill corpus representative of real play; participant coverage is printed
+ * beside the score so device identity can never masquerade as player-independent evidence.
  */
 fun main(args: Array<String>) {
     val directory = File(args.firstOrNull() ?: "badwatch-data/captures")
@@ -30,10 +30,15 @@ fun main(args: Array<String>) {
 
     val evaluation = repository.evaluateClassifier()
     val devices = captures.map { it.deviceId }.distinct()
+    val participants = captures.mapNotNull { it.participantId?.takeIf(String::isNotBlank) }.distinct()
+    val unidentifiedDrills = captures.count { it.participantId.isNullOrBlank() }
 
     println()
     println("Rule-based classifier, scored on ${evaluation.swingCount} labelled swings")
-    println("from ${devices.size} device(s) across ${captures.size} drills.")
+    println(
+        "from ${participants.size} identified participant(s), ${devices.size} device(s), " +
+            "and ${captures.size} drills."
+    )
     println()
 
     if (!evaluation.isMeaningful) {
@@ -79,10 +84,14 @@ fun main(args: Array<String>) {
         println()
     }
 
-    if (devices.size < 2) {
+    if (participants.size < 2) {
         println()
-        println("  All swings come from one device. This measures how the classifier does")
-        println("  for one player, not how it generalises.")
+        println("  Fewer than two identified participants are present. This cannot measure")
+        println("  player-independent generalisation, even if several device ids appear.")
+    }
+    if (unidentifiedDrills > 0) {
+        println()
+        println("  $unidentifiedDrills drill(s) have no participant id and are local smoke evidence only.")
     }
     println()
 }

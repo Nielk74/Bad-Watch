@@ -1,67 +1,77 @@
-# Bad Watch Dashboard
+# Bad Watch dashboard
 
-The dashboard is a small self-hosted server. The watch pushes finished sessions to it over
-HTTPS; you open the dashboard in any browser — phone, laptop, tablet.
+The dashboard is an optional self-hosted Ktor server plus a responsive browser UI. The watch does
+not need it to record, review, or retain a session. It adds authenticated detailed review, diary
+editing, filters, JSON backup/restore, reviewed CSV, and consent-bound Detection Lab tooling.
 
-## Why a web dashboard rather than a phone app
+The bundled server speaks plain HTTP. Release builds of the watch app keep Android's secure
+cleartext default and therefore require an **HTTPS** URL, normally supplied by a TLS reverse proxy.
+Debug builds alone include a network-security override for trusted-LAN HTTP development.
 
-- **Nothing extra to install.** No companion APK, no Play Store pairing, no Data Layer
-  handshake. The Pixel Watch 3 has WiFi and LTE and posts directly.
-- **Works everywhere.** The same URL opens on a phone at the club and on a desktop at home.
-- **Charts are cheap in a browser** and expensive in Compose.
-- **One schema.** `:server` depends on `:core`, so the server deserializes the exact Kotlin
-  types the watch serialized. A wire-format mistake is a compile error, not a runtime
-  surprise.
+## Run locally
 
-The trade-off is that you must run a server somewhere. The watch does not require it — every
-feature except the dashboard works with no network at all, and sessions queue on the watch
-until the server is reachable.
-
-## Running it
+With no environment variables, the server binds only to loopback:
 
 ```bash
 ./gradlew :server:run
+# http://127.0.0.1:8080/
 ```
 
-Configuration is entirely environment variables, all optional:
+Loopback development may run without a token because no other machine can connect. Configuration:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `BADWATCH_PORT` | `8080` | Listen port |
-| `BADWATCH_DATA_DIR` | `./badwatch-data` | Where session JSON is written |
-| `BADWATCH_TOKEN` | *(unset)* | Shared bearer token for every session, capture and dashboard data request. When unset, data APIs are unauthenticated and the server says so at startup. |
+| `BADWATCH_HOST` | `127.0.0.1` | Bind address. Use `0.0.0.0` or a LAN address only with a token. |
+| `BADWATCH_PORT` | `8080` | Listen port, from 1 through 65535. |
+| `BADWATCH_DATA_DIR` | `./badwatch-data` | Session files plus the `captures/` subdirectory. |
+| `BADWATCH_TOKEN` | unset | Shared bearer token for every data API. Mandatory for a non-loopback bind. |
+
+To make a development server reachable from a watch on a private LAN:
 
 ```bash
-BADWATCH_TOKEN=$(openssl rand -hex 24) \
+BADWATCH_HOST=0.0.0.0 \
+BADWATCH_TOKEN="$(openssl rand -hex 24)" \
 BADWATCH_DATA_DIR=/var/lib/badwatch \
 BADWATCH_PORT=8080 \
 ./gradlew :server:run
 ```
 
+The process refuses to start when a non-loopback host has no token. This is deliberate: session
+records contain health and personally identifying diary fields.
+
 For a standalone distribution:
 
 ```bash
 ./gradlew :server:installDist
-./server/build/install/server/bin/server
+BADWATCH_HOST=127.0.0.1 ./server/build/install/server/bin/server
 ```
 
-### Seeding demo data
+### TLS for a release watch
 
-To develop against the dashboard without a watch:
+Put the server behind a TLS-terminating reverse proxy such as Caddy or nginx, keep Ktor on
+loopback, and configure the public `https://` base URL on the watch. The proxy must preserve the
+`Authorization` header and serve the browser UI and API from the same origin.
 
-```bash
-./gradlew :server:seedDemoData -PdataDir=/tmp/badwatch-demo
-BADWATCH_DATA_DIR=/tmp/badwatch-demo ./gradlew :server:run
-```
+Set `BADWATCH_TOKEN` even though Ktor itself is bound to loopback: the reverse proxy makes that
+loopback service reachable. Enter the same token on the watch and in the browser prompt.
 
-This writes six weeks of synthetic sessions with changing session volume so the activity
-history has something to show. Synthetic sessions are only ever written by this explicit
-command — nothing generates them at runtime.
+Do not expose plain Ktor directly to the internet. A single shared token is appropriate for one
+owner or a small trusted deployment; it is not multi-user access control.
 
-## Pointing the watch at it
+## Configure the watch
 
-The watch needs the base URL (and token, if set). Typing a URL on a watch is miserable, so
-debug builds accept it over adb:
+Release and debug builds provide **Settings → Dashboard**. Enter the base URL and shared bearer
+token, then choose **Save & test**. A token is optional only for a truly loopback-only development
+server, which a watch cannot reach. The setup handshake calls `GET /api/v1/status` with the bearer
+token when configured, verifies the shared schema version, and reports the connection result.
+Saved configuration is then used by subsequent WorkManager sync. Replacing the URL without
+entering a new token retains the saved token; removing the server clears both.
+
+An `http://` URL displays a warning. It is useful only in a debug build whose debug-only network
+security configuration permits cleartext. A release build should use the reverse-proxied HTTPS
+URL.
+
+Debug builds also retain an adb shortcut:
 
 ```bash
 adb shell am broadcast -a com.badwatch.app.SET_DASHBOARD \
@@ -70,85 +80,112 @@ adb shell am broadcast -a com.badwatch.app.SET_DASHBOARD \
   --es token "<token>"
 ```
 
-The receiver is declared only in `src/debug/AndroidManifest.xml`. It must be exported for
-`am broadcast` to reach it, and an exported receiver that rewrites the upload destination is
-exactly the shape of an exfiltration hole — so it does not exist in release builds. A proper
-in-app settings flow (or phone-side pairing) is the release path, and is still to be built.
+The exported receiver exists only in `src/debug`; it is intentionally absent from release APKs.
 
-Sync behaviour:
+## Sync behavior
 
-- Sessions are saved to the watch the instant they end. Upload is entirely separate.
-- `SyncWorker` runs when the network is available, with exponential backoff.
-- The server acknowledges each session id individually, so a partial failure re-uploads only
-  what did not land.
-- Sessions the server explicitly rejects are not retried forever.
+- A completed session is atomically durable on the watch before upload is attempted.
+- `SyncWorker` requires a network and uses WorkManager retry/backoff for transient failures.
+- Sessions and consent-eligible captures upload independently, so one class cannot block the other.
+- The server accepts or rejects each record ID separately.
+- A changed diary with a higher revision merges only when its acknowledged base is the current
+  server revision. Stale branches cannot leapfrog browser edits; append-only corrections extend
+  only a matching prefix, and divergent branches surface as a payload-specific conflict.
+- Accepted and rejected states are stored beside the watch record with a payload fingerprint.
+- An unchanged explicit rejection is not retried forever and its reason is visible in History.
+- Editing a diary or correction changes the payload fingerprint and makes the record pending again.
+- The client refuses to follow a redirect while carrying the bearer credential.
 
-When `BADWATCH_TOKEN` is set, opening the dashboard prompts for it after the static shell
-loads. The browser keeps it in `sessionStorage`, so it lasts only for the current tab, and
-sends it as an `Authorization: Bearer …` header. It is never put in the URL, browser history
-or server access-log query string. A local server without a token opens directly with no
-prompt.
+The browser keeps a supplied token in `sessionStorage`, sends it only in the Authorization header,
+and never places it in the URL or browser history.
 
-## Security
+## Reviewed analytics
 
-The threat model is "a server you run for yourself or your club", so the controls are
-deliberately light:
+Dashboard aggregates and detail charts lead with the latest reviewed projection:
 
-- `BADWATCH_TOKEN` is a single shared bearer token guarding all data reads, uploads and
-  deletes. The static dashboard shell and `/api/v1/health` stay public; the shell cannot read
-  any session or capture data until the token is supplied.
-- Browser API access is same-origin. The server does not grant cross-origin reads; put a
-  separate front end behind the same reverse-proxy origin if you build one.
-- **Do not expose the server to the internet without a token**, and put it behind a TLS
-  terminating proxy (Caddy, nginx, Cloudflare Tunnel). The server speaks plain HTTP.
-- Sessions contain heart-rate data. Treat the data directory as health data.
+- corrected timestamped detected hits after edge trim and false-hit removal;
+- exchanges rebuilt from the surviving timestamped events;
+- reviewed duration and optical-HR coverage;
+- provisional stroke mix from surviving detected events;
+- evidence-backed insights using only prior, usable, like-for-like history;
+- reported context, RPE, soreness, equipment, conditions, goal, and notes.
 
-If this ever needs real multi-user access control, that is a genuine feature, not a config
-flag — see the coach-mode item in the product plan.
+Reported missed hits remain a separate untimed number. They do not enter detected-hit charts,
+exchange timing, active-time estimates, or stroke mix. Every detail response also contains the
+immutable raw `SessionExport` for audit.
+
+The rolling volume chart is a transparent seven-day sum of estimated active time compared with
+the weekly average from the preceding four complete weeks. It is not ACWR, readiness, tissue load,
+or injury risk. HRR-minutes are shown only with sufficient optical coverage and explicitly sourced
+resting and maximum heart rate.
+
+## Browser backup, CSV, and restore
+
+The authenticated header exposes three owner actions:
+
+- **Backup JSON** downloads a lossless deterministic archive of every session and only those raw
+  captures that recorded model-training consent plus participant/protocol metadata.
+- **Export CSV** downloads a human-readable reviewed diary with raw and corrected totals,
+  effective duration, context, report, equipment, conditions, HR coverage, and correction count.
+  CSV is not a restore format.
+- **Restore** validates the complete archive before the first write, then merges by stable ID.
+  New records are created, stale diary snapshots cannot erase newer ones, compatible append-only
+  reviews are extended, identical records remain unchanged, and absent local records are never
+  deleted. Immutable-evidence collisions and divergent histories fail before any semantic write.
+
+Archive encoding omits a generated timestamp and canonicalizes record/key order, so the same data
+produces the same bytes. Validation rejects incompatible schemas, duplicate or filesystem-unsafe
+IDs, invalid bounds, malformed correction provenance, and ineligible raw captures before mutation.
+
+## Security contract
+
+- `/` and `/api/v1/health` are public so the shell and liveness check can load.
+- Every other API route requires the configured bearer token.
+- Data API responses send `Cache-Control: no-store`.
+- The server does not grant cross-origin browser reads.
+- Non-loopback binding without a token is rejected at startup.
+- TLS is the operator's reverse-proxy responsibility.
+- Protect the data directory and backups as health/personal data.
 
 ## API
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/` | The dashboard page |
-| `GET` | `/api/v1/health` | Liveness plus the schema version this server speaks |
-| `POST` | `/api/v1/sessions` | Upload a `SyncEnvelope`; returns accepted/rejected ids |
-| `GET` | `/api/v1/sessions` | Every stored session, newest first |
-| `GET` | `/api/v1/sessions/{id}` | One full session including every shot |
-| `DELETE` | `/api/v1/sessions/{id}` | Remove a session (requires the token) |
-| `GET` | `/api/v1/dashboard` | Pre-aggregated data the dashboard page renders |
-| `POST` | `/api/v1/captures` | Upload labelled training drills (`CaptureEnvelope`) |
-| `GET` | `/api/v1/captures` | Full labelled capture corpus, newest first |
-| `GET` | `/api/v1/captures/summary` | Dataset progress: swings per stroke, contributing devices |
-| `GET` | `/api/v1/captures/evaluation` | Rule-based classifier score against labelled captures |
+| `GET` | `/` | Static dashboard shell. |
+| `GET` | `/api/v1/health` | Public liveness and schema version. |
+| `GET` | `/api/v1/status` | Watch setup handshake and record counts. |
+| `POST` | `/api/v1/sessions` | Upload a `SyncEnvelope`; return per-ID acceptance/rejection. |
+| `GET` | `/api/v1/sessions` | Stored raw session envelopes, newest first. |
+| `GET` | `/api/v1/sessions/{id}` | One lossless raw session for owner/API compatibility. |
+| `GET` | `/api/v1/sessions/{id}/detail` | Reviewed primary detail plus immutable raw audit envelope. |
+| `PUT` | `/api/v1/sessions/{id}/diary` | CAS-update only typed player-reported diary fields. |
+| `DELETE` | `/api/v1/sessions/{id}` | Delete one server session. |
+| `GET` | `/api/v1/dashboard` | Reviewed aggregate, filters, and comparison groups. |
+| `POST` | `/api/v1/captures` | Upload a consent-eligible `CaptureEnvelope`. |
+| `GET` | `/api/v1/captures` | Protocol-complete, consented capture corpus. |
+| `GET` | `/api/v1/captures/summary` | Usable swings by label and consenting participants. |
+| `GET` | `/api/v1/captures/evaluation` | Rule-classifier evaluation over eligible captures. |
+| `GET` | `/api/v1/export/archive` | Deterministic lossless JSON archive. |
+| `GET` | `/api/v1/export/sessions.csv` | Reviewed human-readable CSV. |
+| `POST` | `/api/v1/import/archive` | Validate, merge, and restore an archive. |
 
-When `BADWATCH_TOKEN` is configured, every API route in this table except
-`/api/v1/health` requires `Authorization: Bearer <token>`. The `/` shell remains available
-so it can collect that token without putting credentials in a link.
+`GET /api/v1/dashboard` supports repeatable or comma-separated `activityMode`, `completion`, and
+`recordingQuality` parameters plus one case-insensitive `comparisonTag`. Unknown enum values return
+HTTP 400. Diary mutation is intentionally narrower than `SessionExport`: it cannot replace raw
+shots, HR, original exchanges, legacy metadata, or correction history.
 
-A schema-version mismatch is rejected with HTTP 400 rather than being parsed optimistically —
-a silently misread session is worse than an upload the watch retries after an app update.
+Every diary form submits the `diaryRevision` it loaded. A successful save increments the revision;
+an intervening save returns HTTP 409 and the browser reloads the current record rather than
+discarding either edit silently.
 
-## What the dashboard shows
+## Demo data
 
-- **Detected hits / time on court / average detected exchange / HR load** as headline tiles.
-  A detected hit is a racket-wrist contact candidate, not the match's total shot count.
-- **Detected hits per session** over time — a transparent external-volume measure.
-- **Detected exchange length** — bursts inferred from quiet gaps between the wearer's hits,
-  not authoritative rally boundaries or the full two-player shot count.
-- **Shot mix** — provisional detected stroke labels. Do not use it for coaching decisions
-  until the classifier is calibrated against real play.
-- **Estimated active-time volume** — a rolling seven-day sum compared with the weekly average
-  from the preceding four complete weeks. Both lines use the same unit. No ratio is labelled
-  a safe zone, readiness score, or injury-risk prediction.
-- **Session table** — every session, and the accessible fallback for every chart above.
+Synthetic sessions are created only by the explicit developer command:
 
-When optical heart rate was actually recorded, the dashboard also shows cardiovascular load
-as elapsed minutes multiplied by mean heart-rate reserve (`HRR-min`), alongside signal
-coverage. It is withheld below 60% signal coverage and remains separate from hits and
-inferred active time because those units are not interchangeable. Old or incomplete sessions
-show an em dash instead of a fabricated value.
+```bash
+./gradlew :server:seedDemoData -PdataDir=/tmp/badwatch-demo
+BADWATCH_DATA_DIR=/tmp/badwatch-demo ./gradlew :server:run
+```
 
-All hit, exchange and stroke classification remains provisional. The dashboard reports the
-one-wrist detector's output explicitly; it does not claim to observe the shuttle, opponent,
-partner, official rally boundary or point outcome.
+They are fixtures for UI and analytics development, never model-accuracy or physiological
+evidence.

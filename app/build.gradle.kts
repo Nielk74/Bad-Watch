@@ -3,6 +3,7 @@ import java.util.Locale
 plugins {
     id("com.android.application")
     kotlin("android")
+    id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
@@ -25,14 +26,14 @@ fun computeVersionCode(version: String): Int {
 
 android {
     namespace = "com.badwatch.app"
-    // Compiling against 36 is required by current Compose/Wear artifacts. targetSdk stays
-    // at 34 deliberately — raising it changes runtime behaviour and needs its own testing pass.
+    // Compile and target the current platform after validating target-36 health-service,
+    // denied-heart-rate, notification, networking, and persistence paths on Wear hardware.
     compileSdk = 36
 
     defaultConfig {
         applicationId = "com.badwatch.badwatch"
         minSdk = 30
-        targetSdk = 34
+        targetSdk = 36
         versionCode = computeVersionCode(semanticVersion)
         versionName = semanticVersion
 
@@ -102,6 +103,11 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.health.services)
+    implementation(libs.androidx.watchface.complications.data.source.ktx)
+    // Health Services carries Guava at runtime but not on its API classpath. Declaring the
+    // exact Android artifact it uses keeps Tiles' ListenableFuture signatures compilable.
+    implementation(libs.guava.android)
     implementation(libs.coroutines.android)
     implementation(platform(libs.compose.bom))
     implementation(libs.bundles.compose)

@@ -1,588 +1,460 @@
-# Bad Watch — Plan to Finish
+# Bad Watch product plan — v0.3 completion record
 
-> A Wear OS training companion for badminton players. This document is the honest
-> state of the project, the product thesis, the full feature vision, and a phased
-> plan to get from "gyroscope demo" to "the thing serious players wear every session."
+**Status:** implementation complete for the v0.3 product contract; final release evidence is
+recorded in [Validation and evidence](#validation-and-evidence).
 
-**Progress: Phase 0 complete · Phase 1 substantially complete · dashboard, labelled data
-pipeline and session insights delivered.** The blocker on Phase 2 is now data collection
-with real players, not missing tooling. Six of the seven v1.0 promises are met or partly
-met; the outstanding one is shot-classification accuracy.
-See [Part 5 — Roadmap](#part-5--roadmap) for per-phase status and
-[Part 8 — Changes to this plan](#part-8--changes-to-this-plan) for decisions that have been
-revised since it was written.
+**Updated:** 2026-07-26
 
----
+**Platform:** standalone Wear OS app plus an optional self-hosted web dashboard
 
-## Part 0 — Where we started
+This document closes the original speculative roadmap. Every proposal in that roadmap now has
+one of three explicit outcomes:
 
-> **Historical.** This audit describes the repository as found. Most of it has since been
-> fixed — the table is kept because it explains why the architecture looks the way it does.
-> For current state see the [roadmap](#part-5--roadmap) and the README.
+- **Delivered** when it makes a trustworthy session product better today.
+- **Research-gated** when real-player evidence is required before a user-facing claim is safe.
+- **Excluded** when one racket-wrist watch cannot observe it, the claim would be misleading, or
+  the cost would pull the product away from its purpose.
 
-Before planning, an audit. The docs in this repo described an app that did not exist.
-
-| `docs/` claims | Repository reality |
-| --- | --- |
-| Real-time classification of smash/clear/drop/drive/backhand | `core/` contains `ShotClassifier`, `ShotDetectionPipeline`, `TrainingSessionAggregator` — unit-tested and **never referenced by `app/`**. `app/build.gradle.kts` has no `implementation(project(":core"))`. |
-| Heart-rate zones, fatigue, effort, recovery scores | No HR sensor subscription, no `BODY_SENSORS` permission, no Health Services dependency. `HeartRateZone` and the aggregator are orphaned. |
-| DataStore session history (40 entries), history screen, "Clear history" | No DataStore dependency, no repository, no persistence of any kind. State dies with the Activity. |
-| Foreground `SensorService`, 50 Hz, windowed median filter, 250 ms batching | `SensorCollector` is a `callbackFlow` on `SENSOR_DELAY_GAME`, started from `MainActivity.onStart()`. No service, no filter, no batching. Stops when the screen sleeps. |
-| Export as JSON/CSV | `GyroViewModel.exportCaptureCsv()` correctly builds a CSV string. The UI button discards it and writes a line to `Log.d`. |
-| Session insights, focus areas, warm-up detection | Computed from raw gyro *magnitude* thresholds (`< 1.2` = Idle, `> 4.5` = Burst). Nothing badminton-specific. Copy is invented at render time. |
-| "Tested analytics pipeline plus ViewModel unit coverage" | True, and genuinely decent — but it tests code that is either unreachable (`core`) or not about badminton (`GyroViewModel`). |
-
-Also missing at the platform level: no permissions declared beyond the gyro feature flag,
-no foreground service, no Tile, no complication, no ambient/always-on mode, no companion
-phone app, no ProGuard config that matters, no CI, and no local Android SDK on this machine
-(`ANDROID_HOME` unset — the project has never been built here).
-
-**The one honest asset:** the `core` module is a reasonable, testable, platform-free skeleton.
-It is the right shape. It just needs to be plugged in and made real.
-
-**The one honest liability:** the docs. They describe aspiration as fact. Step zero of this
-plan is to rewrite them as a roadmap, so nobody (human or agent) burns a day chasing a
-`SensorService` that was never written.
+There are no unchecked implementation promises in this plan. Future work begins from measured
+player need and passes the gates below; it does not inherit entitlement from the old wish list.
 
 ---
 
-## Part 1 — The spirit
+## 1. Product contract
 
-Read the repo charitably and the intent is clear, and it's a good one:
+Bad Watch is a fast, private badminton session companion for the racket wrist. It should help a
+player answer four questions without pretending to be an electronic coach:
 
-> **Badminton is the fastest racket sport in the world and it is almost completely
-> un-instrumented.** Tennis has Babolat Play. Golf has Arccos. Running has everything.
-> A badminton player — a sport of 30 million+ regular players, dominant across Asia and
-> Europe — walks off court after two hours with no idea how many smashes they hit, how
-> long their rallies were, whether their footwork degraded in the third game, or whether
-> today's session was heavier than their shoulder can take.
->
-> Bad Watch says: **you are already wearing the sensor.** A modern smartwatch has a
-> 6-axis IMU, an optical HR sensor, a microphone, a haptic motor, and a screen 40 cm from
-> the racket. That is enough to reconstruct a badminton session in remarkable detail —
-> with no cameras, no racket dongles, no subscriptions, and no cloud.
+1. **Did my whole session record?**
+2. **What did the watch actually detect, and how can I correct it?**
+3. **How did this comparable session differ from my own recent play?**
+4. **Can I keep, inspect, and export the evidence myself?**
 
-Three commitments that follow from that thesis, and that should govern every decision:
+The watch is the primary product. It works offline, without an account or subscription. The
+optional dashboard provides room for detailed review, editing, JSON backup, CSV export, and
+model-research tooling; it is not required to record or understand a session.
 
-1. **Wrist-only.** No extra hardware. If a feature needs a sensor in the racket handle,
-   it doesn't ship. Optional phone/video adds *depth*, never a dependency.
-2. **On-device and private.** Sessions are health data. Everything computes on the watch.
-   Sync is opt-in, export is user-initiated, no account required to get full value.
-3. **Glanceable-first, haptic-first.** During a rally you have ~0.4 s of attention.
-   The primary output channel is the vibration motor, not the display. The display is for
-   between points. The phone is for after.
+### The five non-negotiables
 
-**Anti-goals** (say them out loud so the roadmap doesn't drift): not a social network,
-not a live-streaming scoreboard, not a general fitness tracker, not a subscription funnel.
+1. **One tap to play.** The home screen, Tile, and ongoing flow put recording ahead of setup.
+2. **Glanceable in motion.** Large numerals, a single visual hierarchy, ambient support, and
+   optional—not mandatory—detected-hit haptics.
+3. **Evidence before adjectives.** Values are named measured, detected, estimated, reported, or
+   inferred. An insight cites its evidence or stays silent.
+4. **Corrections propagate everywhere.** Reviewed detected hits, time window, and rebuilt
+   exchanges feed recap, history, progress, Tile, complication, dashboard, insights, and CSV.
+   Reported missed hits remain a separate untimed number.
+5. **Raw evidence remains recoverable.** Reviews append provenance; they never rewrite the raw
+   recording. Persistence and sync failures must be visible and retry-safe.
 
----
+### What the app never claims
 
-## Part 2 — What the sport actually demands
+A single watch does not see shuttle contact, the opponent, partner, point winner, court position,
+knee alignment, grip, tactics, pain, or technique cause. Bad Watch therefore does not claim:
 
-Feature ideation should come from the sport, not from what's easy to build. So:
+- true rally length, exact active playing time, shuttle speed, landing position, or shot quality;
+- automatic scoring, serve order, errors, winners, pressure, or momentum;
+- a global beginner/intermediate/advanced level inferred from wrist movement;
+- fatigue, recovery, readiness, calorie accuracy, tissue load, injury risk, or a safe workload;
+- personalized heart-rate zones without a sourced maximum heart rate, or heart-rate reserve
+  without both sourced resting and maximum values.
 
-**Badminton is an interval sport.** Rallies average 6–9 s in singles, 4–7 s in doubles,
-with 10–20 s between them. Work:rest is roughly 1:2. Effective playing time in a 60-minute
-session is ~30–35%. Any "session duration" metric that ignores this is lying to the player.
-
-**The stroke vocabulary is large and hierarchical.** Overhead (smash, jump smash, half-smash,
-slice/cut smash, clear — attacking and defensive, drop, slice drop, around-the-head variants),
-midcourt (drive, block, push, defensive lift), front court (net shot, tumble/spin net, net kill,
-net lift), and serves (low serve, flick, drive serve, high serve). Plus backhand versions of most.
-A five-class classifier is a starting point, not the goal.
-
-**Footwork is half the sport, and it's more measurable than strokes.** Split-step timing,
-lunge depth and recovery, chassé vs. crossover, scissor-kick jumps, return-to-base discipline,
-six-corner coverage. A watch on *either* wrist sees body rotation, jumps, and step cadence.
-This is genuinely underserved — nobody instruments amateur footwork.
-
-**Injuries are predictable and specific.** Shoulder (rotator cuff, from smash volume),
-knee (patellar tendon, from lunges), Achilles (from jump landings — the single most common
-career-ending badminton injury), and lower back (from around-the-head). Every one of these
-correlates with a countable event the IMU can see. Load management is not a nice-to-have,
-it is arguably the highest-value feature in the whole product.
-
-**Players are obsessive about conditions.** String tension (kg/lb), racket balance, shuttle
-speed grade (76–78, and it shifts with hall temperature and altitude), grip, hall lighting
-and drafts. They will absolutely log this if you make it two taps, and correlating it with
-performance is a feature no competitor has.
-
-**Which wrist matters enormously.** Habitually, most people wear a watch on the
-*non-dominant* wrist — which for a racket sport is a completely different signal: no swing
-at all, but good body rotation, footwork and lunge/jump data.
-
-> **Decided:** Bad Watch requires the **racket wrist**, and says so in onboarding. Supporting
-> both would mean two models and two honest-but-different feature sets before either is good.
-> The non-dominant, footwork-only mode is deferred, not rejected — `WristPlacement` keeps a
-> place for it in the data model. See [Part 8](#part-8--changes-to-this-plan).
-
-The footwork work in Pillar 3 is what would eventually make that second mode viable, since
-almost all of it works on either wrist.
+These boundaries are part of the product, not disclaimers added after the interface is designed.
+The canonical vocabulary and formulas live in [SPORT_MODEL.md](SPORT_MODEL.md).
 
 ---
 
-## Part 3 — The feature vision
+## 2. Research translated into product decisions
 
-Organized as seven pillars. Each is scoped to what wrist sensors can genuinely support;
-where something is speculative it is marked **[R]** for "needs research spike."
+### Badminton technique and common practice themes
 
-### Pillar 1 — Shot intelligence
+The BWF Level 1 coaching material organizes movement around start, approach, hit, and recover;
+it also teaches split-step timing, balanced lunges, adaptable grip, and side-on overhead
+preparation. Those are useful themes for a player-selected practice library. They are not things
+a wrist watch can personally grade.
 
-The foundation. Replace the threshold heuristics with a real perception stack.
+**Decision:** ship sourced general practice cards and a six-corner shadow prompt. Every card says
+what the player is practising and what the watch does not assess. The shadow routine measures only
+cue and player-confirmation timestamps. No Footwork Index, automatic split-step timing, lunge
+quality score, or corrective technique diagnosis is shown.
 
-- **Multi-sensor fusion.** Gyroscope + accelerometer + linear acceleration + rotation vector
-  at 100–200 Hz, using hardware FIFO batching and `event.timestamp` (monotonic nanos), not
-  wall-clock. The current `System.currentTimeMillis()` + `distinctUntilChanged()` combination
-  destroys timing fidelity and silently drops legitimate repeated samples.
-- **Impact detection via microphone.** The shuttle-on-string "pock" is a ~2–5 kHz transient
-  with a very distinctive envelope, audible over hall noise at wrist distance. Fusing an audio
-  onset with an IMU swing peak gives near-certain "this was a real shot, not a practice swing"
-  — and the *absence* of a pock after a full swing is a **miss/mishit**, which no IMU-only
-  system can detect. Audio never leaves the device; only onset timestamps are retained. **[R]**
-- **Sweet-spot estimation.** Off-centre hits produce a duller, lower-frequency impact and a
-  characteristic post-impact frame vibration in the accelerometer. Combined, they yield a
-  per-shot "clean contact" score. This is the closest thing to a technique coach the wrist can offer. **[R]**
-- **Racket-head speed estimation.** ω × effective radius (wrist-to-string-bed, calibrated per
-  player and racket) gives head speed; with a shuttle-transfer coefficient it becomes an
-  estimated shuttle speed. Players *love* this number. Report it as a range, honestly labelled
-  as an estimate, and use it primarily for *relative* trends (your smash today vs. your baseline).
-- **Full stroke taxonomy** — grow from 5 classes to ~15, with a confidence-gated hierarchy:
-  always confident about the family (overhead / midcourt / net / serve), less confident about
-  the specific stroke. Show the family when the stroke is uncertain, rather than guessing.
-- **Handedness and wrist-placement models.** Two model heads, selected at onboarding and
-  verifiable ("swing three smashes"). Non-dominant wrist gets a *different feature set*:
-  no stroke classification, but full footwork, rally, and load analysis — advertised honestly.
-- **Personal calibration.** A 90-second guided routine ("hit five smashes… five clears…") that
-  fine-tunes thresholds and, later, adapts the model's final layer on-device. Re-offered when
-  confidence drifts.
-- **Active learning loop.** When the classifier is unsure, the watch buzzes once at the next
-  natural pause: "That last shot — smash or clear?" Two taps. Every answer is training data,
-  and the player feels the model getting better at *them*.
+Sources: [BWF Coach Education Level 1](https://development.bwfbadminton.com/coaches/level-1) and
+the [BWF Level 1 manual](https://badminton.lv/faili/bwf_coach_education_coaches_manual_l1-2nd-edition-midres.pdf).
 
-### Pillar 2 — Rally & match engine
+### Recognizing a player's level
 
-The layer that turns a stream of shots into badminton.
+Research can distinguish groups under controlled protocols, but the sensor setup matters. A
+40-player study found useful temporal and acceleration features, while later novice/experienced
+work used seven inertial sensors. Video footwork studies use information a wrist does not contain.
+None validates a global level badge from this product's single racket-wrist stream.
 
-- **Rally segmentation.** Cluster shots by inter-shot interval and motion energy to detect
-  rally start/end. Yields rally length (shots and seconds), inter-rally rest, and the true
-  work:rest ratio — the single most informative number about how the session actually went.
-- **Auto-scoring.** Rally boundaries plus serve detection (a low serve has an unmistakable
-  low-amplitude, low-and-forward signature) drive a rally-scoring model: 21 points, two-point
-  margin, cap at 30, best of three. Ambiguity is resolved by the wrist: a flick gesture or
-  a tap awards the point. Serve court (odd/even) is tracked automatically, which is the thing
-  club players get wrong constantly.
-- **Match mode on the wrist.** Giant score, server indicator, correct service court, automatic
-  interval reminder at 11, change-of-ends prompt, and a between-games 120-second timer.
-  Always-on ambient rendering so the score is readable without a wrist flick.
-- **Rally intensity profile.** Every rally scored on shot rate, peak head speed, and movement
-  volume. Surfaces "your rallies over 12 shots are where you lose points" — a genuinely
-  actionable pattern that amateurs never see.
-- **Momentum and pressure analytics.** Performance at 19-19 vs. 5-2. Error rate in the last
-  three points of a game. Serve consistency under pressure. This is the stuff coaches talk
-  about and nobody measures.
-- **Doubles awareness.** Detect front/back vs. side-by-side formation from movement-envelope
-  shape, and rotation events. Log partner and compute per-pairing stats. **[R]**
+**Decision:** keep two truths separate:
 
-### Pillar 3 — Footwork & movement
+- an editable **self-reported experience** field; and
+- a multidimensional **play pattern** after at least five usable, like-for-like sessions across
+  at least three days.
 
-The pillar that works on either wrist, and the one with the least competition.
+The play pattern reports medians such as corrected detected hits per minute, estimated active
+share, detected hits per burst, and heart-rate reserve only when authorized. It never converts
+them into “good,” “advanced,” or a single score. Different matches and drills are not ranked
+against each other.
 
-- **Split-step detection and timing.** A small, sharp vertical accelerometer signature.
-  Measure whether it happens, and its latency relative to the opponent's contact (which the
-  microphone can hear). "You split-stepped on 61% of rallies" is elite-level feedback
-  delivered to a club player. **[R]**
-- **Lunge counting, depth, and recovery time.** Deceleration signature into the lunge,
-  push-off impulse out. Recovery time to base is the fatigue tell — it lengthens before the
-  player notices anything.
-- **Jump and landing analysis.** Flight time from free-fall duration → jump height. Landing
-  impact magnitude → Achilles/knee load. Cumulative landing load is the injury-prevention
-  input nobody tracks.
-- **Court coverage estimate.** Inertial dead-reckoning over 3–8 second rallies (short enough
-  that drift stays bounded), producing distance covered and a directional-bias rose:
-  "68% of your movement was to the forehand rear corner." Sold as an estimate, never as GPS truth. **[R]**
-- **Shadow footwork trainer.** The best standalone feature in the product, and it needs no
-  detection at all — only haptics. Six corners, six distinct vibration patterns. The watch
-  calls corners in a randomized or scripted sequence; you move; it measures your time to reach
-  and return using the motion signature. Progressive difficulty, ghost-race against your best
-  run, and a Footwork Index that trends over weeks. Works alone, at home, in a car park.
-- **Recovery discipline score.** Percentage of shots after which you actually returned to base
-  before the next contact. Simple, brutal, and exactly what club coaches shout about.
+Sources: [temporal/acceleration study](https://pubmed.ncbi.nlm.nih.gov/32546052/),
+[seven-sensor study](https://doi.org/10.1186/s13102-025-01163-w), and
+[video footwork study](https://doi.org/10.3389/fspor.2026.1753118).
 
-### Pillar 4 — Physiology, load & injury prevention
+### Match demands, exertion, and injury language
 
-Where the product stops being a toy and starts being something you'd miss if it broke.
+Badminton work/rest findings vary by discipline and protocol, so an untrimmed club practice
+should not be judged against an elite match average. Sports-load guidance also calls for external
+work, internal response, context, and player report to be considered together. Injury literature
+is too heterogeneous for a personal risk predictor, and acute:chronic workload ratios do not
+justify universal danger bands.
 
-- **Health Services integration.** Use `ExerciseClient` rather than raw `SensorManager` for
-  HR, calories, and steps — better battery, better accuracy, correct behavior with the
-  system's exercise state, and automatic pause/resume.
-- **Badminton-specific HR analysis.** Zone histogram weighted by rally vs. rest, HR recovery
-  between rallies (a strong fitness marker), and time-above-threshold within rallies.
-  Generic "average heart rate" is nearly meaningless for an interval sport.
-- **Fatigue detection from technique, not just heart rate.** Racket-head speed decline vs.
-  session baseline, swing-variance increase, lunge-recovery lengthening, split-step drop-off.
-  When three of four degrade, the watch says so: *"Smash speed down 11%, lunge recovery up 18%.
-  This is where injuries happen."* This is the flagship insight of the whole app.
-- **Per-tissue load accounting.** Shoulder load = Σ(overhead shots × intensity³). Knee load =
-  Σ(lunge depth × count). Achilles load = Σ(landing impulse). Tracked daily, weekly, and as an
-  **acute:chronic workload ratio**, with the sports-science standard warning band above 1.5.
-- **Readiness score and training prescription.** Combines ACWR, HRV/resting HR trend, sleep
-  (via Health Connect), and days since last heavy session into a single go/caution/rest signal
-  shown *before* you leave the house — on a Tile, not buried in the app.
-- **Hydration and interval prompts** during long sessions and tournaments, sensitive to
-  session intensity and (via weather, if the phone is present) hall conditions.
+**Decision:** compare a player primarily with their own earlier, usable, like-for-like sessions.
+Keep recorded duration, detected volume, estimated exchange structure, measured optical HR,
+reported RPE, soreness, completion, and context as separate evidence. Display transparent
+session-RPE (`reviewed minutes × reported RPE`) and HRR-minutes only when their inputs exist. Do
+not collapse them into readiness or injury advice.
 
-### Pillar 5 — Coaching, drills & progression
+Sources: [temporal-structure review](https://doi.org/10.3389/fspor.2025.1466778),
+[IOC load consensus](https://pubmed.ncbi.nlm.nih.gov/27535989/),
+[badminton injury review](https://bmjopensem.bmj.com/content/11/1/e002127), and
+[ACWR critique](https://pubmed.ncbi.nlm.nih.gov/32502973/).
 
-Turning measurement into improvement.
+### Wrist classification
 
-- **Drill library** with wrist-guided execution: multi-shuttle feeds, pattern play, net drills,
-  defensive blocks. Each drill knows what it expects to detect, so it can score your execution
-  rather than just time you.
-- **Adaptive weekly plan.** Detected weaknesses drive prescriptions: backhand drive under 4%
-  of shots → backhand drive block. Split-step rate under 50% → shadow footwork. Third-game
-  fatigue → conditioning. Periodized backwards from a tournament date you enter once.
-- **Technique consistency scoring.** Per-stroke-type variance in swing trajectory over time.
-  A rising consistency score is the most motivating number in skill acquisition, and unlike
-  "shot count" it can't be gamed by just playing more.
-- **Goal setting with real targets** — smash count, rally endurance, footwork index,
-  weekly load — with honest progress deltas and a "personal best" ledger.
-- **Coach mode.** A coach's phone view over multiple players: session compliance, load flags,
-  assigned drills, and side-by-side comparisons. This is the natural B2B wedge (clubs, academies,
-  national junior programs) if the project ever wants to be more than a personal tool.
-- **Video sync — the killer post-session feature.** Prop a phone on a tripod. The app aligns
-  IMU-timestamped shot events to the video timeline (clap-sync or Data Layer clock sync), then
-  auto-generates: a highlight reel of every smash above a speed threshold, a clip of every rally
-  over 15 shots, and a tap-a-shot-jump-to-frame timeline. Everyone films themselves and nobody
-  ever watches the footage — this makes it watchable in ninety seconds. **[R]**
+Controlled wrist studies establish feasibility, not Bad Watch accuracy. Cross-player results,
+representative non-badminton negatives, real match play, device variation, and calibration all
+matter. A plausible-looking heuristic confidence is not a probability.
 
-### Pillar 6 — Context, gear & the social layer
+**Decision:** the current detector may count candidate motion events and display its stroke label
+only as **provisional**. Stroke labels cannot drive coaching, level, load, achievements, or match
+outcomes. The Detection Lab freezes consent and protocol metadata at recording start and provides
+a player-grouped evaluation pipeline, but no learned model is deployable until the release gates
+in section 7 pass.
 
-Cheap to build, disproportionately loved.
-
-- **Gear locker.** Rackets with string type and tension, grips, shoes with mileage tracking
-  (shoe midsole death is a real injury cause). Two taps at session start selects the setup.
-- **Conditions log.** Hall, shuttle brand and speed grade, temperature, drafts. Then the payoff:
-  *"Your smash speed is 6% higher with the racket at 25 lb vs 27 lb"* — a genuinely novel
-  correlation that no product offers, and exactly the argument every club has weekly.
-- **Opponents and partners.** Head-to-head records, per-partner doubles win rate, and
-  a local ELO. Not a social network — a personal ledger.
-- **Achievements with taste.** Milestones tied to the sport (1,000 smashes, a 40-shot rally,
-  a month of consistent split-steps), not engagement-farming streak guilt.
-- **Club and squad challenges** — opt-in leaderboards for a weekly footwork index or rally
-  endurance, shareable by link, no account required to view.
-
-### Pillar 7 — Platform & data ownership
-
-The unglamorous work that makes it a real app rather than a demo.
-
-- **Wear OS surfaces done properly:** a Tile showing readiness and last session; complications
-  for weekly load and shot count; ongoing-activity notification with live score; always-on
-  ambient mode for match play; rotary-crown navigation; Wear-native `ScalingLazyColumn`
-  ergonomics throughout.
-- **Companion phone app.** The watch is capture and live feedback; the phone is analysis:
-  full charts, shot timelines, coverage roses, load trends, video sync, gear management.
-  Wear Data Layer sync, offline-first on both ends.
-- **Export and interoperability.** JSON and CSV (finish what `exportCaptureCsv()` started),
-  Health Connect write-back, FIT/TCX for Strava and Garmin Connect, and the configurable HTTPS
-  endpoint already sketched in `docs/architecture.md` — WorkManager-backed with retry/backoff,
-  token auth, and a visible delivery audit log.
-- **Backup and restore** via encrypted local archive; optional end-to-end-encrypted cloud sync.
-- **Battery budget as a first-class requirement.** Target: a 3-hour session on under 45% of a
-  Pixel Watch 3 battery. Achieved with sensor FIFO batching, duty-cycled microphone (armed only
-  when the IMU suggests a swing window), a quantized model under 200 KB, and a strict inference
-  budget. Every release runs a measured battery-drain test — this constraint kills more
-  smartwatch sports apps than bad features do.
+Sources: [controlled wrist study](https://doi.org/10.1177/17543371211048328),
+[cross-player study](https://doi.org/10.1109/BigData55660.2022.10020984),
+[BadminSense](https://doi.org/10.1145/3772318.3790998), and
+[MultiSenseBadminton](https://www.nature.com/articles/s41597-024-03144-z).
 
 ---
 
-## Part 4 — Architecture
+## 3. Complete player journeys
 
-The current two-module split is right; it just needs filling in and connecting.
+### Record and recover a session
 
-```
-:core            Pure Kotlin/JVM. Sensor contracts, feature extraction, rally engine,
-                 scoring rules, load models, session math. No Android imports. Fast tests.
-:core-ml         TFLite inference wrapper + model assets + fallback to :core heuristics.
-:data            Room database, repositories, export/serialization, Data Layer sync.
-:sensing         Android sensor + audio capture, Health Services, foreground service.
-:wear-app        Wear Compose UI, Tiles, complications, ambient, haptic engine.
-:phone-app       Companion Compose app: analysis, video sync, gear, coach mode.
-:shared-ui       Design system shared across watch and phone.
-tools/           Python: dataset ingestion, labeling UI, model training, TFLite export.
-isolate/         Existing headless emulator tooling — keep, it's genuinely useful.
-```
+1. The player confirms racket-hand wear and handedness once.
+2. **Start session** launches a health foreground service. A gyroscope is required;
+   accelerometer and Health Services heart rate degrade independently.
+3. Recording continues with the display off. The live face leads with detected hits and elapsed
+   time; estimated exchanges and optical HR remain secondary and disappear when unavailable.
+4. If Wear OS recreates the process, the durable journal restores the same session ID and start
+   time, marks recording quality partial, and resumes without inventing the missing interval.
+5. **Stop & save** persists one atomic JSON record. Discard is explicit and confirmed.
 
-Key technical decisions to make early, because they're expensive to reverse:
+The service never starts a synthetic session after a sticky capture restart, never steals an
+exercise already owned by another app, and never requires the optional heart-rate permission to
+record motion.
 
-1. **Timestamps.** Everything keyed to `SensorEvent.timestamp` (monotonic nanos), with a single
-   conversion to wall-clock at persistence time. The current mixing of wall-clock and sensor
-   time makes multi-sensor fusion and video sync impossible.
-2. **Ring buffers, not `ArrayDeque` copies.** The current pipeline calls `buffer.toList()` on
-   every sample — an allocation per sample at 100 Hz across three sensors. Pre-allocated
-   circular float buffers, zero allocation in the hot path.
-3. **Persistence: Room, not DataStore.** Sessions contain thousands of shot and movement events
-   and need querying by date, stroke type, and gear. DataStore is a key-value store; the docs'
-   choice was wrong for the data shape.
-4. **Foreground service with `FOREGROUND_SERVICE_HEALTH`,** driven by Health Services'
-   `ExerciseClient`, so tracking survives screen-off — the single most important correctness
-   fix, since the app currently stops recording the moment the watch sleeps.
-5. **Model fallback chain.** TFLite model → calibrated heuristics (`:core`) → raw motion
-   metrics. The app must degrade gracefully and never show a blank screen.
-6. **Feature flags** for everything speculative, so the audio and dead-reckoning spikes can
-   ship dark and be validated with real players before they're promised in the UI.
+### Review, correct, and understand it
 
----
+1. A five-step optional diary records activity mode, RPE, soreness review, completion, and
+   recording quality. Detailed context, equipment, conditions, goal, and notes remain editable.
+2. Detection review can trim either edge, mark recent timestamped events false, and report a
+   missed-hit total. Each change appends actor, time, reason, and revision ID.
+3. The recap shows corrected **detected** hits as the primary total. Reported misses are separate
+   because they have no timestamp or stroke type.
+4. Detected exchanges, active span, summary, baselines, personal records, insights, exports, and
+   server analytics are rebuilt from the reviewed window and surviving timestamped events.
+5. Heart-rate zones appear only with a configured/age-estimated maximum. HRR-minutes require an
+   explicitly configured resting rate as well. Age estimation uses `208 − 0.7 × age` for adults
+   and an exact maximum overrides it.
 
-## Part 5 — Roadmap
+### Build a useful history
 
-Seven phases. Each ends with something a real player can use on a real court — no phase is
-purely internal, because a smartwatch sports app that isn't tested on court is fiction.
+- Home shows the latest usable recap and a literal seven-day activity card.
+- History provides status, review/edit, correction, and confirmed deletion.
+- Progress supports player-chosen seven-day session and recorded-minute goals, personal archive
+  records, self-reported experience, and the like-for-like play pattern.
+- Sessions marked **Unusable** stay in the audit trail but do not teach baselines, goals,
+  progress, Tile, or complication aggregates.
+- The Tile starts a session and summarizes the last session/week. The watch-face complication is
+  explicitly “7-day corrected detected hits,” not load or readiness.
 
-### Phase 0 — Truth and foundation ✅ **Complete**
+### Keep score manually
 
-Stop the docs from lying, and make the thing buildable.
+The standalone match scoreboard supports singles and doubles, rally-point games to 21, two-point
+winning margin capped at 30, best of three, interval-at-11, change-of-ends prompts, service side,
+undo, and ambient display. The player taps the rally winner; the watch never invents one.
 
-- ✅ Rewrote `README.md`, `docs/architecture.md`, `docs/usage.md` to describe what exists,
-  with everything else marked as roadmap. Added `docs/dashboard.md`.
-- ✅ Documented Android SDK bootstrap; `local.properties` setup in the README.
-- ✅ Wired `implementation(project(":core"))` into `:app`. Deleted the dead gyro-diagnostics
-  UI, ViewModel and sensor collector that the app was actually running.
-- ✅ CI: `./gradlew test lint assembleDebug` on every push.
-- ✅ Replaced the export button that discarded its output into `Log.d` — sessions are now
-  durable JSON files, readable via `adb`.
+The active match and its undo history are atomically checkpointed and restored after process
+death. It is deliberately a durable live utility rather than a second, incompatible session
+archive. Players who want movement/HR evidence run the ordinary session recorder.
 
-**Shipped:** a truthful repo that builds, tests, and gets data off the watch.
+### Practise without fake coaching
 
-### Phase 1 — Real capture 🟡 **Substantially complete**
+- A balanced six-corner shadow routine covers every corner once per block and avoids a duplicate
+  at block boundaries. Racket-relative wording works for either handedness.
+- Learnable haptics encode forehand/backhand and front/mid/rear while the screen remains the
+  source of truth.
+- Pause, resume, early finish, process restoration, and corruption recovery are durable. Downtime
+  is excluded from cue timing.
+- BWF-derived cards give general practice instructions with a visible source and measurement
+  boundary.
 
-You cannot build a classifier without data, and there was no way to collect any.
+### Own and move the data
 
-- ✅ Multi-sensor capture: gyro + accel + HR at 100 Hz with FIFO batching and monotonic
-  `SensorEvent.timestamp`. Removed the `distinctUntilChanged()` that was silently dropping
-  every at-rest sample.
-- ✅ Foreground service (`health` type), so recording survives screen-off — the single most
-  important correctness fix in the app.
-- ✅ Session persistence (file-per-session JSON; see
-  [Part 8](#part-8--changes-to-this-plan) for why not Room).
-- ✅ `SessionRecorder` in `:core` joins pipeline + aggregator + rally segmentation, fully
-  unit-tested on the JVM without an emulator.
-- ✅ Rally segmentation with work:rest analysis — pulled forward from Phase 3 because the
-  dashboard needed it and it is pure, testable math.
-- ⬜ Health Services `ExerciseClient` instead of raw `SensorManager` for HR.
-- ✅ On-watch labelled capture: pick a stroke, hit repetitions, save the drill.
-  `SwingSegmenter` cuts windows on angular-velocity peaks, deliberately independent of the
-  rule-based classifier so the training set does not inherit its blind spots.
-- ✅ `tools/` ingestion and training pipeline with device-grouped cross-validation.
-- ⬜ Post-hoc "tag that last shot" flow during ordinary sessions.
-- ⬜ Battery instrumentation harness.
-- ✅ Zero-allocation ring buffer in the hot path: `SampleWindow` replaced the
-  `ArrayDeque.toList()` per sample with a pre-allocated ring and a zero-copy list facade.
-
-**Remaining before Phase 1 closes:** Health Services, the battery harness, and the
-zero-allocation hot path. The dataset path — the thing that actually gates Phase 2 — is now
-open end to end: record a drill on the watch, sync it, run `tools/ingest.py`, train.
-
-**Phase 1 status: substantially complete.** What is left is optimisation and accuracy of the
-physiological signal, not capability.
-
-### Phase 1.5 — Dashboard ✅ **Complete** *(pulled forward)*
-
-Not in the original plan as a separate phase; built early because analysis surfaces were the
-first thing asked for after the plan was written, and because it forced the sync contract to
-be designed properly rather than retrofitted.
-
-- ✅ `:server` Ktor module sharing `:core`'s `@Serializable` types — one schema, no drift.
-- ✅ `POST /api/v1/sessions` ingest with per-session acknowledgement, schema-version
-  rejection, and optional bearer token.
-- ✅ `SyncWorker` on the watch: WorkManager, exponential backoff, offline-first.
-- ✅ Browser dashboard: headline tiles, shots per session, rally length distribution, shot
-  mix, and an acute:chronic shoulder-load trend.
-- ✅ Synthetic session generator for development and fixtures.
-- ⬜ Release-build dashboard configuration UI (only the debug adb receiver exists).
-- ✅ Per-session detail view with a rally timeline (hash-routed from the session list,
-  `/api/v1/sessions/{id}` + client-side SVG).
-
-### Phase 2 — Perception *(4–6 weeks)* — **next**
-
-- Python training pipeline: classical baselines (Random Forest, gradient boosting on windowed
-  features) before neural approaches, since they're interpretable and often competitive here.
-- 1D CNN / small LSTM in TFLite, quantized, target under 200 KB and under 5 ms inference.
-- Both wrist-placement model heads; handedness handled at onboarding.
-- Audio-onset spike: can we detect the shuttle "pock" reliably in a noisy hall? Ship dark.
-- Per-stroke confidence, honest fallback to stroke *family* when uncertain.
-- Personal calibration routine.
-- Evaluation harness: per-class precision/recall, confusion matrices, held-out players.
-
-**Ships:** real shot detection. Target: >85% accuracy on the four major families, on the
-dominant wrist, across players not in the training set.
-
-### Phase 3 — The session product *(3–4 weeks)*
-
-- ✅ Rally segmentation and work:rest analysis *(delivered in Phase 1)*.
-- 🟡 Live HUD: the glanceable layout (giant primary number, rally metrics, post-session
-  recap) is built, now with haptic-on-shot and a Wear OS 6 dynamic palette. Rotary
-  navigation comes free with the M3 lists. Ambient mode is wired
-  (`AmbientLifecycleObserver` → dim static HUD) but untested on hardware with always-on
-  enabled.
-- ✅ Session insights — delivered early, because they only need signals that are already
-  trustworthy. See [Part 9](#part-9--what-an-insight-is-allowed-to-say).
-- Post-session recap: shot distribution, rally timeline, HR profile, fatigue curve.
-- Session history with trends; goals and personal bests.
-- 🟡 Tile delivered (last session + weekly load, Start chip deep link); complications not.
-- Fatigue detection from technique degradation — the flagship insight.
-
-**Ships:** v1.0. A complete, useful, self-contained badminton training app.
-
-### Phase 4 — Movement *(4 weeks)*
-
-- Lunge, jump, and landing detection with load accounting.
-- Split-step detection and timing.
-- Shadow footwork trainer with the six-corner haptic engine (this one can ship earlier if
-  the team wants a quick win — it has no detection dependency).
-- Court-coverage dead-reckoning spike.
-- Footwork Index and recovery-discipline scoring.
-- Non-dominant-wrist feature set fully validated.
-
-**Ships:** the differentiator. Nobody else measures amateur footwork.
-
-### Phase 5 — Match & load *(4 weeks)*
-
-- Auto-scoring, match mode, service-court tracking, interval and change-of-ends prompts.
-- Pressure and momentum analytics.
-- Per-tissue load models, ACWR, readiness score on the pre-session Tile.
-- Health Connect integration; sleep and HRV inputs.
-- Gear locker and conditions log with correlation analysis.
-
-**Ships:** the app you wear to a tournament.
-
-### Phase 6 — Companion & depth *(6 weeks)*
-
-- Phone app with full analysis surfaces and Data Layer sync.
-- Video sync and auto-highlight generation.
-- Drill library and adaptive training plans.
-- Coach mode and squad dashboards.
-- Export to FIT/TCX/Strava; the configurable HTTPS export endpoint.
-
-**Ships:** the platform.
-
-### Phase 7 — Polish and release *(ongoing)*
-
-Onboarding, accessibility, localization (English, French, Chinese, Indonesian, Danish —
-follow the sport's actual geography), Play Store listing, crash and quality telemetry
-(opt-in, anonymized), and a public beta with the club that supplied the training data.
+- Sessions and eligible Detection Lab captures are file-per-record JSON with atomic replacement,
+  orphan-temp recovery, and corrupt-file quarantine.
+- Sync uses WorkManager, bearer authentication, no credential-following redirects, per-record
+  acceptance/rejection, exponential retry, and payload fingerprints. An unchanged server-rejected
+  record stops retrying and shows a localized action category; editing it creates a new upload
+  candidate. A changed diary is accepted only when its acknowledged base matches the current
+  server revision, so an offline branch cannot leapfrog an intervening browser edit.
+- The dashboard binds to loopback by default. A non-loopback bind requires a token. Data API
+  responses are `Cache-Control: no-store`; TLS is delegated to a reverse proxy.
+- The authenticated browser supports reviewed analytics, filters, a raw-vs-reviewed detail audit,
+  diary editing, deterministic lossless JSON backup, reviewed CSV, and validate-before-write
+  restore. Raw motion enters an archive only when recording-time model-training consent,
+  participant ID, and protocol are all present.
 
 ---
 
-## Part 6 — Risks and open questions
+## 4. Interface and brand completion
 
-| Risk | Mitigation |
-| --- | --- |
-| **Non-dominant wrist is the majority case** and cannot do stroke classification | Lead with footwork and load for that mode; be explicit in onboarding about what each placement can measure. Never fake it. |
-| **Battery.** 100 Hz IMU + mic + inference over 3 hours is brutal | Hard budget, measured every release. FIFO batching, duty-cycled mic, quantized model. Ship a low-power mode that drops to 50 Hz and skips audio. |
-| **Labeled data is the bottleneck**, not the model | Phase 1 exists purely to solve this. Recruit real players early; the labeling UX is a first-class feature, not a debug screen. |
-| **Audio in a sports hall** — six courts, shouting, background music | Ship dark behind a flag, validate before promising. IMU-only must remain fully functional. |
-| **Estimated shuttle speed will be wrong** and players will screenshot it | Report ranges, label as estimate, emphasize relative trends over absolute numbers. |
-| **Dead-reckoning drift** | Bound it to rally-length windows; present as directional bias, never as a court map with coordinates. |
-| **Scope.** This document describes several years of work | Every phase ships something usable. Phase 3 is a complete product; everything after is optional depth. |
-| **Health claims.** Load and injury features shade toward medical advice | Frame as training-load information, not diagnosis. Cite the sports-science basis for ACWR. Legal review before any injury-risk language ships. |
+The visual direction is **court at night**: OLED black, a cool off-white text hierarchy, mint as
+the primary court-line/accent color, blue for supporting action, and fixed semantic colors where
+meaning must not drift. It is modern without becoming a tiny phone UI.
 
-**Open questions to resolve with real players, not in a text editor:**
+Delivered rules:
 
-1. Do players want live in-rally feedback at all, or is any buzz during play unwelcome?
-2. Is auto-scoring trustworthy enough to be useful, or does one wrong point destroy all trust?
-3. Which matters more to a club player: shot analytics, or footwork and fitness?
-4. Would players actually record video if the app made the footage genuinely watchable?
-5. What is the acceptable battery cost? Is 45% for three hours fine, or is 25% the real bar?
+- the home screen has one dominant start action, a small training/match choice, and three
+  recognizable secondary destinations;
+- live play has one glance face, one details page, and a deliberate stop/discard boundary;
+- numerals are large, high-contrast, and stable in ambient mode; burn-in-sensitive motion and
+  controls disappear there;
+- round-screen safe areas, edge actions, Wear-native lists, concise cards, and semantic grouping
+  are used throughout;
+- haptics are opt-in for detected hits and purposeful for score/training confirmation;
+- destructive actions have confirmation; recoverable actions expose undo where appropriate;
+- all user-facing app flows are in English and French, use resource/plural formatting, and expose
+  merged semantics/content descriptions for screen readers;
+- target SDK 36 permission denial is a supported state, not an error screen.
+
+The delivered design and screen inventory are recorded in
+[ui_ux_overhaul_plan.md](ui_ux_overhaul_plan.md); accessibility decisions are in
+[accessibility-localization.md](accessibility-localization.md).
 
 ---
 
-## Part 7 — Definition of done for v1.0
+## 5. Delivery matrix
 
-The end of Phase 3. Bad Watch v1.0 ships when a player can:
-
-| # | Promise | Status |
+| Area | Outcome | Evidence in the repository |
 | --- | --- | --- |
-| 1 | Start a session with one tap and have it record reliably for three hours with the screen off | 🟡 One tap and screen-off recording work. Three-hour reliability and battery cost are unmeasured. |
-| 2 | Get shot counts by type with >85% accuracy on the dominant wrist, for a player the model has never seen | ❌ Classifier is rule-based and uncalibrated. Phase 2. |
-| 3 | See rally count, rally length distribution, and true work:rest ratio | ✅ On the watch and on the dashboard. |
-| 4 | Receive one honest, specific, actionable insight per session — not four generated adjectives | ✅ `SessionInsightEngine` derives insights from rally structure and heart rate only — never from uncalibrated stroke labels. Every insight cites its evidence, and the engine returns nothing when the data is thin. |
-| 5 | Review the last thirty sessions and see whether they are getting better | ✅ History on the watch, trends on the dashboard. |
-| 6 | Get their data out, in a real format, without a computer | 🟡 JSON is durable and syncs to the dashboard; on-watch share/export has no UI. |
-| 7 | Do all of the above with no account, no network, and no subscription | ✅ No account exists anywhere in the system; the watch is fully functional offline. |
-
-Everything in this document beyond that line is upside. But that line is the promise — and
-the honest summary today is that the *plumbing* is real and tested, while the *perception*
-is not. Shot counts and stroke labels remain the weakest claim in the product, and nothing
-downstream of them should be trusted until Phase 2 lands.
-
----
-
-## Part 8 — Changes to this plan
-
-Decisions revised since the plan was written, with the reasoning.
-
-**Dominant wrist is now a requirement, not a mode.** The original plan hedged with two model
-heads and a footwork-only feature set for the non-racket wrist. Scoped to one wrist: it
-removes an entire parallel model, and the honest framing ("we read the swing, so wear it on
-the racket hand") is better than a silently degraded second mode. `WristPlacement` remains
-in the data model so the constraint is recorded in every exported session and a future
-footwork mode has somewhere to live.
-
-**A web dashboard replaced the companion phone app.** The plan's Phase 6 assumed an Android
-companion synced over the Wear Data Layer. A self-hosted server plus a browser page is
-strictly simpler: no second app to install or maintain, the same URL works on phone and
-desktop, charts are far cheaper in HTML than in Compose, and `:server` sharing `:core`'s
-types means the wire contract cannot drift. The watch remains fully functional with no
-server at all.
-
-**Persistence is files, not Room.** The plan specified Room because sessions contain
-thousands of events. But the watch only lists, reads, marks-synced and deletes — all
-querying happens on the server. A file per session gives durable storage, the export format
-and the sync payload in one representation, with no annotation processor in the build.
-Revisit if on-watch trend queries over hundreds of sessions become a real feature.
-
-**Rally segmentation moved from Phase 3 to Phase 1.** It is pure, testable math, and the
-dashboard is far more useful with it than without.
-
-**The dashboard was built before Phase 2.** Out of order deliberately: it forced the sync
-contract to be designed properly rather than retrofitted, and it gives every later phase a
-place to display results.
-
-**Health Services is still deferred.** The plan called for `ExerciseClient` in Phase 1;
-heart rate currently goes through `SensorManager`. This works, but it is less accurate and
-less power-efficient, and it should be replaced before any battery claim is made.
-
+| Racket-hand onboarding and handedness | Delivered | `OnboardingScreen`, `SettingsStore` |
+| Required gyro, optional accelerometer | Delivered | `FusedSensorCollector` capability/failure paths |
+| Health Services optical HR | Delivered | `ExerciseHeartRateSession`, coverage and timestamp tests |
+| Screen-off recording | Delivered | health FGS `SessionService`, active journal, hardware probe |
+| Process-death session recovery | Delivered | `ActiveSessionJournal`, controller recovery tests |
+| Zero-copy detector window | Delivered | `SampleWindow` and pipeline tests |
+| Atomic session/capture persistence | Delivered | shared `AtomicFileWriter`, recovery/quarantine tests |
+| Detected exchange estimates | Delivered | `RallySegmenter`, measurement vocabulary |
+| Optional post-session diary | Delivered | typed `SessionContext`/`PostSessionReport`, EN/FR watch flow |
+| Append-only detection correction | Delivered | `SessionCorrections`, `ReviewedSessionAnalysis` |
+| Evidence-backed insights | Delivered | prior-only like-for-like baseline and silence tests |
+| Adult HR profile provenance | Delivered | exact/estimated/placeholder sources and gating tests |
+| Transparent HRR-min and session-RPE | Delivered | coverage-gated physiology and explicit formulas |
+| History, goals, records, play pattern | Delivered | usable-session filters and `PlayProfileBuilder` |
+| Manual BWF scoreboard | Delivered | scoring reducer, durable controller, ambient UI |
+| Six-corner shadow routine | Delivered | balanced reducer, durable controller, haptic grammar |
+| Sourced practice library | Delivered | BWF cards with non-measurement notes |
+| Tile and watch-face complication | Delivered | corrected detected-hit semantics and refresh tests |
+| Self-hosted dashboard configuration | Delivered | release UI with connection test and HTTP warning |
+| Dashboard review/editor/filtering | Delivered | authenticated APIs and responsive browser UI |
+| Backup, reviewed CSV, restore | Delivered | deterministic archive and validation tests |
+| Consent-bound Detection Lab | Delivered | immutable consent/protocol/participant metadata |
+| Player-independent ML tooling | Delivered as research infrastructure | grouped ingestion/training/evaluation and acceptance gate |
+| Automatic learned classifier | Research-gated | no model is accepted without section 7 evidence |
+| English/French and accessibility pass | Delivered | localized resources, semantics, hardware inspection |
+| Android platform / target SDK 36 | Delivered | granular HR permission and denied-path proof on Android 17 / API 37 hardware |
+| Full CI and tag release gate | Delivered | Python, JVM, lint, debug and release assemblies |
 
 ---
 
-## Part 9 — What an insight is allowed to say
+## 6. Original roadmap disposition
 
-The app this grew out of generated "insights" like *"Swing variance is 62%. Focus on
-repeatable arcs before pushing pace"* from raw gyroscope magnitude. It read as coaching and
-was closer to a random number generator. Avoiding a repeat needs a rule, not good intentions.
+This section is the closure record for ideas intentionally not carried into the product.
 
-**An insight may only be derived from a signal we measure, not one we infer.**
+### Research-gated, not promised to players
 
-Today that means rally structure (a rally boundary is a gap in time) and heart rate (a
-sensor reading). It explicitly excludes stroke type, because the classifier is uncalibrated
-heuristics — so "you hit too few backhands" is not an insight, it is a guess wearing a
-coach's jacket. When Phase 2 makes stroke labels trustworthy, stroke rules join as
-*additions*.
+- **Learned hit/stroke-family perception.** Keep collecting consented, protocol-complete real play
+  and publish an offline evaluation artifact. The heuristic remains the safe fallback.
+- **Audio contact onset.** It requires separate consent, noise/privacy analysis, battery evidence,
+  and held-out halls. No microphone permission or dark capture exists in v0.3.
+- **Automatic movement events.** Lunge, jump, landing, split-step, and court-direction claims need
+  body-appropriate ground truth; a racket wrist is not assumed sufficient.
+- **Optional video review.** It would be a new consent and storage product, not a hidden extension
+  of watch capture.
 
-Four supporting constraints, all enforced in `SessionInsightEngine` and its tests:
+These are external-evidence programs. Their absence is not an incomplete v0.3 checkbox.
 
-1. **Every insight carries its evidence.** The number the claim rests on is displayed. A
-   player can then disagree with the interpretation while still trusting the measurement,
-   and a wrong insight is debuggable rather than merely irritating.
-2. **Silence is a valid output.** Under five rallies, nothing is said. Rally-decay analysis
-   needs twelve. Cardiac drift needs heart rate on both halves. Roughly half of
-   `SessionInsightEngineTest` asserts that *nothing* is produced — a rule that never stays
-   quiet is a bug.
-3. **Compare against the player, not a population.** Sport-wide norms are the fallback used
-   only until three sessions of history exist, and baselines use medians so one freak
-   session cannot redefine normal.
-4. **At most three, cautions first.** A fatigue signal must not be buried under a personal
-   best.
+### Excluded from this product contract
 
-The observable effect: on nineteen seeded sessions the engine speaks about thirteen and says
-nothing about six. That ratio is the feature.
+- automatic point/winner/error/serve inference and automatic match scoring;
+- shuttle/racket speed presented as fact, court heatmaps, dead-reckoned coverage, or opponent and
+  partner tracking from one watch;
+- technique grading, adaptive prescriptions, global skill tier, pressure/momentum, and causal
+  “focus areas” generated from provisional labels;
+- fatigue curves, recovery/readiness scores, per-tissue load, ACWR safety bands, injury alerts,
+  and precision calories;
+- engagement-farming streaks, social leaderboards, squad surveillance, and achievements based on
+  unvalidated stroke labels;
+- a mandatory phone companion, account, proprietary cloud, subscription, Health Connect write,
+  FIT/TCX/Strava publishing, or automatic cloud backup;
+- speculative gear-performance correlations such as string tension causing faster smashes.
+
+Specific old-roadmap decisions are also closed:
+
+- the ordinary-session “tag the last shot” idea is superseded by timestamped false-hit review,
+  reported misses, and the separate protocol-labelled Detection Lab; it would not create reliable
+  ground truth during a match;
+- the gear “locker” and shoe-mileage alerts are reduced to optional per-session equipment
+  snapshots—useful context without maintenance theater or injury implications;
+- generic hydration prompts are excluded; the watch does not know an individual's hydration need
+  and Wear OS already provides timers;
+- automatic encrypted local/cloud backup is replaced by authenticated deterministic owner export;
+  encryption at rest belongs to the operator's storage and keys, not an undocumented app secret;
+- the old “under 45% battery in three hours” target is not claimed without an unpowered hardware
+  run. The reproducible probe measures lifecycle first and reports drain only when every battery
+  sample proves the watch was off power; no fictional low-power mode is promised;
+- Chinese, Indonesian, and Danish were removed from v0.3 rather than machine-translated without a
+  reviewer. English and French are the supported release locales; another locale needs a fluent
+  review and the same lint/device gate.
+
+Some could be valid products with additional sensors, users, consent, infrastructure, and evidence.
+They are excluded here because the best Bad Watch is a focused session companion, not a broad
+platform that fills missing sensors with confident copy.
+
+---
+
+## 7. Gates for any stronger model claim
+
+A model may not replace the heuristic or remove “provisional” language until a versioned report
+shows all of the following:
+
+1. fixed collection protocol and annotation guide;
+2. real drills plus singles/doubles play and representative non-badminton negatives;
+3. multiple participants, handedness, experience bands, halls, strap fits, and supported watch
+   models;
+4. participant-grouped train/validation/test splits with no window leakage;
+5. hit-event precision/recall and timing tolerance, per-family precision/recall, confusion matrix,
+   and explicit not-detected outcome;
+6. confidence intervals and subgroup/context failure reporting;
+7. calibrated probabilities before any percentage is shown;
+8. an on-device fixed-corpus regression and latency/battery result;
+9. a signed model artifact, feature schema, decision threshold, and model card;
+10. acceptance criteria declared before the final test set is scored.
+
+`tools/model_acceptance.json` is deliberately offline: training can produce evidence, but cannot
+silently deploy a model. User-independent test data remains the authority.
+
+---
+
+## 8. Architecture that shipped
+
+```text
+:core    Pure Kotlin models, detector, exchange segmentation, corrections, scoring,
+         training reducers, physiology, insights, progress, and shared wire schema.
+:app     Wear OS sensing, Health Services, foreground lifecycle, durable stores, sync,
+         Compose UI, Tile, complication, English/French resources.
+:server  Ktor persistence/API/analytics plus the responsive self-hosted dashboard.
+tools/   Consent-aware ingestion, grouped evaluation/training, and offline model gate.
+isolate/ Wear/emulator inspection helpers.
+tooling/ Release and real-device endurance probes.
+```
+
+Files remain the right persistence shape for this standalone watch: listing, reading, replacing,
+syncing, and deleting whole session envelopes are its operations. Server-side analytics own the
+cross-session query workload. Room and a multi-module architecture would add migration/build cost
+without making those operations safer.
+
+The shared `:core` schema is the wire and archive contract. Raw events and original summaries are
+immutable; reviewed views are deterministic projections. Compatibility-only schema-1
+recovery/fatigue/effort fields decode but current producers write zero and no surface reads them.
+
+---
+
+## 9. Definition of done
+
+v0.3 is done only when all of these are true:
+
+| Acceptance condition | Result |
+| --- | --- |
+| The full app can be used offline with no account/dashboard | Complete |
+| Session and Detection Lab capture survive screen-off under the health FGS | Complete |
+| Optional HR failure/denial leaves a truthful motion-only session | Complete |
+| Process death restores a stable session without fabricating downtime | Complete |
+| Player review changes every derived primary metric and preserves raw evidence | Complete |
+| Match and shadow utilities checkpoint every command and restore safely | Complete |
+| Sync acceptance/rejection is durable, visible, and payload-specific | Complete |
+| Browser backup/CSV/restore is authenticated and loss-safe | Complete |
+| English/French, accessibility, lint, JVM tests, debug and release builds pass | Complete |
+| A target-36 Pixel Watch run proves the final APK's core flow | Complete |
+| A three-hour screen-off probe produces exactly one duration-correct session | Complete |
+| Documentation describes shipped behavior and rejected claims without stale roadmap text | Complete |
+
+### Validation and evidence
+
+The reproducible software gate is:
+
+```bash
+python3 -m unittest discover -s tools -p 'test_*.py' -v
+python3 -m py_compile tools/ingest.py tools/train.py \
+  tooling/wear_session_probe.py tooling/wear_recovery_probe.py
+./gradlew test :app:lintDebug :app:assembleDebug :app:assembleRelease \
+  --stacktrace --no-daemon
+```
+
+The device gate installs the resulting target-SDK-36 debug APK on a Pixel Watch 4 running Android
+17 / API 37, verifies
+start/stop/save with HR permission denied, process-kill recovery, ambient/manual-match/training
+flows, French and enlarged-text rendering, and runs:
+
+```bash
+python3 tooling/wear_session_probe.py \
+  --duration-minutes 180 --sample-seconds 60 \
+  --output build/wear-session-probe
+
+python3 tooling/wear_recovery_probe.py \
+  --output build/wear-recovery-probe
+```
+
+The probe requires the foreground service to remain present, exactly one new durable session,
+and saved duration within five seconds of observed wall time. Battery percentage is reported only
+when every sample says the watch was unpowered; a charging run is lifecycle evidence, not a
+battery-drain claim.
+
+The target-36 denied-HR proof, including commands and observed journal sample count, is retained in
+[accessibility-localization.md](accessibility-localization.md#target-sdk-36-heart-rate-denial-evidence-2026-07-26).
+The final v0.3 screenshot and endurance artifact paths are recorded in
+[device-validation.md](device-validation.md); generated artifacts without a matching ledger entry
+do not count as evidence.
+
+CI runs the same software gate on every `master` push and release tag. A release workflow also
+verifies package ID, version, APK signature, and checksums before publication.
+
+---
+
+## 10. Product handoff
+
+Bad Watch v0.3 is a complete, useful session tracker—not a promise that a watch understands all
+of badminton. Its strongest features are the unglamorous ones that preserve trust: recording
+survives real Wear OS lifecycle pressure, uncertainty is named, corrections flow through the
+whole product, subjective context stays subjective, and the player owns the archive.
+
+Any next version should start with observed court use. The first questions are whether players
+actually use the review step, whether optional haptics distract, which diary fields earn repeat
+use, and where the detector fails in real matches. New sensor-derived claims come only after the
+evidence gates above—not because an old roadmap had an empty box.

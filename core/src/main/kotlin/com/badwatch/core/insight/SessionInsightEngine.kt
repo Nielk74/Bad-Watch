@@ -44,8 +44,8 @@ class SessionInsightEngine(
             heartRateDriftInsight(session, rallyProfile)
         )
             // Strongest observations first, so a meaningful change is not buried under a
-            // personal best. Medical or injury cautions require a stronger signal than this
-            // engine currently receives.
+            // personal best. Medical, fatigue, readiness, and injury claims are outside the
+            // evidence this engine receives.
             .sortedByDescending { it.severity.ordinal }
             .take(maximumInsights)
     }
@@ -73,7 +73,13 @@ class SessionInsightEngine(
                     detail = "Gaps between detected exchanges were ${percent(change)}% longer " +
                         "than your typical 1:${format(usual)} active:quiet pattern.",
                     severity = InsightSeverity.Notable,
-                    evidence = evidence
+                    evidence = evidence,
+                    localizationArgs = mapOf(
+                        "ratio" to oneDecimal(ratio),
+                        "exchanges" to profile.rallyCount.toString(),
+                        "change" to percent(change).toString(),
+                        "usual" to oneDecimal(usual)
+                    )
                 )
             }
             if (change < -0.25f) {
@@ -83,7 +89,13 @@ class SessionInsightEngine(
                     detail = "Detected exchanges had ${percent(abs(change))}% less quiet time " +
                         "than your typical 1:${format(usual)} active:quiet pattern.",
                     severity = InsightSeverity.Info,
-                    evidence = evidence
+                    evidence = evidence,
+                    localizationArgs = mapOf(
+                        "ratio" to oneDecimal(ratio),
+                        "exchanges" to profile.rallyCount.toString(),
+                        "change" to percent(abs(change)).toString(),
+                        "usual" to oneDecimal(usual)
+                    )
                 )
             }
             return null
@@ -97,7 +109,11 @@ class SessionInsightEngine(
                     detail = "The detected pattern was 1:${format(ratio)} estimated active to quiet time. " +
                     "Use this as a baseline for your next comparable session.",
                 severity = InsightSeverity.Notable,
-                evidence = evidence
+                evidence = evidence,
+                localizationArgs = mapOf(
+                    "ratio" to oneDecimal(ratio),
+                    "exchanges" to profile.rallyCount.toString()
+                )
             )
         }
         return null
@@ -126,7 +142,13 @@ class SessionInsightEngine(
                 "against ${format(opening)} at the start — ${percent(abs(change))}% fewer. " +
                 "The watch cannot tell whether tactics, errors, opponents or missed hits caused it.",
             severity = InsightSeverity.Notable,
-            evidence = "${format(opening)} → ${format(closing)} detected hits per exchange"
+            evidence = "${format(opening)} → ${format(closing)} detected hits per exchange",
+            localizationArgs = mapOf(
+                "third" to third.toString(),
+                "closing" to oneDecimal(closing),
+                "opening" to oneDecimal(opening),
+                "change" to percent(abs(change)).toString()
+            )
         )
     }
 
@@ -141,7 +163,12 @@ class SessionInsightEngine(
                     detail = "A ${longest.shotCount}-hit exchange, above your previous best of " +
                         "${baseline.bestRallyShots}.",
                     severity = InsightSeverity.Notable,
-                    evidence = "${longest.shotCount} detected hits over ${seconds(longest.durationMillis)}s"
+                    evidence = "${longest.shotCount} detected hits over ${seconds(longest.durationMillis)}s",
+                    localizationArgs = mapOf(
+                        "hits" to longest.shotCount.toString(),
+                        "previous" to baseline.bestRallyShots.toString(),
+                        "seconds" to seconds(longest.durationMillis).toString()
+                    )
                 )
             }
             return null
@@ -155,7 +182,11 @@ class SessionInsightEngine(
                 detail = "Your longest detected exchange ran ${longest.shotCount} hits over " +
                     "${seconds(longest.durationMillis)} seconds.",
                 severity = InsightSeverity.Info,
-                evidence = "${longest.shotCount} detected hits"
+                evidence = "${longest.shotCount} detected hits",
+                localizationArgs = mapOf(
+                    "hits" to longest.shotCount.toString(),
+                    "seconds" to seconds(longest.durationMillis).toString()
+                )
             )
         }
         return null
@@ -178,7 +209,12 @@ class SessionInsightEngine(
             detail = "$minutes of $total minutes sat inside detected exchange windows. " +
                 "Warm-up, drills without hits and missed detections can lower this estimate.",
             severity = InsightSeverity.Notable,
-            evidence = "${percent(profile.workDensity)}% estimated active time"
+            evidence = "${percent(profile.workDensity)}% estimated active time",
+            localizationArgs = mapOf(
+                "activeMinutes" to minutes.toString(),
+                "totalMinutes" to total.toString(),
+                "activePercent" to percent(profile.workDensity).toString()
+            )
         )
     }
 
@@ -208,7 +244,12 @@ class SessionInsightEngine(
                 "from the first half to the second. Compare with how the session felt; the " +
                 "watch does not yet know whether the exchanges were equally intense.",
             severity = InsightSeverity.Notable,
-            evidence = "${early.roundToInt()} → ${late.roundToInt()} bpm across detected exchanges"
+            evidence = "${early.roundToInt()} → ${late.roundToInt()} bpm across detected exchanges",
+            localizationArgs = mapOf(
+                "drift" to drift.roundToInt().toString(),
+                "early" to early.roundToInt().toString(),
+                "late" to late.roundToInt().toString()
+            )
         )
     }
 
@@ -216,6 +257,9 @@ class SessionInsightEngine(
         if (isEmpty()) 0f else sumOf { it.shotCount }.toFloat() / size
 
     private fun format(value: Float): String = ((value * 10).roundToInt() / 10.0).toString()
+
+    private fun oneDecimal(value: Float): String =
+        ((value * 10).roundToInt() / 10f).toString()
 
     private fun percent(fraction: Float): Int = (fraction * 100).roundToInt()
 

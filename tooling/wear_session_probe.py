@@ -10,6 +10,7 @@ report plus start/end screenshots; it never clears app data or deletes a session
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -40,6 +41,12 @@ class BatteryReading:
     voltage_millivolts: int | None
     powered: bool | None
     status: int | None
+    wakefulness: str | None
+    service_running: bool
+    service_foreground: bool | None
+    foreground_service_type: str | None
+    journal_session_id: str | None
+    journal_samples_processed: int | None
 
 
 def parse_args() -> argparse.Namespace:
@@ -88,8 +95,28 @@ class Device:
         return self.adb("shell", *args, check=check)  # type: ignore[return-value]
 
     def is_session_service_running(self) -> bool:
+        return self.service_state()[0]
+
+    def service_state(self) -> tuple[bool, bool | None, str | None]:
         output = self.shell("dumpsys", "activity", "services", PACKAGE)
-        return SERVICE_NAME in output
+        running = SERVICE_NAME in output
+        if not running:
+            return False, False, None
+        foreground_match = re.search(r"\bisForeground=(true|false)\b", output)
+        type_match = re.search(
+            r"\b(?:foregroundServiceType|types)=(0x[0-9a-fA-F]+)\b",
+            output,
+        )
+        return (
+            True,
+            foreground_match.group(1) == "true" if foreground_match else None,
+            type_match.group(1) if type_match else None,
+        )
+
+    def wakefulness(self) -> str | None:
+        output = self.shell("dumpsys", "power")
+        match = re.search(r"^\s*mWakefulness=([^\s]+)\s*$", output, re.MULTILINE)
+        return match.group(1) if match else None
 
     def session_files(self) -> set[str]:
         output = self.shell("run-as", PACKAGE, "ls", "files/sessions", check=False)
@@ -107,6 +134,8 @@ class Device:
             if power:
                 power_sources.append(power.group(1) == "true")
         temperature = values.get("temperature")
+        service_running, service_foreground, service_type = self.service_state()
+        journal_session_id, journal_samples_processed = self.active_journal_state()
         return BatteryReading(
             captured_at_epoch_millis=int(time.time() * 1000),
             level_percent=values.get("level"),
@@ -114,7 +143,37 @@ class Device:
             voltage_millivolts=values.get("voltage"),
             powered=any(power_sources) if power_sources else None,
             status=values.get("status"),
+            wakefulness=self.wakefulness(),
+            service_running=service_running,
+            service_foreground=service_foreground,
+            foreground_service_type=service_type,
+            journal_session_id=journal_session_id,
+            journal_samples_processed=journal_samples_processed,
         )
+
+    def active_journal_state(self) -> tuple[str | None, int | None]:
+        journal = self.read_active_journal()
+        if journal is None:
+            return None, None
+        try:
+            checkpoint = journal["checkpoint"]
+            return checkpoint.get("sessionId"), int(checkpoint["samplesProcessed"])
+        except (KeyError, TypeError, ValueError):
+            return None, None
+
+    def read_active_journal(self) -> dict[str, Any] | None:
+        payload = self.shell(
+            "run-as",
+            PACKAGE,
+            "cat",
+            "files/active-session/journal.json",
+            check=False,
+        )
+        try:
+            decoded = json.loads(payload)
+            return decoded if isinstance(decoded, dict) else None
+        except json.JSONDecodeError:
+            return None
 
     def screenshot(self, destination: Path) -> None:
         destination.write_bytes(self.adb("exec-out", "screencap", "-p", binary=True))  # type: ignore[arg-type]
@@ -126,6 +185,11 @@ class Device:
             "am", "start", "-f", "0x04000000", "-n", ACTIVITY,
             "--ez", "autostart_session", "true",
         )
+
+    def sleep_display(self) -> None:
+        # Explicitly exercise the screen-off/doze lifecycle even when a development device is
+        # charging with stay-awake enabled. This changes display state, never battery telemetry.
+        self.shell("input", "keyevent", "223")  # KEYCODE_SLEEP
 
     def stop_session_through_ui(self) -> None:
         self.shell("input", "keyevent", "224", check=False)  # KEYCODE_WAKEUP
@@ -210,7 +274,20 @@ def main() -> int:
     time.sleep(2)
     device.screenshot(output / "start.png")
 
+    device.sleep_display()
+    wait_until(
+        lambda: device.wakefulness() in {"Asleep", "Dozing"},
+        15,
+        "the display to enter sleep or doze",
+    )
+
     readings = [device.battery()]
+    print(
+        "probe 0m: "
+        f"service={readings[0].service_running}/{readings[0].service_foreground} "
+        f"wake={readings[0].wakefulness} samples={readings[0].journal_samples_processed}",
+        flush=True,
+    )
     duration_seconds = args.duration_minutes * 60.0
     deadline = time.monotonic() + duration_seconds
     while True:
@@ -220,8 +297,17 @@ def main() -> int:
         time.sleep(min(args.sample_seconds, remaining))
         reading = device.battery()
         readings.append(reading)
-        if not device.is_session_service_running():
+        elapsed_minutes = (reading.captured_at_epoch_millis - start_wall_millis) / 60_000
+        print(
+            f"probe {elapsed_minutes:.1f}m: "
+            f"service={reading.service_running}/{reading.service_foreground} "
+            f"wake={reading.wakefulness} samples={reading.journal_samples_processed}",
+            flush=True,
+        )
+        if not reading.service_running:
             raise ProbeError("foreground service disappeared before the requested duration elapsed")
+        if reading.service_foreground is not True:
+            raise ProbeError("session service remained present but was not foreground")
 
     device.stop_session_through_ui()
     wait_until(lambda: not device.is_session_service_running(), 20, "the session service to stop")
@@ -247,10 +333,47 @@ def main() -> int:
     start_battery = readings[0].level_percent
     end_battery = readings[-1].level_percent
     battery_measurement_valid = all(reading.powered is False for reading in readings)
+    display_sleep_observed = any(
+        reading.wakefulness in {"Asleep", "Dozing"} for reading in readings
+    )
+    foreground_observed = all(
+        reading.service_running and reading.service_foreground is True for reading in readings
+    )
+    health_type_observed = all(
+        reading.foreground_service_type is not None
+        and int(reading.foreground_service_type, 16) & 0x100 != 0
+        for reading in readings
+    )
+    journal_samples = [
+        reading.journal_samples_processed
+        for reading in readings
+        if reading.journal_samples_processed is not None
+    ]
+    journal_session_ids = {
+        reading.journal_session_id
+        for reading in readings
+        if reading.journal_session_id is not None
+    }
+    sensor_progress_observed = (
+        len(journal_samples) == len(readings)
+        and len(journal_session_ids) == 1
+        and journal_session_ids == {session.get("id")}
+        and all(later >= earlier for earlier, later in zip(journal_samples, journal_samples[1:]))
+        and journal_samples[-1] > journal_samples[0]
+    )
+    lifecycle_pass = (
+        duration_error <= 5_000
+        and display_sleep_observed
+        and foreground_observed
+        and health_type_observed
+        and sensor_progress_observed
+    )
     report = {
-        "schemaVersion": 1,
-        "result": "pass" if duration_error <= 5_000 else "fail",
-        "deviceSerial": serial,
+        "schemaVersion": 2,
+        "result": "pass" if lifecycle_pass else "fail",
+        # ADB mDNS serials can identify a local transport. The build fingerprint and model are
+        # sufficient release evidence; retain only a short one-way correlation token.
+        "deviceTransportHash": hashlib.sha256(serial.encode()).hexdigest()[:12],
         "device": metadata,
         "requestedDurationMillis": requested_millis,
         "wallDurationMillis": wall_duration,
@@ -272,13 +395,19 @@ def main() -> int:
             else ["Battery delta withheld because the watch was powered or charger state was unknown."]
         ),
         "batteryReadings": [asdict(reading) for reading in readings],
+        "displaySleepObserved": display_sleep_observed,
+        "foregroundServiceObservedThroughout": foreground_observed,
+        "healthForegroundTypeObservedThroughout": health_type_observed,
+        "sensorJournalProgressObservedThroughout": sensor_progress_observed,
         "startedAtEpochMillis": start_wall_millis,
         "endedAtEpochMillis": end_wall_millis,
     }
     (output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2))
     if report["result"] != "pass":
-        raise ProbeError("saved duration differed from the recorder's wall-clock interval by more than five seconds")
+        raise ProbeError(
+            "duration, display-sleep, health-foreground, or sensor-journal lifecycle gate failed"
+        )
     print(f"Evidence written to {output}")
     return 0
 
