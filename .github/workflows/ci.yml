@@ -16,6 +16,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # :server:test executes the dependency-free dashboard client journeys with Node's test runner.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - if: runner.environment == 'github-hosted'
         uses: android-actions/setup-android@v3
 

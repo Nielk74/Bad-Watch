@@ -175,8 +175,27 @@ HTTP 400. Diary mutation is intentionally narrower than `SessionExport`: it cann
 shots, HR, original exchanges, legacy metadata, or correction history.
 
 Every diary form submits the `diaryRevision` it loaded. A successful save increments the revision;
-an intervening save returns HTTP 409 and the browser reloads the current record rather than
-discarding either edit silently.
+an intervening save returns HTTP 409. Before reporting that conflict, the browser reloads the
+current session detail and filtered dashboard aggregate, replaces the stale form with the server's
+latest revision, and asks the player to review before saving again. It never retries the stale edit
+automatically or discards either edit silently.
+
+## Browser regression gate
+
+The dependency-free browser-client suite executes the JavaScript extracted from the shipped
+`index.html` in Node's VM with a deterministic fake DOM, storage, navigation, dialogs, and HTTP
+responses:
+
+```bash
+./gradlew :server:dashboardBrowserTest
+# Direct equivalent: TZ=UTC node --test server/src/test/js/dashboard-client.test.mjs
+```
+
+It behaviorally covers bearer-token rejection/retry, URL filter hydration/apply/reset/error,
+deep-linked reviewed detail rendering, successful diary save, HTTP 409 reload, and archive restore
+success/error. `:server:test` depends on this task, and CI/release install Node 22 before running the
+shared Gradle test gate. This is a client-state and request-contract regression suite; responsive
+layout and browser-engine rendering still require visual browser review.
 
 ## Demo data
 

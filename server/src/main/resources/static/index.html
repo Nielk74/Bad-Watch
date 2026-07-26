@@ -1407,6 +1407,41 @@ function humanizeDiaryValue(value) {
     .replace(/^./, c => c.toUpperCase());
 }
 
+/**
+ * A compare-and-set diary conflict means the form is now stale. Reload both the record and the
+ * filtered dashboard before presenting the conflict so the player never keeps editing an obsolete
+ * revision while looking at obsolete aggregates.
+ */
+async function reloadDiaryConflict(sessionId) {
+  sessionCache.delete(sessionId);
+  const [detailResult, dashboardResult] = await Promise.allSettled([
+    fetchSessionDetail(sessionId),
+    apiJson(dashboardResource())
+  ]);
+
+  if (detailResult.status !== "fulfilled") {
+    throw new Error(
+      "Diary changed on the server, but the latest version could not be loaded. Reload and try again."
+    );
+  }
+
+  const latest = detailResult.value;
+  sessionCache.set(sessionId, latest);
+  if (dashboardResult.status === "fulfilled") {
+    window.__data = dashboardResult.value;
+    reportFilterStatus(dashboardFilterSummary(dashboardResult.value.sessionCount));
+  }
+  renderSession(latest);
+
+  const status = document.getElementById("diaryStatus");
+  if (status) {
+    status.classList.add("error");
+    status.textContent = dashboardResult.status === "fulfilled"
+      ? "Diary changed on the server. Latest version loaded; review and save again."
+      : "Diary changed on the server. Latest session loaded, but the dashboard summary could not refresh.";
+  }
+}
+
 function buildDiaryEditor(data) {
   const raw = data.raw;
   const context = raw.context || {};
@@ -1612,6 +1647,10 @@ function buildDiaryEditor(data) {
           const error = await response.json();
           if (error.error) message = error.error;
         } catch (_) { /* Keep status-only message. */ }
+        if (response.status === 409) {
+          await reloadDiaryConflict(raw.session.id);
+          return;
+        }
         throw new Error(message);
       }
       await response.json();

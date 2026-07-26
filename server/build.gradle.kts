@@ -48,6 +48,17 @@ tasks.register<JavaExec>("seedDemoData") {
     args(providers.gradleProperty("dataDir").getOrElse("badwatch-data"))
 }
 
+val dashboardBrowserTest by tasks.registering(Exec::class) {
+    group = "verification"
+    description = "Executes the shipped dashboard JavaScript journeys in a dependency-free fake browser."
+    workingDir(projectDir)
+    environment("TZ", "UTC")
+    commandLine("node", "--test", "src/test/js/dashboard-client.test.mjs")
+    inputs.file("src/main/resources/static/index.html")
+    inputs.files(fileTree("src/test/js") { include("**/*.mjs") })
+}
+
 tasks.test {
     useJUnit()
+    dependsOn(dashboardBrowserTest)
 }
