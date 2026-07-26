@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.health.connect.HealthPermissions
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -41,16 +42,19 @@ class MainActivity : ComponentActivity() {
             override fun onEnterAmbient(ambientDetails: AmbientLifecycleObserver.AmbientDetails) {
                 ambientTimeMillis.value = System.currentTimeMillis()
                 isAmbient.value = true
+                Log.i(AMBIENT_LOG_TAG, "entered")
             }
 
             override fun onUpdateAmbient() {
                 // Wear invokes this at its ambient refresh cadence (normally once a minute).
                 // It is the only clock tick the dim HUD needs; live telemetry cannot drive it.
                 ambientTimeMillis.value = System.currentTimeMillis()
+                Log.d(AMBIENT_LOG_TAG, "updated")
             }
 
             override fun onExitAmbient() {
                 isAmbient.value = false
+                Log.i(AMBIENT_LOG_TAG, "exited")
             }
         }
     )
@@ -96,13 +100,16 @@ class MainActivity : ComponentActivity() {
 
     /**
      * The tile's Start chip launches this activity with [EXTRA_START_SESSION]. The extra is
-     * consumed so a recreate with the same intent does not start a second session.
+     * consumed before starting so permission UI or a later recreation cannot start a second
+     * session. `singleTop` in the manifest guarantees that an already-live activity receives
+     * this payload through [onNewIntent] rather than Wear only bringing its task forward.
      */
     private fun maybeStartSessionFromTile(intent: Intent) {
-        if (intent.getBooleanExtra(EXTRA_START_SESSION, false)) {
-            intent.removeExtra(EXTRA_START_SESSION)
-            startSession()
-        }
+        consumeTileStartSessionRequest(
+            hasRequest = intent.getBooleanExtra(EXTRA_START_SESSION, false),
+            consumeRequest = { intent.removeExtra(EXTRA_START_SESSION) },
+            startSession = ::startSession
+        )
     }
 
     override fun onStart() {
@@ -169,7 +176,26 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        /** Stable diagnostic tag used by the physical-device always-on evidence probe. */
+        const val AMBIENT_LOG_TAG = "BadWatchAmbient"
+
         /** Intent extra set by the watch-face tile's Start chip to auto-start a session. */
         const val EXTRA_START_SESSION = "autostart_session"
     }
+}
+
+/**
+ * Consumes the Tile's one-shot command before crossing into permission and service code.
+ * Keeping this tiny transition Android-free makes the concrete duplicate-start regression
+ * deterministic in a local unit test; manifest coverage separately locks in intent delivery.
+ */
+internal fun consumeTileStartSessionRequest(
+    hasRequest: Boolean,
+    consumeRequest: () -> Unit,
+    startSession: () -> Unit
+): Boolean {
+    if (!hasRequest) return false
+    consumeRequest()
+    startSession()
+    return true
 }

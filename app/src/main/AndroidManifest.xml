@@ -53,10 +53,16 @@
         android:roundIcon="@drawable/ic_launcher_foreground"
         android:supportsRtl="true"
         android:theme="@style/Theme.BadWatch">
-        <!-- taskAffinity is required on Wear so the app appears correctly in recents. -->
+        <!--
+          taskAffinity is required on Wear so the app appears correctly in recents.
+          singleTop is also part of the Tile launch contract: when MainActivity already owns
+          the foreground task, Wear must deliver the Start payload through onNewIntent instead
+          of only bringing the existing task forward and losing the autostart request.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:taskAffinity="com.badwatch.badwatch.main">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
