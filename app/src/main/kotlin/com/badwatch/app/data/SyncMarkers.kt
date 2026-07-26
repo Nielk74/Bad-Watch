@@ -31,8 +31,18 @@ private data class DurableSyncMarker(
  * cannot mark the replacement payload as accepted or rejected. Historical `.synced` files
  * contained only a timestamp; they remain accepted for UI and storage compatibility.
  */
-internal fun readStoredSyncState(payloadFile: File, payloadText: String): StoredSyncState {
-    val fingerprint = payloadFingerprint(payloadText)
+internal fun readStoredSyncState(payloadFile: File, payloadText: String): StoredSyncState =
+    readStoredSyncStateForFingerprint(payloadFile, payloadFingerprint(payloadText))
+
+/**
+ * As above, for callers that already hold the payload fingerprint. Hashing a session payload
+ * is not cheap, and the store needs the same digest for the [StoredSession] it builds, so
+ * passing it in avoids digesting every file on disk twice per listing.
+ */
+internal fun readStoredSyncStateForFingerprint(
+    payloadFile: File,
+    fingerprint: String
+): StoredSyncState {
     val acceptedFile = acceptedMarkerFor(payloadFile)
     if (acceptedFile.exists()) {
         val marker = acceptedFile.decodeMarkerOrNull()

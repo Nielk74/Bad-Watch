@@ -473,6 +473,89 @@ class SessionStoreTest {
         assertThat(store.refresh()).isEmpty()
     }
 
+    @Test
+    fun listingReflectsAPayloadRewrittenOutsideTheStore() = runTest {
+        val directory = temporaryFolder.newFolder("sessions")
+        val store = SessionStore(directory)
+        store.save(export(startedAtMillis = 1_000L, shots = 3))
+        assertThat(store.refresh().single().export.session.summary.totalShots).isEqualTo(3)
+
+        // The parsed-payload cache must not serve a stale export when the bytes on disk change
+        // underneath it. Force a distinct modification time so the change is observable.
+        val payload = directory.listFiles()!!.single { it.extension == "json" }
+        val replacement = export(startedAtMillis = 1_000L, shots = 9)
+        payload.writeText(
+            BadWatchJson.encodeToString(SessionExport.serializer(), replacement)
+        )
+        payload.setLastModified(payload.lastModified() + 5_000L)
+
+        assertThat(store.refresh().single().export.session.summary.totalShots).isEqualTo(9)
+    }
+
+    @Test
+    fun listingReflectsAnAcceptanceMarkerWrittenAfterAnEarlierListing() = runTest {
+        val directory = temporaryFolder.newFolder("sessions")
+        val store = SessionStore(directory)
+        val export = export(startedAtMillis = 1_000L, shots = 2)
+        store.save(export)
+        assertThat(store.refresh().single().synced).isFalse()
+
+        // Sync state lives in sibling marker files, so a cached parse keyed only on the
+        // payload would keep reporting the session as unsynced.
+        store.markSynced(listOf(export.session.id))
+
+        assertThat(store.refresh().single().synced).isTrue()
+    }
+
+    @Test
+    fun diaryEditIsVisibleEvenWhenTheRewriteIsIndistinguishableByFileStamp() = runTest {
+        val directory = temporaryFolder.newFolder("sessions")
+        // Pad every payload to a fixed length and pin the modification time, so successive
+        // revisions are byte-indistinguishable by size and timestamp alone. Only explicit
+        // invalidation on write can keep the listing correct here.
+        val frozen: (File, String) -> Unit = { file, text ->
+            writeDurableAtomically(file, text.padEnd(PADDED_PAYLOAD_LENGTH, ' '))
+            file.setLastModified(1_700_000_000_000L)
+        }
+        val store = SessionStore(directory, atomicWriter = frozen)
+        val export = export(startedAtMillis = 1_000L, shots = 4)
+        store.save(export)
+
+        val payload = directory.listFiles()!!.single { it.extension == "json" }
+        val sizeBefore = payload.length()
+        val modifiedBefore = payload.lastModified()
+
+        store.mutateReview(export.session.id) { current ->
+            current.revisedDiary(current.context, current.report.copy(rpe = 7))
+        }
+
+        // Guard the guard: if the rewrite changed size or mtime, this test would pass for the
+        // wrong reason and would not be exercising the collision it exists to cover.
+        assertThat(payload.length()).isEqualTo(sizeBefore)
+        assertThat(payload.lastModified()).isEqualTo(modifiedBefore)
+
+        val reloaded = store.refresh().single()
+        assertThat(reloaded.export.report.rpe).isEqualTo(7)
+        assertThat(reloaded.export.diaryRevision).isEqualTo(export.diaryRevision + 1L)
+    }
+
+    @Test
+    fun listingDropsASessionDeletedOutsideTheStore() = runTest {
+        val directory = temporaryFolder.newFolder("sessions")
+        val store = SessionStore(directory)
+        store.save(export(startedAtMillis = 1_000L, shots = 1))
+        assertThat(store.refresh()).hasSize(1)
+
+        directory.listFiles()!!.single { it.extension == "json" }.delete()
+
+        assertThat(store.refresh()).isEmpty()
+    }
+
+    private companion object {
+        /** Comfortably longer than any payload this test writes, so all revisions match. */
+        const val PADDED_PAYLOAD_LENGTH = 8_192
+    }
+
     private fun export(startedAtMillis: Long, shots: Int): SessionExport {
         val shotEvents = (0 until shots).map { index ->
             ShotEvent(

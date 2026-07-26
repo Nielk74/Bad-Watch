@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +53,8 @@ import com.badwatch.app.ui.theme.BadWatchTheme
 import com.badwatch.app.viewmodel.BadWatchViewModel
 import com.badwatch.core.sync.effectiveMetrics
 import com.badwatch.core.sync.RecordingQuality
+import com.badwatch.core.sync.ReviewedSessionAnalysis
+import com.badwatch.core.sync.SessionExport
 import com.badwatch.core.sync.reviewedAnalysis
 import java.util.concurrent.TimeUnit
 
@@ -85,7 +88,8 @@ fun HomeScreen(
         onOpenMatch = onOpenMatch,
         onOpenTraining = onOpenTraining,
         onOpenProgress = onOpenProgress,
-        onOpenSession = onOpenSession
+        onOpenSession = onOpenSession,
+        analysisOf = viewModel::analysisOf
     )
 }
 
@@ -99,9 +103,12 @@ private fun HomeContent(
     onOpenMatch: () -> Unit,
     onOpenTraining: () -> Unit,
     onOpenProgress: () -> Unit,
-    onOpenSession: (StoredSession) -> Unit
+    onOpenSession: (StoredSession) -> Unit,
+    // Defaulted so @Preview can render without a ViewModel; the app always passes the
+    // memoising implementation.
+    analysisOf: (SessionExport) -> ReviewedSessionAnalysis = { it.reviewedAnalysis() }
 ) {
-    val last = latestUsableSession(history, System.currentTimeMillis())
+    val last = remember(history) { latestUsableSession(history, System.currentTimeMillis()) }
 
     WatchScreen(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         item { BrandHeader() }
@@ -141,7 +148,7 @@ private fun HomeContent(
             )
         }
 
-        item { ThisWeekCard(history) }
+        item { ThisWeekCard(history, analysisOf) }
 
         item {
             TitleCard(
@@ -173,8 +180,8 @@ private fun HomeContent(
 
         if (last != null) {
             item {
-                val effective = last.export.effectiveMetrics()
-                val reviewed = last.export.reviewedAnalysis()
+                val effective = remember(last) { last.export.effectiveMetrics() }
+                val reviewed = analysisOf(last.export)
                 TitleCard(
                     onClick = { onOpenSession(last) },
                     title = { Text(stringResource(R.string.home_last_session)) },
@@ -338,43 +345,69 @@ private fun QuickAction(
  * Rolling seven-day activity, computed from sessions actually on the watch. Detected hits
  * and explicitly labelled estimated active time avoid implying whole-rally or court coverage.
  */
+/** Everything the week card shows, derived once per history change rather than per frame. */
+private data class WeekRecap(
+    val sessionCount: Int,
+    val totalShots: Int,
+    val hasCorrections: Boolean,
+    val estimatedActiveMillis: Long,
+    val recentShots: List<Float>
+)
+
 @Composable
-private fun ThisWeekCard(history: List<StoredSession>) {
-    val nowMillis = System.currentTimeMillis()
-    val week = selectHomeRollingWeek(history, nowMillis)
-    val usable = history.filter {
-        it.export.context.recordingQuality != RecordingQuality.Unusable &&
-            it.export.session.startedAtMillis <= nowMillis
+private fun ThisWeekCard(
+    history: List<StoredSession>,
+    analysisOf: (SessionExport) -> ReviewedSessionAnalysis
+) {
+    // The whole derivation walks every stored session and, for the week, runs a full reviewed
+    // projection each time. Keyed on the history snapshot so it runs on data change, not on
+    // every recomposition of Home.
+    val recap = remember(history, analysisOf) {
+        val nowMillis = System.currentTimeMillis()
+        val week = selectHomeRollingWeek(history, nowMillis)
+        val usable = history.filter {
+            it.export.context.recordingQuality != RecordingQuality.Unusable &&
+                it.export.session.startedAtMillis <= nowMillis
+        }
+        WeekRecap(
+            sessionCount = week.size,
+            totalShots = week.sumOf { it.export.effectiveMetrics().correctedDetectedHitCount },
+            hasCorrections = week.any { it.export.effectiveMetrics().hasCorrections },
+            estimatedActiveMillis = week.sumOf {
+                analysisOf(it.export).rallyProfile.totalWorkMillis
+            },
+            recentShots = usable.take(8).reversed()
+                .map { it.export.effectiveMetrics().correctedDetectedHitCount.toFloat() }
+        )
     }
 
     InfoCard(title = stringResource(R.string.home_this_week)) {
-        if (week.isEmpty()) {
+        if (recap.sessionCount == 0) {
             Text(
                 text = stringResource(R.string.home_first_recap),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
-            val totalShots = week.sumOf {
-                it.export.effectiveMetrics().correctedDetectedHitCount
-            }
-            val hasCorrections = week.any { it.export.effectiveMetrics().hasCorrections }
-            val estimatedActiveMillis = week.sumOf {
-                it.export.reviewedAnalysis().rallyProfile.totalWorkMillis
-            }
             DurationStatRow(
-                first = Stat(stringResource(R.string.label_sessions), week.size.toString()),
+                first = Stat(
+                    stringResource(R.string.label_sessions),
+                    recap.sessionCount.toString()
+                ),
                 second = Stat(
                     stringResource(
-                        if (hasCorrections) R.string.label_reviewed_hits else R.string.label_detected_hits
+                        if (recap.hasCorrections) {
+                            R.string.label_reviewed_hits
+                        } else {
+                            R.string.label_detected_hits
+                        }
                     ),
-                    totalShots.toString()
+                    recap.totalShots.toString()
                 ),
                 durationLabel = stringResource(R.string.home_estimated_active_short),
-                durationMillis = estimatedActiveMillis
+                durationMillis = recap.estimatedActiveMillis
             )
-            val recentShots = usable.take(8).reversed()
-                .map { it.export.effectiveMetrics().correctedDetectedHitCount.toFloat() }
+            val recentShots = recap.recentShots
             if (recentShots.size >= 2) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Sparkline(

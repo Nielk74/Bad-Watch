@@ -59,6 +59,7 @@ class SessionStore(
             }
             val payloadText = BadWatchJson.encodeToString(SessionExport.serializer(), export)
             atomicWriter(file, payloadText)
+            invalidate(file)
             val stored = StoredSession(
                 file = file,
                 export = export,
@@ -305,6 +306,7 @@ class SessionStore(
         clearStoredSyncState(existing.file, requireSuccess = true)
         val payloadText = BadWatchJson.encodeToString(SessionExport.serializer(), export)
         atomicWriter(existing.file, payloadText)
+        invalidate(existing.file)
         val stored = StoredSession(
             file = existing.file,
             export = export,
@@ -328,6 +330,7 @@ class SessionStore(
         val payloadText = BadWatchJson.encodeToString(SessionExport.serializer(), normalized)
         if (normalized != stored.export) {
             atomicWriter(stored.file, payloadText)
+            invalidate(stored.file)
         }
         writeAcceptedSyncMarker(
             payloadFile = stored.file,
@@ -339,13 +342,15 @@ class SessionStore(
     private fun readOrNull(file: File): StoredSession? = runCatching {
         val payloadText = file.readText()
         val export = BadWatchJson.decodeFromString(SessionExport.serializer(), payloadText)
-        val syncState = readStoredSyncState(file, payloadText)
+        // One digest per payload: the sync-state check and the StoredSession share it.
+        val fingerprint = payloadFingerprint(payloadText)
+        val syncState = readStoredSyncStateForFingerprint(file, fingerprint)
         StoredSession(
             file = file,
             export = export,
             synced = syncState.synced,
             syncRejection = syncState.rejection,
-            syncPayloadFingerprint = payloadFingerprint(payloadText)
+            syncPayloadFingerprint = fingerprint
         )
     }.getOrNull()
 
@@ -370,11 +375,72 @@ class SessionStore(
         )
     }
 
-    private fun loadAll(): List<StoredSession> =
-        directory.listFiles { file -> file.extension == "json" }
-            ?.mapNotNull(::readOrNull)
-            ?.sortedByDescending { it.export.session.startedAtMillis }
-            .orEmpty()
+    /**
+     * Cache of parsed payloads, keyed on the file's observable identity.
+     *
+     * Several store operations call [loadAll] more than once (validate, mutate, re-publish),
+     * and every call previously re-read, re-parsed and re-digested every session on disk. An
+     * entry is reused only when path, size, modification time *and* the sibling sync markers
+     * are unchanged, so any external edit or marker transition still forces a fresh read.
+     *
+     * File timestamps are only millisecond-granular at best, so this store additionally drops
+     * the entry for every payload it writes itself ([invalidate]). Without that, a revision
+     * written in the same millisecond as its predecessor and encoding to the same length —
+     * a one-digit diary change, say — would be indistinguishable from the cached parse.
+     *
+     * Accessed only under [mutex], which serialises every path that touches it.
+     */
+    private val parsedCache = HashMap<String, CachedSession>()
+
+    /** Drops any cached parse for a payload this store is about to replace or remove. */
+    private fun invalidate(payloadFile: File) {
+        parsedCache.remove(payloadFile.path)
+    }
+
+    private fun loadAll(): List<StoredSession> {
+        val files = directory.listFiles { file -> file.extension == "json" }.orEmpty()
+        val seen = HashSet<String>(files.size)
+        val loaded = files.mapNotNull { file ->
+            val key = file.path
+            seen += key
+            val stamp = FileStamp.of(file)
+            val cached = parsedCache[key]
+            if (cached != null && cached.stamp == stamp) {
+                cached.session
+            } else {
+                readOrNull(file)?.also { parsedCache[key] = CachedSession(stamp, it) }
+                    ?: run { parsedCache.remove(key); null }
+            }
+        }
+        parsedCache.keys.retainAll(seen)
+        return loaded.sortedByDescending { it.export.session.startedAtMillis }
+    }
+
+    private data class CachedSession(val stamp: FileStamp, val session: StoredSession)
+
+    /**
+     * The parts of a payload's on-disk state that must match for a cached parse to stay valid.
+     * Marker stamps are included because sync state lives in sibling files, not in the payload.
+     */
+    private data class FileStamp(
+        val sizeBytes: Long,
+        val lastModifiedMillis: Long,
+        val acceptedMarker: Long,
+        val rejectedMarker: Long
+    ) {
+        companion object {
+            fun of(payloadFile: File): FileStamp = FileStamp(
+                sizeBytes = payloadFile.length(),
+                lastModifiedMillis = payloadFile.lastModified(),
+                acceptedMarker = markerStamp(acceptedMarkerFor(payloadFile)),
+                rejectedMarker = markerStamp(rejectedMarkerFor(payloadFile))
+            )
+
+            /** 0 when absent; otherwise a value that changes whenever the marker is rewritten. */
+            private fun markerStamp(marker: File): Long =
+                if (!marker.exists()) 0L else marker.lastModified() * 31 + marker.length()
+        }
+    }
 
     private fun notifySessionsChanged() {
         // Complication refresh is a best-effort observer; storage must remain authoritative

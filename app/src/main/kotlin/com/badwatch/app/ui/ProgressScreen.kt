@@ -5,6 +5,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -30,7 +31,8 @@ import com.badwatch.core.progress.PlayProfileBuilder
 import com.badwatch.core.sync.ActivityMode
 import com.badwatch.core.sync.RecordingQuality
 import com.badwatch.core.sync.effectiveMetrics
-import com.badwatch.core.sync.reviewedAnalysis
+import com.badwatch.core.sync.ReviewedSessionAnalysis
+import com.badwatch.core.sync.SessionExport
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
@@ -47,9 +49,26 @@ fun ProgressScreen(viewModel: BadWatchViewModel) {
         experience = profile.experience,
         sessionGoal = sessionGoal,
         minuteGoal = minuteGoal,
-        onGoalsChanged = viewModel::setWeeklyGoals
+        onGoalsChanged = viewModel::setWeeklyGoals,
+        analysisOf = viewModel::analysisOf
     )
 }
+
+/** All-time personal records, computed once per usable-history change. */
+private data class ProgressRecords(
+    val mostHits: Int,
+    val mostHitsHasCorrections: Boolean,
+    val longestBurst: Int,
+    val longestRecordingMillis: Long
+)
+
+/** Whole-corpus derivations for the progress screen, computed once per history change. */
+private data class ProgressDerived(
+    val usable: List<StoredSession>,
+    val recent: List<StoredSession>,
+    val recentMinutes: Long,
+    val playProfile: PlayProfile
+)
 
 @Composable
 private fun ProgressContent(
@@ -57,13 +76,45 @@ private fun ProgressContent(
     experience: SelfReportedExperience,
     sessionGoal: Int,
     minuteGoal: Int,
-    onGoalsChanged: (Int, Int) -> Unit
+    onGoalsChanged: (Int, Int) -> Unit,
+    analysisOf: (SessionExport) -> ReviewedSessionAnalysis
 ) {
-    val nowMillis = System.currentTimeMillis()
-    val usable = selectProgressUsableHistory(history, nowMillis)
-    val recent = selectProgressRollingWeek(usable, nowMillis)
-    val recentMinutes = progressObservedMillis(recent) / 60_000
-    val playProfile = PlayProfileBuilder.build(usable.map { it.export })
+    // Each of these walks the full stored history, and PlayProfileBuilder additionally runs a
+    // whole-corpus aggregation. Bound to the history snapshot so goal-slider recompositions
+    // and scrolling no longer re-derive the entire corpus.
+    val derived = remember(history) {
+        val nowMillis = System.currentTimeMillis()
+        val usable = selectProgressUsableHistory(history, nowMillis)
+        val recent = selectProgressRollingWeek(usable, nowMillis)
+        ProgressDerived(
+            usable = usable,
+            recent = recent,
+            recentMinutes = progressObservedMillis(recent) / 60_000,
+            playProfile = PlayProfileBuilder.build(usable.map { it.export })
+        )
+    }
+    val usable = derived.usable
+    val recent = derived.recent
+    val recentMinutes = derived.recentMinutes
+    val playProfile = derived.playProfile
+
+    // Personal records scan the whole usable corpus, including a reviewed projection per
+    // session for the longest burst. Null when there is nothing to report.
+    val records = remember(usable, analysisOf) {
+        usable.takeIf { it.isNotEmpty() }?.let { sessions ->
+            val mostHitsSession = sessions.maxBy {
+                it.export.effectiveMetrics().correctedDetectedHitCount
+            }
+            ProgressRecords(
+                mostHits = mostHitsSession.export.effectiveMetrics().correctedDetectedHitCount,
+                mostHitsHasCorrections = mostHitsSession.export.effectiveMetrics().hasCorrections,
+                longestBurst = sessions.maxOf {
+                    analysisOf(it.export).rallyProfile.longestRally?.shotCount ?: 0
+                },
+                longestRecordingMillis = progressLongestObservedMillis(sessions)
+            )
+        }
+    }
 
     WatchScreen {
         item { ScreenHeader(stringResource(R.string.progress_title)) }
@@ -246,20 +297,15 @@ private fun ProgressContent(
             }
         }
 
-        if (usable.isNotEmpty()) {
-            val mostHitsSession = usable.maxBy {
-                it.export.effectiveMetrics().correctedDetectedHitCount
-            }
-            val mostHits = mostHitsSession.export.effectiveMetrics().correctedDetectedHitCount
-            val longestBurst = usable.maxOf {
-                it.export.reviewedAnalysis().rallyProfile.longestRally?.shotCount ?: 0
-            }
-            val longestRecording = progressLongestObservedMillis(usable)
+        if (records != null) {
+            val mostHits = records.mostHits
+            val longestBurst = records.longestBurst
+            val longestRecording = records.longestRecordingMillis
             item {
                 InfoCard(title = stringResource(R.string.progress_personal_records)) {
                     DetailRow(
                         stringResource(
-                            if (mostHitsSession.export.effectiveMetrics().hasCorrections) {
+                            if (records.mostHitsHasCorrections) {
                                 R.string.label_reviewed_hits
                             } else {
                                 R.string.label_detected_hits

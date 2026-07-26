@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -139,17 +140,34 @@ data class Stat(
     val weight: Float = 1f
 )
 
+/** Per-stat presentation derived from the stat's own strings, cached across recompositions. */
+private data class RenderedStat(val label: String, val isTextual: Boolean)
+
 @Composable
 fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
     val dense = stats.size >= 3
     val stacked = shouldStackStats(stats.size, LocalDensity.current.fontScale)
+    // Uppercasing and scanning each value for letters is pure per-stat string work that used
+    // to run on every recomposition of every card. Keyed on the stats themselves.
+    // Keyed on the stat list's contents, not the vararg array: arrays compare by identity, so
+    // an array key would both miss every call and risk serving a stale entry for a reused one.
+    val statList = stats.asList()
+    val rendered = remember(statList, Locale.getDefault()) {
+        val locale = Locale.getDefault()
+        statList.map { stat ->
+            RenderedStat(
+                label = stat.label.uppercase(locale),
+                isTextual = stat.value.any(Char::isLetter)
+            )
+        }
+    }
 
     if (stacked) {
         Column(
             modifier = modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            stats.forEach { stat ->
+            stats.forEachIndexed { index, stat ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -158,7 +176,7 @@ fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = stat.label.uppercase(Locale.getDefault()),
+                        text = rendered[index].label,
                         modifier = Modifier
                             .weight(1f)
                             .padding(end = 8.dp),
@@ -169,7 +187,7 @@ fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
                     )
                     Text(
                         text = stat.value,
-                        style = if (stat.value.any(Char::isLetter)) {
+                        style = if (rendered[index].isTextual) {
                             MaterialTheme.typography.titleSmall
                         } else {
                             MaterialTheme.typography.numeralSmall
@@ -190,7 +208,7 @@ fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        stats.forEach { stat ->
+        stats.forEachIndexed { index, stat ->
             Column(
                 modifier = Modifier
                     .weight(stat.weight)
@@ -198,7 +216,7 @@ fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = stat.label.uppercase(Locale.getDefault()),
+                    text = rendered[index].label,
                     // Three-up cards are narrower than the full screen. Keep both words of
                     // qualifiers such as "Detected exchanges" visible rather than clipping a
                     // truth-bearing label at the round edge.
@@ -215,7 +233,7 @@ fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
                 Text(
                     text = stat.value,
                     style = when {
-                        stat.value.any(Char::isLetter) -> MaterialTheme.typography.titleSmall
+                        rendered[index].isTextual -> MaterialTheme.typography.titleSmall
                         dense -> MaterialTheme.typography.numeralSmall
                         else -> MaterialTheme.typography.numeralMedium
                     },
@@ -379,13 +397,15 @@ fun Sparkline(
     } else {
         Modifier.semantics { this.contentDescription = contentDescription }
     }
+    // Allocated once and rewound per frame rather than rebuilt on every draw pass.
+    val path = remember { Path() }
     Canvas(modifier = modifier.fillMaxWidth().height(28.dp).then(accessibility)) {
         if (values.size < 2) return@Canvas
         val min = values.min()
         val max = values.max()
         val range = (max - min).takeIf { it > 0f } ?: 1f
         val stepX = size.width / (values.size - 1)
-        val path = Path()
+        path.reset()
         values.forEachIndexed { index, value ->
             val x = stepX * index
             val y = size.height * (1f - (value - min) / range)
@@ -717,5 +737,28 @@ fun formatHeartRate(bpm: Float?): String =
 fun formatRestRatio(ratio: Float): String =
     if (ratio <= 0f) "--" else String.format(Locale.getDefault(), "1:%.1f", ratio)
 
-fun formatSessionDate(epochMillis: Long): String =
-    SimpleDateFormat("EEE d MMM · HH:mm", Locale.getDefault()).format(Date(epochMillis))
+/**
+ * Reused per thread rather than constructed per call: this runs once per history row, and
+ * building a [SimpleDateFormat] parses the pattern and loads locale symbols every time.
+ * [SimpleDateFormat] is not thread-safe, hence the [ThreadLocal] rather than a shared instance.
+ * The cached formatter is rebuilt when the default locale changes, so a locale switch still
+ * formats exactly as it did before.
+ */
+private val sessionDateFormat = object : ThreadLocal<Pair<Locale, SimpleDateFormat>>() {
+    override fun initialValue(): Pair<Locale, SimpleDateFormat> = newFormatter()
+}
+
+private fun newFormatter(): Pair<Locale, SimpleDateFormat> {
+    val locale = Locale.getDefault()
+    return locale to SimpleDateFormat("EEE d MMM · HH:mm", locale)
+}
+
+fun formatSessionDate(epochMillis: Long): String {
+    val cached = sessionDateFormat.get() ?: newFormatter()
+    val formatter = if (cached.first == Locale.getDefault()) {
+        cached.second
+    } else {
+        newFormatter().also(sessionDateFormat::set).second
+    }
+    return formatter.format(Date(epochMillis))
+}

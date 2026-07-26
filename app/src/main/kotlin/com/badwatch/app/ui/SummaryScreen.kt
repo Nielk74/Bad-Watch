@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +44,7 @@ import com.badwatch.app.ui.components.provisionalDisplayName
 import com.badwatch.core.insight.Insight
 import com.badwatch.core.model.HeartRateZone
 import com.badwatch.core.physiology.PostBurstHeartRateBuilder
+import com.badwatch.core.physiology.PostBurstHeartRateChange
 import com.badwatch.core.sync.SessionExport
 import com.badwatch.core.sync.ActivityMode
 import com.badwatch.core.sync.DiaryReviewStatus
@@ -51,7 +53,16 @@ import com.badwatch.core.sync.SessionCompletion
 import com.badwatch.core.sync.effectiveMetrics
 import com.badwatch.core.sync.hasKnownProcessAbsence
 import com.badwatch.core.sync.knownProcessAbsenceMillisInEffectiveWindow
+import com.badwatch.core.sync.ReviewedSessionAnalysis
 import com.badwatch.core.sync.reviewedAnalysis
+
+/** Per-session derivations for the recap, computed once per export rather than per frame. */
+private data class SummaryDerived(
+    val reviewed: ReviewedSessionAnalysis,
+    val postBurstHeartRate: PostBurstHeartRateChange?,
+    val effectiveGapMillis: Long,
+    val activityComposition: SessionActivityComposition
+)
 
 /**
  * Post-session recap.
@@ -69,17 +80,30 @@ fun SummaryScreen(
     onEditDiary: (() -> Unit)? = null,
     onCorrectRecording: (() -> Unit)? = null
 ) {
-    val reviewed = stored.reviewedAnalysis()
+    // The reviewed projection and these builders each walk the full session. The recap is a
+    // scrolling screen, so deriving them per recomposition made it stutter; the export is
+    // immutable, so one derivation per session is equivalent.
+    val derived = remember(stored) {
+        val reviewed = stored.reviewedAnalysis()
+        val effectiveGapMillis = processAbsenceNoticeMillis(stored)
+        SummaryDerived(
+            reviewed = reviewed,
+            postBurstHeartRate = PostBurstHeartRateBuilder.build(stored),
+            effectiveGapMillis = effectiveGapMillis,
+            activityComposition = sessionActivityComposition(
+                durationMillis = reviewed.metrics.window.durationMillis,
+                detectedActiveMillis = reviewed.rallyProfile.totalWorkMillis,
+                knownUnobservedMillis = effectiveGapMillis
+            )
+        )
+    }
+    val reviewed = derived.reviewed
     val summary = reviewed.session.summary
     val rallies = reviewed.rallyProfile
     val effective = reviewed.metrics
-    val postBurstHeartRate = PostBurstHeartRateBuilder.build(stored)
-    val effectiveGapMillis = processAbsenceNoticeMillis(stored)
-    val activityComposition = sessionActivityComposition(
-        durationMillis = effective.window.durationMillis,
-        detectedActiveMillis = rallies.totalWorkMillis,
-        knownUnobservedMillis = effectiveGapMillis
-    )
+    val postBurstHeartRate = derived.postBurstHeartRate
+    val effectiveGapMillis = derived.effectiveGapMillis
+    val activityComposition = derived.activityComposition
 
     WatchScreen(
         edgeButton = {

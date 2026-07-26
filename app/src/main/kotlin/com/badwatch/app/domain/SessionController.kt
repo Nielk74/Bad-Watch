@@ -164,12 +164,23 @@ class SessionController(
     ) {
         collectionJob = scope.launch {
             var lastCheckpointAtMillis = firstCheckpointAtMillis
+            var lastPublishAtMillis = Long.MIN_VALUE
             try {
                 sensorStream.samples().collect { sample ->
                     val shot = session.onSample(sample)
                     if (shot != null) _shots.tryEmit(shot)
                     val timestamp = sample.timestampMillis
-                    publishRecording(session, timestampMillis = timestamp)
+                    // Publishing rebuilds the snapshot and re-segments every rally. At 100 Hz
+                    // that repeated the whole derivation ~100x per displayed frame. Publish on
+                    // a detected shot — the one event that changes the counters immediately —
+                    // and otherwise at the rate the elapsed-time display actually ticks, so
+                    // nothing the player can see is delayed.
+                    if (shot != null ||
+                        timestamp - lastPublishAtMillis >= PUBLISH_INTERVAL_MILLIS
+                    ) {
+                        publishRecording(session, timestampMillis = timestamp)
+                        lastPublishAtMillis = timestamp
+                    }
                     if (timestamp - lastCheckpointAtMillis >= CHECKPOINT_INTERVAL_MILLIS) {
                         if (!persistCheckpoint(session, activeIdentity, timestamp)) {
                             throw IOException("Could not update the session recovery checkpoint")
@@ -362,6 +373,15 @@ class SessionController(
     companion object {
         /** Balances a useful recovery point against wakeups and flash writes. */
         const val CHECKPOINT_INTERVAL_MILLIS: Long = 12_000L
+
+        /**
+         * Minimum spacing between recording-state emissions in the absence of a detected shot.
+         *
+         * Well under the ~1 s cadence at which any live figure visibly changes, so this is
+         * imperceptible, while cutting snapshot and rally-segmentation work by ~25x against
+         * the 100 Hz sample rate. A detected shot always publishes immediately regardless.
+         */
+        const val PUBLISH_INTERVAL_MILLIS: Long = 250L
     }
 }
 

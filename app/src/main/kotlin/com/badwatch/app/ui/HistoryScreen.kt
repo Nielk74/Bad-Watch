@@ -28,7 +28,6 @@ import com.badwatch.app.ui.components.WatchScreen
 import com.badwatch.app.ui.components.formatSessionDate
 import com.badwatch.app.ui.theme.CourtColors
 import com.badwatch.app.viewmodel.BadWatchViewModel
-import com.badwatch.core.sync.reviewedAnalysis
 
 /**
  * The sessions stored on the watch, newest first.
@@ -61,7 +60,9 @@ fun HistoryScreen(
         }
 
         items(history, key = { it.export.session.id }) { stored ->
-            val reviewed = stored.export.reviewedAnalysis()
+            // Memoised in the ViewModel: re-deriving this per bound row is what made the
+            // history list stutter under a scroll.
+            val reviewed = viewModel.analysisOf(stored.export)
             val rejection = stored.syncRejection
             SwipeToReveal(
                 primaryAction = {

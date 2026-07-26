@@ -23,6 +23,7 @@ import com.badwatch.core.sync.CorrectionProvenance
 import com.badwatch.core.sync.DiaryReviewStatus
 import com.badwatch.core.sync.HitCorrectionRevision
 import com.badwatch.core.sync.PostSessionReport
+import com.badwatch.core.sync.ReviewedSessionAnalysis
 import com.badwatch.core.sync.SessionContext
 import com.badwatch.core.sync.SessionCorrections
 import com.badwatch.core.sync.SessionExport
@@ -51,6 +52,17 @@ class BadWatchViewModel(
     val shots = container.sessionController.shots
 
     val history: StateFlow<List<StoredSession>> = container.sessionStore.sessions
+
+    /**
+     * Memoised reviewed projections, so screens can read analysis inside composition without
+     * paying for a full re-derivation on every recomposition. Entries are keyed by the
+     * immutable export, so a review edit transparently produces a fresh one.
+     */
+    private val analysisCache = SessionAnalysisCache()
+
+    /** The reviewed view of [export], computed once per distinct export instance. */
+    fun analysisOf(export: SessionExport): ReviewedSessionAnalysis =
+        analysisCache.analysisFor(export)
 
     val captureState: StateFlow<CaptureState> = container.captureController.state
 
