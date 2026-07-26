@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -138,6 +139,47 @@ data class Stat(
 @Composable
 fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
     val dense = stats.size >= 3
+    val stacked = shouldStackStats(stats.size, LocalDensity.current.fontScale)
+
+    if (stacked) {
+        Column(
+            modifier = modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            stats.forEach { stat ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics(mergeDescendants = true) {},
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stat.label.uppercase(Locale.getDefault()),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp),
+                        style = MaterialTheme.typography.bodyExtraSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2
+                    )
+                    Text(
+                        text = stat.value,
+                        style = if (stat.value.any(Char::isLetter)) {
+                            MaterialTheme.typography.titleSmall
+                        } else {
+                            MaterialTheme.typography.numeralSmall
+                        },
+                        color = stat.color,
+                        textAlign = TextAlign.End,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+        return
+    }
+
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -179,6 +221,10 @@ fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
         }
     }
 }
+
+/** Three-up watch metrics need a vertical reflow once accessibility text outgrows each third. */
+internal fun shouldStackStats(statCount: Int, fontScale: Float): Boolean =
+    statCount >= 3 && fontScale >= 1.2f
 
 /** A left-label / right-value line, for dense detail lists inside cards. */
 @Composable
