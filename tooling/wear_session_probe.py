@@ -17,10 +17,11 @@ import subprocess
 import sys
 import time
 import xml.etree.ElementTree as ET
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 
 PACKAGE = "com.badwatch.badwatch"
@@ -28,6 +29,12 @@ ACTIVITY = f"{PACKAGE}/com.badwatch.app.MainActivity"
 SERVICE_NAME = "com.badwatch.app.service.SessionService"
 SESSION_FILE = re.compile(r"^[0-9]+-[A-Za-z0-9-]+\.json$")
 STOP_ACTION_DESCRIPTIONS = {"Stop & save", "Arrêter et enregistrer"}
+ZEN_MODE_TO_DND_FILTER = {
+    0: "all",
+    1: "priority",
+    2: "none",
+    3: "alarms",
+}
 
 
 class ProbeError(RuntimeError):
@@ -74,6 +81,52 @@ class BatteryReading:
     journal_samples_processed: int | None
 
 
+@dataclass(frozen=True)
+class SystemWakeControls:
+    """System controls that can wake or illuminate a powered Wear device.
+
+    The two Settings values remain strings so an absent value can be distinguished from every
+    concrete value and restored with ``settings delete``. Zen mode is restored through
+    NotificationManager's public shell contract rather than by mutating its backing setting.
+    """
+
+    stay_on_while_plugged_in: str | None
+    theater_mode_on: str | None
+    zen_mode: int
+
+    def as_report(self) -> dict[str, str | int | None]:
+        return {
+            "stayOnWhilePluggedIn": self.stay_on_while_plugged_in,
+            "theaterModeOn": self.theater_mode_on,
+            "zenMode": self.zen_mode,
+            "dndFilter": dnd_filter_for_zen_mode(self.zen_mode),
+        }
+
+
+@dataclass
+class SystemWakeSuppressionEvidence:
+    enabled: bool
+    original: SystemWakeControls | None = None
+    active: SystemWakeControls | None = None
+    restored: SystemWakeControls | None = None
+
+    def as_report(self) -> dict[str, Any]:
+        return {
+            "enabled": self.enabled,
+            "original": self.original.as_report() if self.original else None,
+            "active": self.active.as_report() if self.active else None,
+            "restored": self.restored.as_report() if self.restored else None,
+        }
+
+
+def dnd_filter_for_zen_mode(zen_mode: int) -> str:
+    """Return the exact ``cmd notification set_dnd`` filter for a zen-mode value."""
+    try:
+        return ZEN_MODE_TO_DND_FILTER[zen_mode]
+    except KeyError as error:
+        raise ProbeError(f"unsupported Android zen_mode value {zen_mode!r}") from error
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--serial", help="adb serial; auto-selects when exactly one device is online")
@@ -84,6 +137,14 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path("build/wear-session-probe"),
         help="report directory (default: build/wear-session-probe)",
+    )
+    parser.add_argument(
+        "--suppress-system-wakes",
+        action="store_true",
+        help=(
+            "during monitoring, temporarily disable plugged-in stay-awake, enable theater "
+            "mode, and set DND to none; exact original values are always restored"
+        ),
     )
     return parser.parse_args()
 
@@ -216,19 +277,83 @@ class Device:
         # charging with stay-awake enabled. This changes display state, never battery telemetry.
         self.shell("input", "keyevent", "223")  # KEYCODE_SLEEP
 
+    def global_setting(self, key: str) -> str | None:
+        value = self.shell("settings", "get", "global", key).strip()
+        return None if value == "null" else value
+
+    def set_global_setting(self, key: str, value: str | None) -> None:
+        if value is None:
+            self.shell("settings", "delete", "global", key)
+        else:
+            self.shell("settings", "put", "global", key, value)
+
+    def system_wake_controls(self) -> SystemWakeControls:
+        zen_value = self.global_setting("zen_mode")
+        try:
+            zen_mode = int(zen_value) if zen_value is not None else None
+        except ValueError as error:
+            raise ProbeError(f"unexpected Android zen_mode value {zen_value!r}") from error
+        if zen_mode is None:
+            raise ProbeError("Android zen_mode setting is absent; refusing to alter DND")
+        # Validate before any caller can use this snapshot as a restoration target.
+        dnd_filter_for_zen_mode(zen_mode)
+        return SystemWakeControls(
+            stay_on_while_plugged_in=self.global_setting("stay_on_while_plugged_in"),
+            theater_mode_on=self.global_setting("theater_mode_on"),
+            zen_mode=zen_mode,
+        )
+
+    def set_dnd_filter(self, dnd_filter: str) -> None:
+        self.shell("cmd", "notification", "set_dnd", dnd_filter)
+
+    def apply_system_wake_suppression(self) -> None:
+        self.set_global_setting("stay_on_while_plugged_in", "0")
+        self.set_dnd_filter("none")
+        self.set_global_setting("theater_mode_on", "1")
+
+    def restore_system_wake_controls(self, original: SystemWakeControls) -> None:
+        self.set_global_setting(
+            "stay_on_while_plugged_in",
+            original.stay_on_while_plugged_in,
+        )
+        self.set_dnd_filter(dnd_filter_for_zen_mode(original.zen_mode))
+        self.set_global_setting("theater_mode_on", original.theater_mode_on)
+
+    def prepare_visible_stop_attempt(self) -> str | None:
+        """Wake only when needed, then bring the exact app Activity to the foreground."""
+        wakefulness = self.wakefulness()
+        if wakefulness in {"Asleep", "Dozing"}:
+            # KEYCODE_WAKEUP is intentionally conditional. Re-sending it to a device that has
+            # already reached Awake is unnecessary and can make vendor wake transitions flaky.
+            self.shell("input", "keyevent", "224", check=False)
+            self.shell("wm", "dismiss-keyguard", check=False)
+        self.shell(
+            "am",
+            "start",
+            "-f",
+            "0x04000000",
+            "-n",
+            ACTIVITY,
+            check=False,
+        )
+        return wakefulness
+
     def stop_session_through_ui(self) -> None:
-        self.shell("input", "keyevent", "224", check=False)  # KEYCODE_WAKEUP
-        self.shell("wm", "dismiss-keyguard", check=False)
-        # A sleeping Wear task can briefly expose the watch face or the pre-wake Compose tree
-        # even after `am start` reports success. Poll the actual visible hierarchy instead of
-        # treating that normal transition as a failed recording.
-        self.shell("am", "start", "-f", "0x04000000", "-n", ACTIVITY)
+        # Exiting Theater Mode is asynchronous on Pixel Watch: the global setting can already
+        # read as restored while System UI still leaves the watch face visible. Re-check actual
+        # wakefulness and retry the fully-qualified Activity throughout hierarchy polling.
         remote = "/sdcard/badwatch-probe-window.xml"
         deadline = time.monotonic() + 15
+        next_launch = 0.0
         target: ET.Element | None = None
         last_visible_text: list[str] = []
+        last_wakefulness: str | None = None
         while time.monotonic() < deadline:
-            time.sleep(0.75)
+            now = time.monotonic()
+            if now >= next_launch:
+                last_wakefulness = self.prepare_visible_stop_attempt()
+                next_launch = now + 1.5
+            time.sleep(0.5)
             dumped = self.shell("uiautomator", "dump", remote, check=False)
             xml_text = self.shell("cat", remote, check=False) if "ERROR" not in dumped else ""
             try:
@@ -247,7 +372,7 @@ class Device:
             preview = ", ".join(repr(text) for text in last_visible_text[:8]) or "no text"
             raise ProbeError(
                 "live UI did not expose the localized stop-and-save action after 15 seconds; "
-                f"last hierarchy showed {preview}"
+                f"last wakefulness was {last_wakefulness!r} and hierarchy showed {preview}"
             )
         bounds = target.attrib.get("bounds", "")
         match = re.fullmatch(r"\[([0-9]+),([0-9]+)]\[([0-9]+),([0-9]+)]", bounds)
@@ -273,6 +398,52 @@ def wait_until(predicate: Any, timeout_seconds: float, description: str) -> None
             return
         time.sleep(0.25)
     raise ProbeError(f"timed out waiting for {description}")
+
+
+def require_system_wake_controls(
+    actual: SystemWakeControls,
+    expected: SystemWakeControls,
+    description: str,
+) -> None:
+    if actual != expected:
+        raise ProbeError(
+            f"{description} system-wake controls do not match: "
+            f"expected {expected.as_report()}, found {actual.as_report()}"
+        )
+
+
+@contextmanager
+def system_wake_suppression(
+    device: Device,
+    enabled: bool,
+) -> Iterator[SystemWakeSuppressionEvidence]:
+    """Temporarily suppress system-generated display wakes, restoring on every exit path."""
+    evidence = SystemWakeSuppressionEvidence(enabled=enabled)
+    if not enabled:
+        yield evidence
+        return
+
+    evidence.original = device.system_wake_controls()
+    try:
+        device.apply_system_wake_suppression()
+        evidence.active = device.system_wake_controls()
+        require_system_wake_controls(
+            evidence.active,
+            SystemWakeControls(
+                stay_on_while_plugged_in="0",
+                theater_mode_on="1",
+                zen_mode=2,
+            ),
+            "active",
+        )
+        yield evidence
+    finally:
+        # This deliberately catches normal completion, ProbeError, KeyboardInterrupt, and even
+        # a partially-applied setup. On the normal path it runs before the visible stop flow,
+        # which itself wakes the display.
+        device.restore_system_wake_controls(evidence.original)
+        evidence.restored = device.system_wake_controls()
+        require_system_wake_controls(evidence.restored, evidence.original, "restored")
 
 
 def device_metadata(device: Device) -> dict[str, str]:
@@ -317,50 +488,54 @@ def main() -> int:
     time.sleep(2)
     device.screenshot(output / "start.png")
 
-    device.sleep_display()
-    wait_until(
-        lambda: device.wakefulness() in {"Asleep", "Dozing"},
-        15,
-        "the display to enter sleep or doze",
-    )
-
-    readings = [device.battery()]
-    print(
-        "probe 0m: "
-        f"service={readings[0].service_running}/{readings[0].service_foreground} "
-        f"wake={readings[0].wakefulness} samples={readings[0].journal_samples_processed}",
-        flush=True,
-    )
     duration_seconds = args.duration_minutes * 60.0
-    deadline = time.monotonic() + duration_seconds
-    while True:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            break
-        # Do not turn the short remainder at the end of a run into another reading. A probe
-        # sample is a continuity interval: taking two readings a second apart can truthfully
-        # see the same durable checkpoint even though sensors are still streaming. That made
-        # the strict per-interval progress gate depend on scheduling jitter. Wait out the tail
-        # without inventing an undersized interval; every retained reading remains at least
-        # sample_seconds after the previous one.
-        if remaining < args.sample_seconds:
-            time.sleep(remaining)
-            break
-        time.sleep(args.sample_seconds)
-        reading = device.battery()
-        readings.append(reading)
-        elapsed_minutes = (reading.captured_at_epoch_millis - start_wall_millis) / 60_000
+    with system_wake_suppression(device, args.suppress_system_wakes) as wake_controls:
+        device.sleep_display()
+        wait_until(
+            lambda: device.wakefulness() in {"Asleep", "Dozing"},
+            15,
+            "the display to enter sleep or doze",
+        )
+
+        readings = [device.battery()]
         print(
-            f"probe {elapsed_minutes:.1f}m: "
-            f"service={reading.service_running}/{reading.service_foreground} "
-            f"wake={reading.wakefulness} samples={reading.journal_samples_processed}",
+            "probe 0m: "
+            f"service={readings[0].service_running}/{readings[0].service_foreground} "
+            f"wake={readings[0].wakefulness} samples={readings[0].journal_samples_processed}",
             flush=True,
         )
-        if not reading.service_running:
-            raise ProbeError("foreground service disappeared before the requested duration elapsed")
-        if reading.service_foreground is not True:
-            raise ProbeError("session service remained present but was not foreground")
+        deadline = time.monotonic() + duration_seconds
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            # Do not turn the short remainder at the end of a run into another reading. A probe
+            # sample is a continuity interval: taking two readings a second apart can truthfully
+            # see the same durable checkpoint even though sensors are still streaming. That made
+            # the strict per-interval progress gate depend on scheduling jitter. Wait out the tail
+            # without inventing an undersized interval; every retained reading remains at least
+            # sample_seconds after the previous one.
+            if remaining < args.sample_seconds:
+                time.sleep(remaining)
+                break
+            time.sleep(args.sample_seconds)
+            reading = device.battery()
+            readings.append(reading)
+            elapsed_minutes = (reading.captured_at_epoch_millis - start_wall_millis) / 60_000
+            print(
+                f"probe {elapsed_minutes:.1f}m: "
+                f"service={reading.service_running}/{reading.service_foreground} "
+                f"wake={reading.wakefulness} samples={reading.journal_samples_processed}",
+                flush=True,
+            )
+            if not reading.service_running:
+                raise ProbeError(
+                    "foreground service disappeared before the requested duration elapsed"
+                )
+            if reading.service_foreground is not True:
+                raise ProbeError("session service remained present but was not foreground")
 
+    # The suppression context restores the user's exact settings before this visible wake/stop.
     device.stop_session_through_ui()
     wait_until(lambda: not device.is_session_service_running(), 20, "the session service to stop")
     end_wall_millis = int(time.time() * 1000)
@@ -445,6 +620,7 @@ def main() -> int:
             [] if battery_measurement_valid
             else ["Battery delta withheld because the watch was powered or charger state was unknown."]
         ),
+        "systemWakeSuppression": wake_controls.as_report(),
         "batteryReadings": [asdict(reading) for reading in readings],
         "displayStayedAsleepThroughout": display_sleep_observed,
         "foregroundServiceObservedThroughout": foreground_observed,
