@@ -92,6 +92,7 @@ dependencies {
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.wear)
+    implementation(libs.androidx.wear.ongoing)
     constraints {
         // androidx.wear:wear pulls an ancient fragment transitively; lint's
         // InvalidFragmentVersionForActivityResult gate needs >= 1.3.0 resolved.

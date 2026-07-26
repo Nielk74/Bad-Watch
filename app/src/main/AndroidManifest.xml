@@ -82,7 +82,7 @@
             </intent-filter>
             <meta-data
                 android:name="androidx.wear.tiles.PREVIEW"
-                android:resource="@drawable/ic_launcher_foreground" />
+                android:resource="@drawable/tile_preview" />
         </service>
 
         <!-- Config-free watch-face complication: corrected detected hits in a rolling 7 days. -->

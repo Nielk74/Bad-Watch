@@ -16,6 +16,21 @@ import org.junit.Test
 class ProgressSessionSelectionTest {
 
     @Test
+    fun usableHistoryExcludesFutureAndUnusableRecordsButKeepsValidPastData() {
+        val now = 2_000_000_000_000L
+        val validPast = stored(now - 1L, RecordingQuality.Partial)
+        val future = stored(now + 1L, RecordingQuality.Unreviewed)
+        val unusable = stored(now - 2L, RecordingQuality.Unusable)
+
+        val selected = selectProgressUsableHistory(
+            listOf(future, validPast, unusable),
+            nowMillis = now
+        )
+
+        assertThat(selected).containsExactly(validPast)
+    }
+
+    @Test
     fun rollingWeekIncludesBoundariesButExcludesFuturePastAndUnusableSessions() {
         val now = 2_000_000_000_000L
         val start = now - TimeUnit.DAYS.toMillis(7)

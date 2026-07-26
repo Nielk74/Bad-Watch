@@ -64,10 +64,9 @@ private fun ProgressContent(
     onGoalsChanged: (Int, Int) -> Unit,
     onBack: () -> Unit
 ) {
-    val usable = history.filter {
-        it.export.context.recordingQuality != RecordingQuality.Unusable
-    }
-    val recent = selectProgressRollingWeek(history, System.currentTimeMillis())
+    val nowMillis = System.currentTimeMillis()
+    val usable = selectProgressUsableHistory(history, nowMillis)
+    val recent = selectProgressRollingWeek(usable, nowMillis)
     val recentMinutes = recent.sumOf { it.export.effectiveMetrics().window.durationMillis } / 60_000
     val playProfile = PlayProfileBuilder.build(usable.map { it.export })
 
@@ -268,15 +267,23 @@ private fun ProgressContent(
     }
 }
 
+/** Trusted Progress corpus. Future records stay inspectable in History but cannot set records. */
+internal fun selectProgressUsableHistory(
+    history: List<StoredSession>,
+    nowMillis: Long
+): List<StoredSession> = history.filter { stored ->
+    stored.export.context.recordingQuality != RecordingQuality.Unusable &&
+        stored.export.session.startedAtMillis <= nowMillis
+}
+
 /** Sessions eligible for Progress goals, including both rolling-window time boundaries. */
 internal fun selectProgressRollingWeek(
     history: List<StoredSession>,
     nowMillis: Long
 ): List<StoredSession> {
     val sevenDaysAgo = nowMillis - TimeUnit.DAYS.toMillis(7)
-    return history.filter { stored ->
-        stored.export.context.recordingQuality != RecordingQuality.Unusable &&
-            stored.export.session.startedAtMillis in sevenDaysAgo..nowMillis
+    return selectProgressUsableHistory(history, nowMillis).filter { stored ->
+        stored.export.session.startedAtMillis >= sevenDaysAgo
     }
 }
 

@@ -1,5 +1,6 @@
 package com.badwatch.app.service
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,11 +8,16 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
+import androidx.wear.ongoing.OngoingActivity
+import androidx.wear.ongoing.Status
 import com.badwatch.app.BadWatchApplication
 import com.badwatch.app.MainActivity
 import com.badwatch.app.R
@@ -55,6 +61,11 @@ class SessionService : Service() {
     private var captureNotificationJob: Job? = null
     private var captureStartJob: Job? = null
     private var sessionStartJob: Job? = null
+    // OngoingActivity.apply() extends this exact builder. Reusing it is intentional: building
+    // notification updates from a fresh builder would silently drop the watch-face metadata.
+    private var sessionNotificationBuilder: NotificationCompat.Builder? = null
+    private var sessionOngoingActivity: OngoingActivity? = null
+    private var sessionStopwatchStartElapsedRealtime: Long? = null
     private val sessionCommandMutex = Mutex()
     private val captureCommandMutex = Mutex()
 
@@ -257,7 +268,12 @@ class SessionService : Service() {
     }
 
     private fun buildCaptureNotification(label: ShotType, swings: Int): Notification =
-        baseNotification(stopAction = ACTION_STOP_CAPTURE)
+        baseNotification(
+            channelId = CAPTURE_CHANNEL_ID,
+            stopAction = ACTION_STOP_CAPTURE,
+            stopLabel = getString(R.string.capture_save_drill),
+            category = NotificationCompat.CATEGORY_SERVICE
+        )
             .setContentTitle(getString(R.string.capture_notification_title))
             .setContentText(
                 getString(
@@ -266,8 +282,10 @@ class SessionService : Service() {
                     getString(label.displayNameResource)
                 )
             )
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .build()
 
+    @Synchronized
     private fun buildSessionNotification(shotCount: Int, durationMillis: Long): Notification {
         val minutes = TimeUnit.MILLISECONDS.toMinutes(durationMillis).toInt()
         val hitsText = resources.getQuantityString(
@@ -276,21 +294,102 @@ class SessionService : Service() {
         val minutesText = resources.getQuantityString(
             R.plurals.session_notification_minutes, minutes, minutes
         )
-        return baseNotification(stopAction = ACTION_STOP)
+        val builder = sessionNotificationBuilder ?: baseNotification(
+            channelId = SESSION_CHANNEL_ID,
+            stopAction = ACTION_STOP,
+            stopLabel = getString(R.string.session_notification_stop),
+            category = NotificationCompat.CATEGORY_WORKOUT
+        ).also { newBuilder ->
+            sessionNotificationBuilder = newBuilder
+        }
+        builder
             .setContentTitle(getString(R.string.session_notification_title))
-            .setContentText(
-                getString(R.string.session_notification_body, hitsText, minutesText)
-            )
-            .build()
+            .setContentText(getString(R.string.session_notification_body, hitsText, minutesText))
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+
+        val candidateStart = stopwatchStartElapsedRealtime(
+            nowElapsedRealtime = SystemClock.elapsedRealtime(),
+            durationMillis = durationMillis
+        )
+        val previousStart = sessionStopwatchStartElapsedRealtime
+        val shouldRebase = previousStart != null && needsStopwatchRebase(
+            currentStartElapsedRealtime = previousStart,
+            candidateStartElapsedRealtime = candidateStart,
+            toleranceMillis = STOPWATCH_REBASE_TOLERANCE_MILLIS
+        )
+        val stopwatchStart = when {
+            previousStart == null || shouldRebase -> candidateStart
+            else -> previousStart
+        }
+        val status = sessionOngoingStatus(stopwatchStart)
+
+        val existingOngoingActivity = sessionOngoingActivity
+        if (existingOngoingActivity == null) {
+            sessionStopwatchStartElapsedRealtime = stopwatchStart
+            sessionOngoingActivity = OngoingActivity.Builder(this, NOTIFICATION_ID, builder)
+                .setStaticIcon(R.drawable.ic_ongoing_badminton)
+                .setTouchIntent(openAppPendingIntent())
+                .setCategory(NotificationCompat.CATEGORY_WORKOUT)
+                .setTitle(getString(R.string.session_notification_title))
+                .setContentDescription(getString(R.string.session_ongoing_content_description))
+                .setStatus(status)
+                .build()
+                .also { ongoingActivity -> ongoingActivity.apply(this) }
+        } else if (
+            shouldRebase && (
+                Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                    ContextCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.POST_NOTIFICATIONS
+                    ) == PackageManager.PERMISSION_GRANTED
+                )
+        ) {
+            // A recovered recorder can be older than this Service instance. Rebase once to
+            // the persisted duration; update() retains all icon, intent, category and a11y
+            // metadata already attached to the existing foreground notification.
+            try {
+                existingOngoingActivity.update(this, status)
+                sessionStopwatchStartElapsedRealtime = stopwatchStart
+            } catch (denied: SecurityException) {
+                // Permission can be revoked between the explicit check and notify(). The
+                // foreground service remains valid. Keep the old origin so a later permitted
+                // update still detects the recovery drift and retries the rebase.
+                Log.i(TAG, "Ongoing activity update unavailable", denied)
+            }
+        }
+
+        return builder.build()
     }
 
-    private fun baseNotification(stopAction: String): NotificationCompat.Builder {
-        val openIntent = PendingIntent.getActivity(
+    private fun sessionOngoingStatus(stopwatchStartElapsedRealtime: Long): Status =
+        Status.Builder()
+            .addTemplate(getString(R.string.session_ongoing_status_template))
+            .addPart(
+                ONGOING_STATUS_ACTIVITY_PART,
+                Status.TextPart(getString(R.string.session_ongoing_status_activity))
+            )
+            .addPart(
+                ONGOING_STATUS_TIME_PART,
+                Status.StopwatchPart(stopwatchStartElapsedRealtime)
+            )
+            .build()
+
+    private fun openAppPendingIntent(): PendingIntent =
+        PendingIntent.getActivity(
             this,
             0,
-            Intent(this, MainActivity::class.java),
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+
+    private fun baseNotification(
+        channelId: String,
+        stopAction: String,
+        stopLabel: String,
+        category: String
+    ): NotificationCompat.Builder {
         val stopIntent = PendingIntent.getService(
             this,
             stopAction.hashCode(),
@@ -298,19 +397,21 @@ class SessionService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentIntent(openIntent)
-            .addAction(0, getString(R.string.session_notification_stop), stopIntent)
+        return NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.drawable.ic_ongoing_badminton)
+            .setContentIntent(openAppPendingIntent())
+            .addAction(0, stopLabel, stopIntent)
             .setOngoing(true)
+            .setLocalOnly(true)
+            .setOnlyAlertOnce(true)
             .setSilent(true)
-            .setCategory(NotificationCompat.CATEGORY_WORKOUT)
+            .setCategory(category)
     }
 
     private fun createNotificationChannel() {
         val manager = getSystemService(NotificationManager::class.java) ?: return
         val channel = NotificationChannel(
-            CHANNEL_ID,
+            SESSION_CHANNEL_ID,
             getString(R.string.session_notification_channel),
             NotificationManager.IMPORTANCE_LOW
         ).apply {
@@ -318,13 +419,27 @@ class SessionService : Service() {
             setShowBadge(false)
         }
         manager.createNotificationChannel(channel)
+
+        val captureChannel = NotificationChannel(
+            CAPTURE_CHANNEL_ID,
+            getString(R.string.capture_notification_channel),
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = getString(R.string.capture_notification_channel_description)
+            setShowBadge(false)
+        }
+        manager.createNotificationChannel(captureChannel)
     }
 
     companion object {
-        private const val CHANNEL_ID = "bad_watch_session"
+        private const val SESSION_CHANNEL_ID = "bad_watch_session"
+        private const val CAPTURE_CHANNEL_ID = "bad_watch_capture"
         private const val TAG = "BadWatchHealth"
         private const val NOTIFICATION_ID = 1001
         private const val NOTIFICATION_UPDATE_INTERVAL_MILLIS = 1_000L
+        private const val STOPWATCH_REBASE_TOLERANCE_MILLIS = 1_500L
+        private const val ONGOING_STATUS_ACTIVITY_PART = "activity"
+        private const val ONGOING_STATUS_TIME_PART = "time"
         const val ACTION_STOP = "com.badwatch.app.action.STOP_SESSION"
         const val ACTION_DISCARD = "com.badwatch.app.action.DISCARD_SESSION"
         const val ACTION_START_CAPTURE = "com.badwatch.app.action.START_CAPTURE"

@@ -22,15 +22,31 @@ class HomeSessionSelectionTest {
         val olderUsable = stored(startedAtMillis = 1_000L, RecordingQuality.Unreviewed)
 
         assertThat(
-            latestUsableSession(listOf(newestUnusable, newestUsable, olderUsable))
+            latestUsableSession(
+                listOf(newestUnusable, newestUsable, olderUsable),
+                nowMillis = 3_000L
+            )
         ).isSameInstanceAs(newestUsable)
     }
 
     @Test
     fun latestUsableSessionIsEmptyWhenOnlyUnusableRecordingsExist() {
         assertThat(
-            latestUsableSession(listOf(stored(1_000L, RecordingQuality.Unusable)))
+            latestUsableSession(
+                listOf(stored(1_000L, RecordingQuality.Unusable)),
+                nowMillis = 1_000L
+            )
         ).isNull()
+    }
+
+    @Test
+    fun latestUsableSessionSkipsFutureDatedRecordings() {
+        val future = stored(startedAtMillis = 3_001L, RecordingQuality.Unreviewed)
+        val validPast = stored(startedAtMillis = 2_000L, RecordingQuality.Partial)
+
+        assertThat(
+            latestUsableSession(listOf(future, validPast), nowMillis = 3_000L)
+        ).isSameInstanceAs(validPast)
     }
 
     @Test

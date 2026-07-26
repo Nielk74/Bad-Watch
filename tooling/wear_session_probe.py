@@ -294,7 +294,16 @@ def main() -> int:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             break
-        time.sleep(min(args.sample_seconds, remaining))
+        # Do not turn the short remainder at the end of a run into another reading. A probe
+        # sample is a continuity interval: taking two readings a second apart can truthfully
+        # see the same durable checkpoint even though sensors are still streaming. That made
+        # the strict per-interval progress gate depend on scheduling jitter. Wait out the tail
+        # without inventing an undersized interval; every retained reading remains at least
+        # sample_seconds after the previous one.
+        if remaining < args.sample_seconds:
+            time.sleep(remaining)
+            break
+        time.sleep(args.sample_seconds)
         reading = device.battery()
         readings.append(reading)
         elapsed_minutes = (reading.captured_at_epoch_millis - start_wall_millis) / 60_000

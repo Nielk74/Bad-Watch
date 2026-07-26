@@ -3,9 +3,9 @@
     <string name="live_discard_question">Discard session?</string>
     <string name="live_discard_body">Recording stops and nothing is saved.</string>
     <string name="live_hits_upper">HITS</string>
+    <string name="ambient_live_values_paused">HR — · TIMER —</string>
     <string name="live_heart_rate_line">%1$s bpm · %2$s</string>
     <string name="live_heart_rate_only">%1$s bpm</string>
-    <string name="live_heart_rate_duration">%1$s bpm · %2$s</string>
     <string name="live_stop_save">Stop &amp; save</string>
     <string name="live_detected_play">Detected play</string>
     <string name="live_rally_bursts">Detected exchanges</string>

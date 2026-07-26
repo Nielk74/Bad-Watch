@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "result": "pass",
+  "deviceTransportHash": "298a475b9dfd",
+  "device": {
+    "manufacturer": "Google",
+    "model": "Pixel Watch 4",
+    "device": "kenari_btwifi",
+    "android_release": "17",
+    "api_level": "37",
+    "build_fingerprint": "google/kenari_btwifi/kenari_btwifi:17/CP2A.260603.001.S1/15396605:user/release-keys",
+    "app_version": "0.3.0",
+    "app_last_update": "2026-07-26 03:58:11"
+  },
+  "sessionFile": "1785031293326-9ecee2f3-a6fa-4c13-abb6-28d6b9e9e568.json",
+  "sessionId": "9ecee2f3-a6fa-4c13-abb6-28d6b9e9e568",
+  "stableSessionId": true,
+  "stableStartedAtMillis": true,
+  "samplesBeforeDeath": 1189,
+  "samplesWhileStopped": 1189,
+  "stoppedCheckpointUnchanged": true,
+  "samplesAfterRecovery": 2369,
+  "samplesAdvancedAfterRecovery": true,
+  "recoveryCount": 1,
+  "recordingQuality": "Partial",
+  "forcedStopAtEpochMillis": 1785031309402,
+  "restartRequestedAtEpochMillis": 1785031313046,
+  "observedForcedStopGapMillis": 3644,
+  "savedDurationMillis": 44087,
+  "savedElapsedSpanMillis": 44087,
+  "savedElapsedSpanIncludesForcedStopGap": true,
+  "gapSemantics": "Elapsed session duration spans the interruption; the frozen sample checkpoint proves that no sensor samples were invented while the process was stopped."
+}

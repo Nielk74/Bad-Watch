@@ -17,7 +17,7 @@ internal fun selectTileSessions(
 ): TileSessionSelection {
     val weekStart = nowMillis - TimeUnit.DAYS.toMillis(7)
     return TileSessionSelection(
-        latest = latestUsableSession(sessions),
+        latest = latestUsableSession(sessions, nowMillis),
         rollingWeek = sessions.filter { stored ->
             stored.export.context.recordingQuality != RecordingQuality.Unusable &&
                 stored.export.session.startedAtMillis in weekStart..nowMillis

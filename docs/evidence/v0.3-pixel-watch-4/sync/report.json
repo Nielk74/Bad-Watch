@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "result": "pass",
+  "evidenceDateUtc": "2026-07-26",
+  "sourceRevision": "99b5f627917d27465dd6494ea0b329ecc670a596",
+  "appVersion": "0.3.0",
+  "debugApkSha256": "dd3754cce11a3fb5627375509690e43a93aa06f4a131247fd33391cbf61dfee1",
+  "device": {
+    "model": "Pixel Watch 4",
+    "apiLevel": 37,
+    "buildFingerprint": "google/kenari_btwifi/kenari_btwifi:17/CP2A.260603.001.S1/15396605:user/release-keys"
+  },
+  "transport": {
+    "watchUrl": "http://127.0.0.1:8080",
+    "bridge": "adb reverse tcp:8080 tcp:8080",
+    "authentication": "ephemeral bearer token, value not retained",
+    "scope": "debug-only cleartext transport; release cleartext rejection is covered by automated policy tests"
+  },
+  "offlineAttempt": {
+    "serverAvailable": false,
+    "workManagerResult": "retry",
+    "failure": "java.net.ConnectException",
+    "pendingSessionFilesBefore": 3,
+    "syncMarkersBefore": 0
+  },
+  "offlineSession": {
+    "id": "a4b5c9dc-45d7-4fbe-a455-3aac92a2641c",
+    "file": "1785031655678-a4b5c9dc-45d7-4fbe-a455-3aac92a2641c.json",
+    "savedBeforeServerStart": true
+  },
+  "retry": {
+    "workManagerResult": "success",
+    "unauthenticatedListStatus": 401,
+    "authenticatedListStatus": 200,
+    "serverSessionCount": 4,
+    "acceptedSessionIds": [
+      "a4b5c9dc-45d7-4fbe-a455-3aac92a2641c",
+      "9ecee2f3-a6fa-4c13-abb6-28d6b9e9e568",
+      "9c9404e8-523a-4472-8ed9-965ce53166dc",
+      "661b9eac-26e3-4186-979f-e8498bd873d3"
+    ],
+    "payloadSpecificSyncMarkersAfter": 4,
+    "offlineSessionReturnedByAuthenticatedApi": true
+  }
+}

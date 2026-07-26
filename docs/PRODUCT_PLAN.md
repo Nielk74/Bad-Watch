@@ -1,7 +1,7 @@
 # Bad Watch product plan — v0.3 completion record
 
-**Status:** implementation complete for the v0.3 product contract; final release evidence is
-recorded in [Validation and evidence](#validation-and-evidence).
+**Status:** implementation complete for the v0.3 product contract; final physical release
+evidence is in progress and tracked in [Validation and evidence](#validation-and-evidence).
 
 **Updated:** 2026-07-26
 
@@ -260,7 +260,7 @@ The delivered design and screen inventory are recorded in
 | Racket-hand onboarding and handedness | Delivered | `OnboardingScreen`, `SettingsStore` |
 | Required gyro, optional accelerometer | Delivered | `FusedSensorCollector` capability/failure paths |
 | Health Services optical HR | Delivered | `ExerciseHeartRateSession`, coverage and timestamp tests |
-| Screen-off recording | Delivered | health FGS `SessionService`, active journal, hardware probe |
+| Screen-off recording | Delivered | health FGS `SessionService`, active journal, short hardware doze proof; endurance gate pending |
 | Process-death session recovery | Delivered | `ActiveSessionJournal`, controller recovery tests |
 | Zero-copy detector window | Delivered | `SampleWindow` and pipeline tests |
 | Atomic session/capture persistence | Delivered | shared `AtomicFileWriter`, recovery/quarantine tests |
@@ -281,9 +281,9 @@ The delivered design and screen inventory are recorded in
 | Consent-bound Detection Lab | Delivered | immutable consent/protocol/participant metadata |
 | Player-independent ML tooling | Delivered as research infrastructure | grouped ingestion/training/evaluation and acceptance gate |
 | Automatic learned classifier | Research-gated | no model is accepted without section 7 evidence |
-| English/French and accessibility pass | Delivered | localized resources, semantics, hardware inspection |
+| English/French resources and accessibility semantics | Delivered | resource checks, semantics, partial hardware visual inspection; full device matrix pending |
 | Android platform / target SDK 36 | Delivered | granular HR permission and denied-path proof on Android 17 / API 37 hardware |
-| Full CI and tag release gate | Delivered | Python, JVM, lint, debug and release assemblies |
+| CI and release-tag automation | Delivered | Python, JVM, lint, debug and release assemblies |
 
 ---
 
@@ -397,17 +397,17 @@ v0.3 is done only when all of these are true:
 | Acceptance condition | Result |
 | --- | --- |
 | The full app can be used offline with no account/dashboard | Complete |
-| Session and Detection Lab capture survive screen-off under the health FGS | Complete |
-| Optional HR failure/denial leaves a truthful motion-only session | Complete |
-| Process death restores a stable session without fabricating downtime | Complete |
+| Session and Detection Lab capture survive screen-off under the health FGS | Device-verified for the short Detection Lab doze run; 180-minute session gate pending |
+| Optional HR failure/denial leaves a truthful motion-only session | Device-verified |
+| Process death restores a stable session without fabricating downtime | Device-verified |
 | Player review changes every derived primary metric and preserves raw evidence | Complete |
-| Match and shadow utilities checkpoint every command and restore safely | Complete |
-| Sync acceptance/rejection is durable, visible, and payload-specific | Complete |
+| Match and shadow utilities checkpoint every command and restore safely | Software complete; physical recovery check pending |
+| Sync acceptance/rejection is durable, visible, and payload-specific | Complete; physical offline-retry and authenticated acceptance verified |
 | Browser backup/CSV/restore is authenticated and loss-safe | Complete |
-| English/French, accessibility, lint, JVM tests, debug and release builds pass | Complete |
-| A target-36 Pixel Watch run proves the final APK's core flow | Complete |
-| A three-hour screen-off probe produces exactly one duration-correct session | Complete |
-| Documentation describes shipped behavior and rejected claims without stale roadmap text | Complete |
+| English/French, accessibility, lint, JVM tests, debug and release builds pass | Software complete; enlarged-text and full physical screen matrix pending |
+| A target-36 Pixel Watch run proves the final APK's core flow | Partially complete; core recording/review and recovery are device-verified |
+| A three-hour screen-off probe produces exactly one duration-correct session | Pending |
+| Documentation describes shipped behavior and rejected claims without stale roadmap text | In progress until the physical ledger is complete |
 
 ### Validation and evidence
 
@@ -443,11 +443,12 @@ includes the interruption while sensor coverage does not. Battery percentage is 
 when every sample says the watch was unpowered; a charging run is lifecycle evidence, not a
 battery-drain claim.
 
-The target-36 denied-HR proof, including commands and observed journal sample count, is retained in
-[accessibility-localization.md](accessibility-localization.md#target-sdk-36-heart-rate-denial-evidence-2026-07-26).
-The final v0.3 screenshot and endurance artifact paths are recorded in
-[device-validation.md](device-validation.md); generated artifacts without a matching ledger entry
-do not count as evidence.
+The target-36 granted/denied-HR proof and observed journal sample counts are retained in
+[accessibility-localization.md](accessibility-localization.md#target-sdk-36-heart-rate-permission-evidence-2026-07-26).
+The current v0.3 screenshot and recovery artifacts are indexed in the
+[Pixel Watch 4 evidence ledger](evidence/v0.3-pixel-watch-4/README.md). Remaining physical gates
+are explicit in [device-validation.md](device-validation.md); generated artifacts without a
+matching ledger entry do not count as evidence.
 
 CI runs the same software gate on every `master` push and release tag. A release workflow also
 verifies package ID, version, APK signature, and checksums before publication.
@@ -456,10 +457,11 @@ verifies package ID, version, APK signature, and checksums before publication.
 
 ## 10. Product handoff
 
-Bad Watch v0.3 is a complete, useful session tracker—not a promise that a watch understands all
-of badminton. Its strongest features are the unglamorous ones that preserve trust: recording
-survives real Wear OS lifecycle pressure, uncertainty is named, corrections flow through the
-whole product, subjective context stays subjective, and the player owns the archive.
+Bad Watch v0.3's implementation is a complete, useful session tracker—not a promise that a watch
+understands all of badminton. Its strongest features are the unglamorous ones that preserve
+trust: recording survives real Wear OS lifecycle pressure, uncertainty is named, corrections
+flow through the whole product, subjective context stays subjective, and the player owns the
+archive.
 
 Any next version should start with observed court use. The first questions are whether players
 actually use the review step, whether optional haptics distract, which diary fields earn repeat

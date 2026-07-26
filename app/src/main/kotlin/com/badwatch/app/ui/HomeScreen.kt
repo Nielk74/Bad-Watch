@@ -101,7 +101,7 @@ private fun HomeContent(
     onOpenProgress: () -> Unit,
     onOpenSession: (StoredSession) -> Unit
 ) {
-    val last = latestUsableSession(history)
+    val last = latestUsableSession(history, System.currentTimeMillis())
 
     WatchScreen(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         item { BrandHeader() }
@@ -267,10 +267,17 @@ private fun HomeContent(
 /**
  * The home recap is a trusted summary surface. Keep unusable recordings available for
  * diagnosis in History, but never promote one as the player's latest meaningful session.
- * SessionStore already returns newest first, so the first usable item is the newest one.
+ * Future-dated records are likewise retained for diagnosis without surfacing as current data.
+ * SessionStore already returns newest first, so the first eligible item is the newest one.
  */
-internal fun latestUsableSession(history: List<StoredSession>): StoredSession? =
-    history.firstOrNull { it.export.context.recordingQuality != RecordingQuality.Unusable }
+internal fun latestUsableSession(
+    history: List<StoredSession>,
+    nowMillis: Long
+): StoredSession? =
+    history.firstOrNull {
+        it.export.context.recordingQuality != RecordingQuality.Unusable &&
+            it.export.session.startedAtMillis <= nowMillis
+    }
 
 @Composable
 private fun BrandHeader() {

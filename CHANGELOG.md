@@ -23,6 +23,13 @@
   practice library whose cards state what the watch cannot assess.
 - Added a rolling seven-day corrected-detected-hit watch-face complication alongside the Start/
   recap Tile. Unusable sessions and reported misses are excluded from the literal detector count.
+- Added a proper Wear workout Ongoing Activity with a one-tap watch-face return affordance and a
+  low-power ambient face that always shows local time while replacing stale HR/timer values with
+  explicit placeholders.
+- Added representative square/round Tile previews and immediate best-effort Tile plus complication
+  refresh after session changes; future-dated records cannot become Home, Progress, or Tile data.
+- Reflowed the live Detection Lab actions around the round-screen EdgeButton and disabled dropping
+  or saving until a genuine swing exists.
 
 ### Session trust and physiology
 
@@ -111,7 +118,8 @@
   made dense three-column metrics preserve detection qualifiers and full duration values on the
   physical 480 px round screen.
 - Tightened the three-hour gate to require continuous screen sleep and sensor progress at every
-  interval; recovery evidence now proves that sample counts freeze during process absence.
+  full sampling interval, without manufacturing a jitter-sized final interval; recovery evidence
+  now proves that sample counts freeze during process absence.
 - Replaced the speculative product/UI roadmaps with a completed product contract, measurement
   vocabulary, current architecture, operating guides, and explicit research/exclusion decisions.
 
@@ -128,6 +136,10 @@
 - Bearer credentials can no longer leak through automatic redirect following.
 - Match and shadow actions no longer appear before their durable checkpoint succeeds; failed
   writes keep the last restorable state visible with a localized retry warning.
+- Future/clock-skewed records can no longer replace the latest recap or enter Progress profiles,
+  personal records, rolling goals, Tile headlines, or seven-day surface totals.
+- Detection Lab correction actions no longer sit underneath the Save edge action on 480 px round
+  displays, and an empty labelled drill can no longer be saved by mistake.
 
 ## [0.2.0] - 2026-07-25
 

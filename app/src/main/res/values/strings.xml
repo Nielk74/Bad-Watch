@@ -5,6 +5,9 @@
     <string name="session_notification_channel">Training session</string>
     <string name="session_notification_channel_description">Keeps your session recording while the screen is off.</string>
     <string name="session_notification_title">Session in progress</string>
+    <string name="session_ongoing_content_description">Badminton session in progress</string>
+    <string name="session_ongoing_status_template">#activity# · #time#</string>
+    <string name="session_ongoing_status_activity">Badminton</string>
     <!-- Both halves are pre-formatted plurals so translations can inflect them independently. -->
     <string name="session_notification_body">%1$s · %2$s</string>
     <plurals name="session_notification_hits">
@@ -23,6 +26,8 @@
 
     <string name="capture_notification_title">Collecting training data</string>
     <string name="capture_notification_body">%1$s · %2$s drill</string>
+    <string name="capture_notification_channel">Detection drills</string>
+    <string name="capture_notification_channel_description">Keeps a labelled detection drill collecting while the screen is off.</string>
 
     <string name="onboarding_wrist_title">Wear it on your racket hand</string>
     <string name="onboarding_wrist_body">Bad Watch detects candidate hit motions at the racket wrist. On your other wrist, it would measure the wrong arm.</string>

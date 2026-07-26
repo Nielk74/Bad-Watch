@@ -1,6 +1,7 @@
 package com.badwatch.app.ui
 
 import android.os.Build
+import android.text.format.DateFormat
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -30,6 +31,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -68,6 +71,7 @@ import com.badwatch.app.ui.components.hrZoneColor
 import com.badwatch.app.ui.components.hrZoneLabel
 import com.badwatch.app.ui.components.provisionalDisplayName
 import com.badwatch.core.model.ShotEvent
+import java.util.Date
 import java.util.Locale
 
 /**
@@ -83,12 +87,13 @@ fun LiveScreen(
     state: SessionState.Recording,
     onStop: () -> Unit,
     onDiscard: () -> Unit,
-    isAmbient: Boolean = false
+    isAmbient: Boolean = false,
+    ambientTimeMillis: Long = System.currentTimeMillis()
 ) {
     // Always-on: in ambient the watch keeps a dim, static face — no animations, no pager,
     // no actions. Recording runs in the foreground service; this is purely the glance.
     if (isAmbient) {
-        AmbientHud(state = state)
+        AmbientHud(state = state, ambientTimeMillis = ambientTimeMillis)
         return
     }
     val pagerState = rememberPagerState(pageCount = { 2 })
@@ -269,34 +274,56 @@ private fun PulsingShotCount(count: Int) {
  * is legible at a glance with the screen at its lowest power state.
  */
 @Composable
-private fun AmbientHud(state: SessionState.Recording) {
+private fun AmbientHud(
+    state: SessionState.Recording,
+    ambientTimeMillis: Long
+) {
     val snapshot = state.snapshot
+    val context = LocalContext.current
+    val is24HourClock = DateFormat.is24HourFormat(context)
+    val model = remember(snapshot.startedAtMillis, ambientTimeMillis, is24HourClock) {
+        ambientHudModel(
+            ambientTimeMillis = ambientTimeMillis,
+            // The minute-scale ambient callback is the key, so 100 Hz telemetry
+            // recompositions cannot continually redraw this otherwise static count.
+            detectedHitCount = snapshot.totalShots,
+            formatLocalTime = { timestampMillis ->
+                DateFormat.getTimeFormat(context).format(Date(timestampMillis))
+            }
+        )
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.Black)
             .padding(horizontal = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = stringResource(R.string.live_hits_upper),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = snapshot.totalShots.toString(),
-            style = MaterialTheme.typography.numeralExtraLarge,
-            color = MaterialTheme.colorScheme.onSurface,
+            text = model.clockText,
+            style = MaterialTheme.typography.titleMedium,
+            color = Color.White.copy(alpha = 0.82f),
             textAlign = TextAlign.Center
         )
         Text(
-            text = stringResource(
-                R.string.live_heart_rate_duration,
-                formatHeartRate(snapshot.currentHeartRate),
-                formatDuration(snapshot.durationMillis)
-            ),
+            text = stringResource(R.string.live_hits_upper),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.5f),
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        Text(
+            text = model.detectedHitCount.toString(),
+            style = MaterialTheme.typography.numeralExtraLarge,
+            color = Color.White.copy(alpha = 0.9f),
+            textAlign = TextAlign.Center
+        )
+        Text(
+            // Neither value is rendered stale: both explicit dashes truthfully say that
+            // high-frequency live metrics resume only after the player wakes the display.
+            text = stringResource(R.string.ambient_live_values_paused),
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = Color.White.copy(alpha = 0.5f),
             textAlign = TextAlign.Center
         )
     }

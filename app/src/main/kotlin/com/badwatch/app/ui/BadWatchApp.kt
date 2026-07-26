@@ -49,7 +49,8 @@ fun BadWatchApp(
     onStartCapture: (ShotType) -> Unit,
     onFinishCapture: () -> Unit,
     onCancelCapture: () -> Unit,
-    isAmbient: StateFlow<Boolean> = MutableStateFlow(false)
+    isAmbient: StateFlow<Boolean> = MutableStateFlow(false),
+    ambientTimeMillis: StateFlow<Long> = MutableStateFlow(System.currentTimeMillis())
 ) {
     val sessionState by viewModel.sessionState.collectAsStateWithLifecycle()
     val captureState by viewModel.captureState.collectAsStateWithLifecycle()
@@ -57,6 +58,7 @@ fun BadWatchApp(
     val shadowRoutineState by viewModel.shadowRoutineState.collectAsStateWithLifecycle()
     val onboarded by viewModel.onboardingComplete.collectAsStateWithLifecycle()
     val ambient by isAmbient.collectAsStateWithLifecycle()
+    val ambientNowMillis by ambientTimeMillis.collectAsStateWithLifecycle()
     val detectedHitHaptics by viewModel.detectedHitHaptics.collectAsStateWithLifecycle()
     var screen by remember { mutableStateOf(Screen.Home) }
     var detailSession by remember { mutableStateOf<StoredSession?>(null) }
@@ -136,7 +138,8 @@ fun BadWatchApp(
                             state = target.state,
                             onStop = onStopSession,
                             onDiscard = onDiscardSession,
-                            isAmbient = ambient
+                            isAmbient = ambient,
+                            ambientTimeMillis = ambientNowMillis
                         )
                     }
 

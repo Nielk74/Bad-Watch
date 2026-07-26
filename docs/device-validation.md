@@ -79,20 +79,29 @@ both semantics.
 Use one retained artifact directory per release candidate. Do not replace **Pending** with
 **Passed** without adding its path, UTC date, app version, and device build fingerprint.
 
+The active v0.3 ledger is
+[`evidence/v0.3-pixel-watch-4/README.md`](evidence/v0.3-pixel-watch-4/README.md). It records the
+2026-07-26 UTC run of app version 0.3.0 on
+`google/kenari_btwifi/kenari_btwifi:17/CP2A.260603.001.S1/15396605:user/release-keys` and the exact
+debug APK hash. The unsigned release artifact was assembled and hashed but was not installed in
+this debug-only hardware run.
+
 | Gate | Evidence to retain | v0.3 release-candidate status |
 | --- | --- | --- |
-| Release install and first-run permissions | APK hash/version/signature, install log, permission notes | **Pending:** add final RC evidence path. |
-| Start, live HUD, stop, save with HR granted and denied | Start/live/recap images plus session/report IDs | **Pending:** add final RC evidence path. |
-| Activity recreation during recording | Log and stable session ID/start-time comparison | **Pending:** add final RC evidence path. |
-| Process death and journal recovery | Before/after export, stable identity, `Partial` quality, missing-interval note | **Pending:** add final RC evidence path. |
-| Detection Lab screen-off capture | Start/sleep/resume/save record with stable capture ID and advancing samples | **Pending:** add final RC evidence path. |
-| Offline save then retry/sync | Session ID and before/after state against an authenticated debug server over `adb reverse`; automated release cleartext-block assertion | **Pending:** add final RC evidence path. |
-| Home, live, recap, review/corrections, History, Progress, Training, Match, Settings, Tile, complication, ambient | Named 480×480 screenshot set | **Pending:** add final RC evidence path. |
-| Normal/enlarged text and English/French spot checks | Screenshot matrix plus clipping/accessibility notes | **Pending:** add final RC evidence path. |
+| Debug RC install and first-run permissions | APK hash/version/signature, package inspection, first-run images, permission notes | **Passed (2026-07-26 UTC):** [candidate identity and first-run evidence](evidence/v0.3-pixel-watch-4/README.md#install-onboarding-and-optional-permissions). |
+| Start, live HUD, stop, and save with HR granted and denied | Start/live/review/recap images plus session IDs and checkpoints | **Passed (2026-07-26 UTC):** [granted and denied session evidence](evidence/v0.3-pixel-watch-4/README.md#session-recording-with-heart-rate-access-granted). The granted watch was off wrist, so this does not claim optical BPM acquisition. |
+| Activity recreation during recording | Stable session ID/start-time and advancing-checkpoint comparison | **Passed (2026-07-26 UTC):** [English-to-French recreation evidence](evidence/v0.3-pixel-watch-4/README.md#heart-rate-denial-and-activity-recreation). |
+| Process death and journal recovery | Before/after export, stable identity, `Partial` quality, missing-interval note | **Passed (2026-07-26 UTC):** [report and screenshots](evidence/v0.3-pixel-watch-4/README.md#process-death-and-journal-recovery). |
+| Detection Lab screen-off acquisition | Before/after images plus stable process/FGS and advancing Android sensor-client duration | **Passed (2026-07-26 UTC):** [doze acquisition evidence](evidence/v0.3-pixel-watch-4/README.md#detection-lab-through-screen-off). No stationary example was misrepresented as a saved swing. |
+| Offline save then retry/sync | Session ID and before/after state against an authenticated debug server over `adb reverse`; automated release cleartext-block assertion | **Passed (2026-07-26 UTC):** [offline failure, authenticated retry, exact markers, and server acceptance](evidence/v0.3-pixel-watch-4/README.md#offline-save-and-authenticated-retry). |
+| Match and shadow process recovery | Before/after state, action/cue identity, pause timing, and cleanup evidence | **Pending:** automated coverage exists, but no physical recovery evidence is retained yet. |
+| Home, live, recap, review/corrections, History, Progress, Training, Match, Settings, Tile, complication, ambient | Named 480×480 screenshot set | **Pending:** the core session subset is retained, but the full inventory, Tile, complication, and ambient checks are not complete. |
+| Normal/enlarged text and English/French spot checks | Screenshot matrix plus clipping/accessibility notes | **Pending:** normal English and a French live/review subset are retained; enlarged text and the complete matrix remain open. |
 | 180-minute powered screen-off lifecycle | Probe `report.json`, `start.png`, `recap.png`, charger state and lifecycle result | **Pending:** no qualifying run is documented yet. |
 | 180-minute unpowered battery measurement | Probe report with every reading unpowered and measured battery delta | **Not claimed:** no qualifying run is documented. |
 
-Active-session checkpoint recovery, match action-log recovery, and shadow-routine recovery are
-implemented and covered by automated tests. The physical process-death rows above remain required:
-code coverage is not device evidence. Likewise, an emulator screenshot does not prove touch
-comfort, ambient behavior, OEM Health Services behavior, or endurance on the Pixel Watch 4.
+Active-session checkpoint recovery is now also proven by the retained physical recovery report.
+Match action-log recovery and shadow-routine recovery remain implemented and covered by automated
+tests only. Their physical row remains required: code coverage is not device evidence. Likewise,
+an emulator screenshot does not prove touch comfort, ambient behavior, OEM Health Services
+behavior, or endurance on the Pixel Watch 4.

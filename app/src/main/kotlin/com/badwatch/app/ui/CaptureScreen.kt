@@ -145,7 +145,9 @@ fun CaptureScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 28.dp),
+                // Reserve the lower arc for the EdgeButton. Without this inset the compact
+                // correction row sat underneath "Save drill" on a 480 px round display.
+                .padding(start = 28.dp, end = 28.dp, bottom = 96.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -188,6 +190,7 @@ fun CaptureScreen(
             ) {
                 CompactButton(
                     onClick = onDiscardLast,
+                    enabled = state.keptCount > 0,
                     colors = ButtonDefaults.filledTonalButtonColors(),
                     label = { Text(stringResource(R.string.capture_drop_last)) }
                 )
@@ -206,6 +209,7 @@ fun CaptureScreen(
 
         EdgeButton(
             onClick = onFinish,
+            enabled = state.keptCount > 0,
             modifier = Modifier.align(Alignment.BottomCenter),
             buttonSize = EdgeButtonSize.Small
         ) {

@@ -6,6 +6,9 @@
     <string name="session_notification_channel">Séance d’entraînement</string>
     <string name="session_notification_channel_description">Maintient l’enregistrement de votre séance lorsque l’écran est éteint.</string>
     <string name="session_notification_title">Séance en cours</string>
+    <string name="session_ongoing_content_description">Séance de badminton en cours</string>
+    <string name="session_ongoing_status_template">#activity# · #time#</string>
+    <string name="session_ongoing_status_activity">Badminton</string>
     <string name="session_notification_body">%1$s · %2$s</string>
     <plurals name="session_notification_hits">
         <item quantity="one">%d frappe détectée</item>
@@ -26,6 +29,8 @@
 
     <string name="capture_notification_title">Collecte de données d’entraînement</string>
     <string name="capture_notification_body">%1$s · exercice %2$s</string>
+    <string name="capture_notification_channel">Exercices de détection</string>
+    <string name="capture_notification_channel_description">Maintient la collecte d’un exercice de détection étiqueté lorsque l’écran est éteint.</string>
 
     <string name="onboarding_wrist_title">Portez-la sur la main qui tient la raquette</string>
     <string name="onboarding_wrist_body">Bad Watch détecte au poignet des gestes susceptibles d’être des frappes. Sur l’autre poignet, elle mesurerait le mauvais bras.</string>

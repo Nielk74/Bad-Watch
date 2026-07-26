@@ -20,6 +20,7 @@ import com.badwatch.app.sensors.FusedSensorCollector
 import com.badwatch.app.sensors.SensorStream
 import com.badwatch.app.sync.DashboardClient
 import com.badwatch.app.sync.SyncWorker
+import com.badwatch.app.tile.BadWatchTileUpdates
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -81,7 +82,14 @@ private class DefaultAppContainer(
     override val sessionStore: SessionStore by lazy {
         SessionStore(
             directory = File(application.filesDir, "sessions"),
-            onSessionsChanged = { WeeklyHitsComplicationUpdates.requestAll(application) }
+            onSessionsChanged = {
+                requestSessionSurfaceUpdates(
+                    complication = {
+                        WeeklyHitsComplicationUpdates.requestAll(application)
+                    },
+                    tile = { BadWatchTileUpdates.request(application) }
+                )
+            }
         )
     }
 

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Monochrome and transparent for both notification masking and ambient watch faces. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4.1,2.7L8.9,8.7L10.8,7.5L6.4,1.3ZM7.6,1.1L11.7,7L13.8,6.4L10.5,0.5ZM11.8,0.9L14.7,6.5L16.8,7.2L14.5,1.5ZM9.6,9.8L16.7,7.5L18.2,9L11.2,11.4ZM18.3,9.8C20.1,9.8 21.5,11.2 21.5,13C21.5,14.8 20.1,16.2 18.3,16.2C16.5,16.2 15.1,14.8 15.1,13C15.1,11.2 16.5,9.8 18.3,9.8ZM16.7,15.7L11,21.4L9.6,20L15.3,14.3Z" />
+</vector>

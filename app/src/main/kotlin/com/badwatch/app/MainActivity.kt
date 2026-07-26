@@ -33,12 +33,20 @@ class MainActivity : ComponentActivity() {
      * static face while ambient; the foreground service keeps recording regardless.
      */
     private val isAmbient = MutableStateFlow(false)
+    private val ambientTimeMillis = MutableStateFlow(System.currentTimeMillis())
 
     private val ambientObserver = AmbientLifecycleObserver(
         this,
         object : AmbientLifecycleObserver.AmbientLifecycleCallback {
             override fun onEnterAmbient(ambientDetails: AmbientLifecycleObserver.AmbientDetails) {
+                ambientTimeMillis.value = System.currentTimeMillis()
                 isAmbient.value = true
+            }
+
+            override fun onUpdateAmbient() {
+                // Wear invokes this at its ambient refresh cadence (normally once a minute).
+                // It is the only clock tick the dim HUD needs; live telemetry cannot drive it.
+                ambientTimeMillis.value = System.currentTimeMillis()
             }
 
             override fun onExitAmbient() {
@@ -73,7 +81,8 @@ class MainActivity : ComponentActivity() {
                 onStartCapture = ::startCapture,
                 onFinishCapture = ::finishCapture,
                 onCancelCapture = ::cancelCapture,
-                isAmbient = isAmbient
+                isAmbient = isAmbient,
+                ambientTimeMillis = ambientTimeMillis
             )
         }
 

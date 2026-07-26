@@ -43,6 +43,27 @@ class TileSessionSelectionTest {
     }
 
     @Test
+    fun futureUsableSessionCannotReplaceValidPastHeadline() {
+        val now = 2_000_000_000_000L
+        val future = stored(now + 1L, RecordingQuality.Unreviewed)
+        val validPast = stored(now - 1L, RecordingQuality.Partial)
+
+        val selection = selectTileSessions(listOf(future, validPast), now)
+
+        assertThat(selection.latest).isSameInstanceAs(validPast)
+    }
+
+    @Test
+    fun futureOnlyHistoryProducesNoLatestHeadline() {
+        val now = 2_000_000_000_000L
+        val future = stored(now + 1L, RecordingQuality.Unreviewed)
+
+        val selection = selectTileSessions(listOf(future), now)
+
+        assertThat(selection.latest).isNull()
+    }
+
+    @Test
     fun rollingWeekIncludesBoundariesButExcludesFutureAndExpiredSessions() {
         val now = 2_000_000_000_000L
         val start = now - TimeUnit.DAYS.toMillis(7)

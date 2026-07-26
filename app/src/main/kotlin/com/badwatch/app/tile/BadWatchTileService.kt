@@ -1,5 +1,6 @@
 package com.badwatch.app.tile
 
+import android.content.Context
 import androidx.concurrent.futures.CallbackToFutureAdapter
 import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders
@@ -47,10 +48,8 @@ import kotlinx.coroutines.launch
  * files are the source of truth and are re-read on every request, so nothing goes stale that
  * the freshness interval would not already allow.
  *
- * Freshness: 30 minutes. Session stats only change when a session is saved, and the platform
- * generally re-requests the timeline when the tile is on screen or about to be, so a shorter
- * interval would mostly re-read unchanged files; a longer one risks showing a stale "this
- * week" count after a session ends while the tile sits in the carousel.
+ * Freshness: session mutations request an immediate best-effort refresh. The 30-minute interval
+ * remains a fallback for a temporarily unavailable Tile host and for rolling-week boundaries.
  */
 class BadWatchTileService : TileService() {
 
@@ -250,5 +249,13 @@ class BadWatchTileService : TileService() {
         private val COLOR_ON_MINT = 0xFF00291F.toInt()
         private val COLOR_TEXT = 0xFFE2EAF2.toInt()
         private val COLOR_TEXT_DIM = 0xFFA7B4C2.toInt()
+    }
+}
+
+/** Requests fresh Tile data without binding session persistence to the system Tile host. */
+object BadWatchTileUpdates {
+    fun request(context: Context) {
+        TileService.getUpdater(context.applicationContext)
+            .requestUpdate(BadWatchTileService::class.java)
     }
 }
