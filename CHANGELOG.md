@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-07-26
+
+### Performance
+
+No recorded data, stored payload, or displayed figure changes in this release; the work moved
+off the frame path, it did not change.
+
+- Fixed scroll stutter on History, Home, Progress, and the recap. These screens derived the
+  reviewed session projection — which sorts every shot, filters the heart-rate trace, rebuilds
+  the session summary and re-runs rally segmentation — from inside composition, so it ran again
+  on every recomposition and every time a scrolled row rebound. Projections are now memoised per
+  immutable session export, and the whole-corpus aggregations on Home and Progress are bound to
+  the history snapshot rather than the frame.
+- Cut live-recording work by roughly 25x. Recording state was published on every sensor sample
+  at 100 Hz, re-segmenting all rallies and rebuilding the snapshot each time, while the display
+  changes about once a second. State is now published on a detected shot — immediately, so
+  counters and haptics are unaffected — or at a 250 ms floor otherwise.
+- Removed repeated disk work in session storage. Listing sessions re-read, re-parsed and
+  re-hashed every payload on disk, and hashed each one twice; parses are now reused while the
+  payload and its sync markers are unchanged on disk, and each payload is digested once.
+- Removed per-frame allocations in shared list components: the session date formatter is reused
+  per thread instead of rebuilt per row, the sparkline reuses its path across draws, and stat
+  labels are no longer uppercased and rescanned on every recomposition.
+
 ## [0.3.1] - 2026-07-26
 
 ### Product and interface
