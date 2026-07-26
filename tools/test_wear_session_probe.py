@@ -2,6 +2,7 @@ import sys
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -10,11 +11,15 @@ sys.path.insert(0, str(ROOT / "tooling"))
 from wear_session_probe import (  # noqa: E402
     ACTIVITY,
     Device,
+    POST_STOP_REVIEW,
     ProbeError,
+    SAVED_RECAP,
     SystemWakeControls,
+    classify_post_stop_screen,
     dnd_filter_for_zen_mode,
     find_stop_action,
     system_wake_suppression,
+    visible_hierarchy_labels,
 )
 
 
@@ -49,6 +54,51 @@ class WearSessionProbeStopActionTest(unittest.TestCase):
         )
 
         self.assertIsNotNone(find_stop_action(root))
+
+
+class WearSessionProbePostStopScreenTest(unittest.TestCase):
+    def test_classifies_english_and_french_optional_review(self) -> None:
+        english = ET.fromstring(
+            '<hierarchy><node text="What did you play?" content-desc="" /></hierarchy>'
+        )
+        french = ET.fromstring(
+            '<hierarchy><node text="Qu’avez-vous joué ?" content-desc="" /></hierarchy>'
+        )
+
+        self.assertEqual(classify_post_stop_screen(english), POST_STOP_REVIEW)
+        self.assertEqual(classify_post_stop_screen(french), POST_STOP_REVIEW)
+
+    def test_classifies_english_and_french_saved_recap(self) -> None:
+        english = ET.fromstring(
+            '<hierarchy><node text="SESSION SAVED" content-desc="" /></hierarchy>'
+        )
+        french = ET.fromstring(
+            '<hierarchy><node text="" content-desc="SÉANCE ENREGISTRÉE" /></hierarchy>'
+        )
+
+        self.assertEqual(classify_post_stop_screen(english), SAVED_RECAP)
+        self.assertEqual(classify_post_stop_screen(french), SAVED_RECAP)
+
+    def test_saved_recap_wins_during_crossfade_and_labels_are_deduplicated(self) -> None:
+        root = ET.fromstring(
+            """<hierarchy>
+            <node text="What did you play?" content-desc="" />
+            <node text="Session saved" content-desc="Session saved" />
+            </hierarchy>"""
+        )
+
+        self.assertEqual(classify_post_stop_screen(root), SAVED_RECAP)
+        self.assertEqual(
+            visible_hierarchy_labels(root),
+            ["What did you play?", "Session saved"],
+        )
+
+    def test_unrelated_screen_is_not_mislabeled_as_evidence(self) -> None:
+        root = ET.fromstring(
+            '<hierarchy><node text="Bad Watch" content-desc="History" /></hierarchy>'
+        )
+
+        self.assertIsNone(classify_post_stop_screen(root))
 
 
 class FakeWakeControlDevice:
@@ -161,6 +211,53 @@ class WearSessionProbeVisibleStopTest(unittest.TestCase):
             ],
         )
         self.assertTrue(all(check is False for command, check in device.commands if command[:2] == ("am", "start")))
+
+
+class FakeRecapDevice(Device):
+    def __init__(self, screens: list[str | None]) -> None:
+        super().__init__("test-serial")
+        self.screens = iter(screens)
+        self.commands: list[tuple[str, ...]] = []
+        self.screenshots: list[str] = []
+
+    def post_stop_screen(self) -> tuple[str | None, list[str]]:
+        screen = next(self.screens)
+        labels = {
+            POST_STOP_REVIEW: ["What did you play?"],
+            SAVED_RECAP: ["Session saved"],
+        }.get(screen, [])
+        return screen, labels
+
+    def shell(self, *args: str, check: bool = True) -> str:
+        self.commands.append(args)
+        return ""
+
+    def screenshot(self, destination: Path) -> None:
+        self.screenshots.append(destination.name)
+
+
+class WearSessionProbeRecapCaptureTest(unittest.TestCase):
+    @patch("wear_session_probe.time.sleep", return_value=None)
+    def test_retains_review_then_skips_once_and_captures_settled_summary(self, _: object) -> None:
+        device = FakeRecapDevice(
+            [POST_STOP_REVIEW, POST_STOP_REVIEW, SAVED_RECAP, SAVED_RECAP]
+        )
+
+        review_captured = device.capture_saved_session_recap(Path("evidence"))
+
+        self.assertTrue(review_captured)
+        self.assertEqual(device.screenshots, ["post-stop-review.png", "recap.png"])
+        self.assertEqual(device.commands, [("input", "keyevent", "4")])
+
+    @patch("wear_session_probe.time.sleep", return_value=None)
+    def test_captures_summary_directly_when_optional_review_is_already_resolved(self, _: object) -> None:
+        device = FakeRecapDevice([SAVED_RECAP, SAVED_RECAP])
+
+        review_captured = device.capture_saved_session_recap(Path("evidence"))
+
+        self.assertFalse(review_captured)
+        self.assertEqual(device.screenshots, ["recap.png"])
+        self.assertEqual(device.commands, [])
 
 
 if __name__ == "__main__":

@@ -4,7 +4,8 @@
 The probe starts a session through the same exported Activity path as the Tile, samples
 battery/service state without keeping the display awake, stops through the visible Wear UI,
 and validates that exactly one new session JSON was persisted. It writes a compact JSON
-report plus start/end screenshots; it never clears app data or deletes a session.
+report, start and verified saved-recap screenshots, plus the optional post-stop diary when it
+appears; it never clears app data or deletes a session.
 """
 
 from __future__ import annotations
@@ -29,6 +30,10 @@ ACTIVITY = f"{PACKAGE}/com.badwatch.app.MainActivity"
 SERVICE_NAME = "com.badwatch.app.service.SessionService"
 SESSION_FILE = re.compile(r"^[0-9]+-[A-Za-z0-9-]+\.json$")
 STOP_ACTION_DESCRIPTIONS = {"Stop & save", "Arrêter et enregistrer"}
+POST_STOP_REVIEW_TITLES = {"What did you play?", "Qu’avez-vous joué ?"}
+SAVED_RECAP_TITLES = {"Session saved", "Séance enregistrée"}
+POST_STOP_REVIEW = "review"
+SAVED_RECAP = "saved_recap"
 ZEN_MODE_TO_DND_FILTER = {
     0: "all",
     1: "priority",
@@ -63,6 +68,35 @@ def find_stop_action(root: ET.Element) -> ET.Element | None:
         (node for node in nodes if node.attrib.get("text") == "Stop & save"),
         None,
     )
+
+
+def visible_hierarchy_labels(root: ET.Element) -> list[str]:
+    """Return non-empty visible text and accessibility labels in document order."""
+    labels: list[str] = []
+    for node in root.iter("node"):
+        for attribute in ("text", "content-desc"):
+            label = node.attrib.get(attribute, "").strip()
+            if label and label not in labels:
+                labels.append(label)
+    return labels
+
+
+def classify_post_stop_screen(root: ET.Element) -> str | None:
+    """Identify the optional diary or the actual saved-session summary.
+
+    During Compose's crossfade both trees can briefly coexist. The saved recap wins in that
+    overlap, but callers still wait and reconfirm it after the animation settles before taking
+    release evidence.
+    """
+    # Wear Material can expose an all-caps semantics value after typography transforms even
+    # though the localized string resource uses sentence case. Unicode casefold keeps accented
+    # French markers exact while making the classifier independent of that visual treatment.
+    labels = {label.casefold() for label in visible_hierarchy_labels(root)}
+    if labels & {title.casefold() for title in SAVED_RECAP_TITLES}:
+        return SAVED_RECAP
+    if labels & {title.casefold() for title in POST_STOP_REVIEW_TITLES}:
+        return POST_STOP_REVIEW
+    return None
 
 
 @dataclass(frozen=True)
@@ -381,6 +415,71 @@ class Device:
         left, top, right, bottom = map(int, match.groups())
         self.shell("input", "tap", str((left + right) // 2), str((top + bottom) // 2))
 
+    def post_stop_screen(self) -> tuple[str | None, list[str]]:
+        """Read and classify the current post-stop UI without changing navigation state."""
+        remote = "/sdcard/badwatch-probe-post-stop.xml"
+        dumped = self.shell("uiautomator", "dump", remote, check=False)
+        xml_text = self.shell("cat", remote, check=False) if "ERROR" not in dumped else ""
+        try:
+            root = ET.fromstring(xml_text)
+        except ET.ParseError:
+            return None, []
+        return classify_post_stop_screen(root), visible_hierarchy_labels(root)
+
+    def capture_saved_session_recap(
+        self,
+        output: Path,
+        timeout_seconds: float = 20.0,
+    ) -> bool:
+        """Capture the real saved summary, skipping the optional diary when necessary.
+
+        A newly completed session intentionally opens on the optional diary. Its Activity-level
+        Back contract means "skip diary" and then shows Summary; sending Back more than once
+        while that asynchronous write is in flight could leave the app, so this method sends it
+        exactly once. The summary title is then allowed to settle and is re-confirmed before
+        ``recap.png`` is written.
+
+        Returns whether the optional review was observed and retained as
+        ``post-stop-review.png``.
+        """
+        deadline = time.monotonic() + timeout_seconds
+        review_captured = False
+        skip_requested = False
+        last_visible_labels: list[str] = []
+
+        while time.monotonic() < deadline:
+            screen, labels = self.post_stop_screen()
+            if labels:
+                last_visible_labels = labels
+
+            if screen == POST_STOP_REVIEW:
+                if not review_captured:
+                    self.screenshot(output / "post-stop-review.png")
+                    review_captured = True
+                if not skip_requested:
+                    self.shell("input", "keyevent", "4")  # KEYCODE_BACK: intentional skip
+                    skip_requested = True
+
+            elif screen == SAVED_RECAP:
+                # Avoid recording the two AnimatedContent trees mid-crossfade. Re-reading after
+                # the transition also makes the filename a verified state claim, not a guess.
+                time.sleep(0.75)
+                settled_screen, settled_labels = self.post_stop_screen()
+                if settled_labels:
+                    last_visible_labels = settled_labels
+                if settled_screen == SAVED_RECAP:
+                    self.screenshot(output / "recap.png")
+                    return review_captured
+
+            time.sleep(0.25)
+
+        preview = ", ".join(repr(label) for label in last_visible_labels[:8]) or "no labels"
+        action = "after requesting the optional diary skip" if skip_requested else "after stop"
+        raise ProbeError(
+            "post-stop UI did not expose a settled localized saved-session recap "
+            f"within {timeout_seconds:g} seconds {action}; hierarchy showed {preview}"
+        )
+
     def read_session(self, filename: str) -> dict[str, Any]:
         if SESSION_FILE.fullmatch(filename) is None:
             raise ProbeError(f"refusing unexpected session filename {filename!r}")
@@ -539,8 +638,7 @@ def main() -> int:
     device.stop_session_through_ui()
     wait_until(lambda: not device.is_session_service_running(), 20, "the session service to stop")
     end_wall_millis = int(time.time() * 1000)
-    time.sleep(1)
-    device.screenshot(output / "recap.png")
+    post_stop_review_captured = device.capture_saved_session_recap(output)
 
     after_files = device.session_files()
     new_files = sorted(after_files - before_files)
@@ -626,6 +724,8 @@ def main() -> int:
         "foregroundServiceObservedThroughout": foreground_observed,
         "healthForegroundTypeObservedThroughout": health_type_observed,
         "sensorJournalProgressObservedThroughout": sensor_progress_observed,
+        "postStopReviewCaptured": post_stop_review_captured,
+        "savedSessionRecapVerified": True,
         "startedAtEpochMillis": start_wall_millis,
         "endedAtEpochMillis": end_wall_millis,
     }
