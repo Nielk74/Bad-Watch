@@ -119,11 +119,12 @@ class SessionControllerRecoveryTest {
         var clock = 1_000L
 
         val firstStream = FakeSensorStream()
+        val firstJournal = ActiveSessionJournal(journalFile)
         val firstScope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
         val first = controller(
             stream = firstStream,
             store = store,
-            journal = ActiveSessionJournal(journalFile),
+            journal = firstJournal,
             scope = firstScope,
             now = { clock }
         )
@@ -133,7 +134,12 @@ class SessionControllerRecoveryTest {
         clock = 13_500L
         firstStream.emit(sample(clock, heartRate = 140f))
         runCurrent()
-        val stableId = ActiveSessionJournal(journalFile).load()!!.checkpoint.sessionId
+        // Read through the same journal instance so its mutex waits for the asynchronous
+        // checkpoint write instead of racing a second, unrelated mutex on the same file.
+        val durableBeforeDeath = firstJournal.load()!!
+        assertThat(durableBeforeDeath.updatedAtMillis).isEqualTo(13_500L)
+        assertThat(durableBeforeDeath.checkpoint.samplesProcessed).isEqualTo(1L)
+        val stableId = durableBeforeDeath.checkpoint.sessionId
         firstScope.cancel()
         runCurrent()
 
