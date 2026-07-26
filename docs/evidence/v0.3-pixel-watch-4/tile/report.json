@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "capturedAtUtc": "2026-07-26T05:09:33Z",
+  "outcome": "pass",
+  "sourceRevision": "6f6f6cd9531040072bc153b365c0c515b0a40781",
+  "debugApkSha256": "28076fc03319ca15df92760a8d20b993af2f8ae8e129ffe61e021876eed0169d",
+  "installedBaseApkSha256": "28076fc03319ca15df92760a8d20b993af2f8ae8e129ffe61e021876eed0169d",
+  "device": {
+    "model": "Pixel Watch 4",
+    "apiLevel": 37,
+    "fingerprint": "google/kenari_btwifi/kenari_btwifi:17/CP2A.260603.001.S1/15396605:user/release-keys",
+    "fontScale": 1.0,
+    "appLocales": []
+  },
+  "precondition": {
+    "component": "com.badwatch.badwatch/com.badwatch.app.MainActivity",
+    "taskId": 309,
+    "activityRecordId": 122959028,
+    "processId": 31944,
+    "taskAlreadyExisted": true,
+    "activityWasPausedBehindSystemTile": true,
+    "activeCheckpointCount": 0
+  },
+  "tile": {
+    "systemRendered": true,
+    "startContentDescription": "Start",
+    "lastSessionText": "Last: 0 detected hits · 0 detected exchanges · 0:04",
+    "weekText": "This week: 16 sessions · 0 detected hits"
+  },
+  "delivery": {
+    "sameTaskIdAfterTap": 309,
+    "sameActivityRecordIdAfterTap": 122959028,
+    "sameProcessIdAfterTap": 31944,
+    "activityCountInTaskAfterTap": 1,
+    "activeCheckpointCountAfterTap": 1,
+    "sessionId": "fd38eee0-825e-49a3-a7bb-25b6d72d12fd",
+    "checkpointSamplesAfter": 3578,
+    "foregroundServiceType": "0x00000100",
+    "foregroundServiceCategory": "workout",
+    "oneShotStartConfirmed": true
+  },
+  "cleanup": {
+    "stoppedWithVisibleFinishAction": true,
+    "reviewSkippedWithSystemBackAction": true,
+    "summaryDismissedWithVisibleDoneAction": true,
+    "savedSessionCountForId": 1,
+    "savedDurationMillis": 49200,
+    "activeCheckpointCountAfterCleanup": 0,
+    "foregroundServicePresentAfterCleanup": false
+  },
+  "evidence": {
+    "tileScreenshot": "../screenshots/32-final-tile-en.png",
+    "tileScreenshotSha256": "6da9c36b1855de04e40324ffb08bcfa8cc53d9656eaf1d3b2a614521227dd523",
+    "liveScreenshot": "../screenshots/60-final-tile-existing-task-live.png",
+    "liveScreenshotSha256": "2da4e1899a52ecef83585767a0f2be36e88d79bde75fe153c980bd3b40edb061"
+  }
+}

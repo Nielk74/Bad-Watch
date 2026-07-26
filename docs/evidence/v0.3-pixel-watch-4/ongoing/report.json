@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "capturedAtUtc": "2026-07-26T02:40:57Z",
+  "outcome": "pass",
+  "sourceRevision": "c5a1a67aa8b1b85a665b74ddf735ee9138308e0c",
+  "debugApkSha256": "d5daeaf26d3e9b93b4b88d307b845f0ce049fd7248eadc324eb26b54e96dc39a",
+  "device": {
+    "model": "Pixel Watch 4",
+    "apiLevel": 37,
+    "fingerprint": "google/kenari_btwifi/kenari_btwifi:17/CP2A.260603.001.S1/15396605:user/release-keys"
+  },
+  "session": {
+    "id": "ab48f1cb-1c71-4416-a814-591e0b403f9e",
+    "startedAtMillis": 1785033013428,
+    "heartRatePermission": "denied",
+    "heartRatePoints": 0,
+    "checkpointSamplesBefore": 1187,
+    "checkpointSamplesAfter": 52794,
+    "finalDurationText": "9:06"
+  },
+  "ongoingActivity": {
+    "notificationCategory": "workout",
+    "visibility": "PUBLIC",
+    "foregroundServiceType": "0x00000100",
+    "flagsObserved": [
+      "ONGOING_EVENT",
+      "ONLY_ALERT_ONCE",
+      "NO_CLEAR",
+      "FOREGROUND_SERVICE",
+      "LOCAL_ONLY",
+      "SILENT"
+    ],
+    "wearExtensionsPresent": true,
+    "systemIndicatorContentDescription": "Badminton session in progress",
+    "systemIndicatorBounds": "[204,435][240,477]",
+    "oneTapReturnedToSameLiveSession": true
+  },
+  "evidence": {
+    "liveScreenshot": "../screenshots/16-final-live-en-hr-denied.png",
+    "watchFaceIndicatorScreenshot": "../screenshots/19-final-ongoing-watchface.png",
+    "oneTapReturnScreenshot": "../screenshots/20-final-ongoing-one-tap-return.png",
+    "reviewScreenshot": "../screenshots/21-final-session-review.png",
+    "completedRecapScreenshot": "../screenshots/22-final-session-recap-complete.png"
+  }
+}

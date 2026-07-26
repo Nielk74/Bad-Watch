@@ -1,7 +1,9 @@
 # Bad Watch product plan — v0.3 completion record
 
-**Status:** implementation complete for the v0.3 product contract; final physical release
-evidence is in progress and tracked in [Validation and evidence](#validation-and-evidence).
+**Status:** implementation complete for the v0.3 product contract. Platform surfaces, recovery
+flows, exact existing-task Tile launch, and the expanded normal/enlarged design matrix are
+physically verified; only the powered 180-minute lifecycle gate remains before this record can be
+marked final.
 
 **Updated:** 2026-07-26
 
@@ -155,6 +157,17 @@ Sources: [controlled wrist study](https://doi.org/10.1177/17543371211048328),
    time, marks recording quality partial, and resumes without inventing the missing interval.
 5. **Stop & save** persists one atomic JSON record. Discard is explicit and confirmed.
 
+If the sensor flow itself fails after recording has begun, Bad Watch does not strand the player
+or silently erase the checkpoint. The failure screen makes the choice explicit: **Dismiss** keeps
+recoverable data for a later retry, while **Discard** requires confirmation and routes through the
+same service command that clears the recorder, optical-HR session, foreground state, and durable
+journal together. The next start is a fresh session only after that confirmed discard.
+
+Detection Lab failures use a separate truthful decision. A collection failure offers
+**Cancel capture** and clears the active sensors/service state. If collection completed but the
+file write failed, **Retry save** keeps the same pending capture ID, writes it atomically, and only
+then queues sync; it never restarts sensing or manufactures a second labelled example.
+
 The service never starts a synthetic session after a sticky capture restart, never steals an
 exercise already owned by another app, and never requires the optional heart-rate permission to
 record motion.
@@ -239,6 +252,14 @@ Delivered rules:
 - live play has one glance face, one details page, and a deliberate stop/discard boundary;
 - numerals are large, high-contrast, and stable in ambient mode; burn-in-sensitive motion and
   controls disappear there;
+- dense groups of three or more metrics stack vertically when font scale reaches `1.20`, keeping
+  labels and values separated instead of squeezing a phone-like row into the round viewport;
+- at the same large-text threshold, live recording reserves a 48 dp action lane and uses the
+  compact visible label **Finish** / **Finir** while retaining the full **Stop & save** accessible
+  name;
+- match scoring/interval prompts and the shadow HUD switch to their compact responsive layouts at
+  `1.20`, with reducer behavior unchanged; failure screens place the safe/recoverable action
+  before any destructive confirmed alternative;
 - round-screen safe areas, edge actions, Wear-native lists, concise cards, and semantic grouping
   are used throughout;
 - haptics are opt-in for detected hits and purposeful for score/training confirmation;
@@ -260,8 +281,10 @@ The delivered design and screen inventory are recorded in
 | Racket-hand onboarding and handedness | Delivered | `OnboardingScreen`, `SettingsStore` |
 | Required gyro, optional accelerometer | Delivered | `FusedSensorCollector` capability/failure paths |
 | Health Services optical HR | Delivered | `ExerciseHeartRateSession`, coverage and timestamp tests |
-| Screen-off recording | Delivered | health FGS `SessionService`, active journal, short hardware doze proof; endurance gate pending |
+| Screen-off recording | Delivered | health FGS `SessionService`, active journal, Detection Lab doze proof, ambient callback proof, and passing two-minute session smoke; 180-minute gate pending |
 | Process-death session recovery | Delivered | `ActiveSessionJournal`, controller recovery tests |
+| Failed-session recovery decision | Delivered | explicit preserve/discard UI, EN/FR copy, and throwing-flow regression |
+| Detection Lab terminal recovery | Delivered | serialized cancel/retry-save commands, stable capture ID, cleanup-order regressions |
 | Zero-copy detector window | Delivered | `SampleWindow` and pipeline tests |
 | Atomic session/capture persistence | Delivered | shared `AtomicFileWriter`, recovery/quarantine tests |
 | Detected exchange estimates | Delivered | `RallySegmenter`, measurement vocabulary |
@@ -281,7 +304,7 @@ The delivered design and screen inventory are recorded in
 | Consent-bound Detection Lab | Delivered | immutable consent/protocol/participant metadata |
 | Player-independent ML tooling | Delivered as research infrastructure | grouped ingestion/training/evaluation and acceptance gate |
 | Automatic learned classifier | Research-gated | no model is accepted without section 7 evidence |
-| English/French resources and accessibility semantics | Delivered | resource checks, semantics, partial hardware visual inspection; full device matrix pending |
+| English/French resources and accessibility semantics | Delivered | resource checks, semantics, final normal/1.30 EN matrix, French recording/review and longest-shadow-state spot checks |
 | Android platform / target SDK 36 | Delivered | granular HR permission and denied-path proof on Android 17 / API 37 hardware |
 | CI and release-tag automation | Delivered | Python, JVM, lint, debug and release assemblies |
 
@@ -397,17 +420,18 @@ v0.3 is done only when all of these are true:
 | Acceptance condition | Result |
 | --- | --- |
 | The full app can be used offline with no account/dashboard | Complete |
-| Session and Detection Lab capture survive screen-off under the health FGS | Device-verified for the short Detection Lab doze run; 180-minute session gate pending |
+| Session and Detection Lab capture survive screen-off under the health FGS | Device-verified for Detection Lab and a passing powered two-minute session smoke; 180-minute session gate pending |
 | Optional HR failure/denial leaves a truthful motion-only session | Device-verified |
 | Process death restores a stable session without fabricating downtime | Device-verified |
+| A failed sensor flow can be preserved or deliberately discarded without trapping the next start | Complete; confirmed-discard UI and a real throwing-flow regression prove journal removal and a fresh next ID |
 | Player review changes every derived primary metric and preserves raw evidence | Complete |
-| Match and shadow utilities checkpoint every command and restore safely | Software complete; physical recovery check pending |
+| Match and shadow utilities checkpoint every command and restore safely | Complete; physical reports retain match identity/action log and shadow seed/cue timing across process death |
 | Sync acceptance/rejection is durable, visible, and payload-specific | Complete; physical offline-retry and authenticated acceptance verified |
 | Browser backup/CSV/restore is authenticated and loss-safe | Complete |
-| English/French, accessibility, lint, JVM tests, debug and release builds pass | Software complete; enlarged-text and full physical screen matrix pending |
-| A target-36 Pixel Watch run proves the final APK's core flow | Partially complete; core recording/review and recovery are device-verified |
-| A three-hour screen-off probe produces exactly one duration-correct session | Pending |
-| Documentation describes shipped behavior and rejected claims without stale roadmap text | In progress until the physical ledger is complete |
+| English/French, accessibility, lint, JVM tests, debug and release builds pass | Complete; the final 1.30 matrix covers navigation, permission, live/review/recap, safe failure, match/interval, and EN/FR practice/shadow states |
+| A target-36 Pixel Watch run proves the final APK's core flow | Complete; frozen-APK identity, exact existing-task Tile delivery, visual matrix, and cleanup are retained |
+| A three-hour screen-off probe produces exactly one duration-correct session | Pending active release gate |
+| Documentation describes shipped behavior and rejected claims without stale roadmap text | Complete except for inserting the final endurance outcome in this evidence record |
 
 ### Validation and evidence
 
@@ -420,6 +444,17 @@ python3 -m py_compile tools/ingest.py tools/train.py \
 ./gradlew test :app:lintDebug :app:assembleDebug :app:assembleRelease \
   --stacktrace --no-daemon
 ```
+
+The failure-recovery regression is intentionally end-to-end at the controller boundary: its
+sensor flow emits one valid sample and then throws, verifies the journal survives Dismiss,
+confirms Discard removes it without creating a saved session, and proves the following start uses
+a new session ID. This locks the UI's preserve/discard promise to real failure behavior instead
+of testing only a dialog callback.
+
+Detection Lab has a complementary storage-failure regression: retry keeps the same completed
+capture/ID, persists it once, enqueues sync only after durable success, and orders all terminal
+cleanup through serialized service commands. This covers the branch where “try again” means retry
+the file write—not silently restart sensor collection.
 
 The device gate installs the resulting target-SDK-36 debug APK on a Pixel Watch 4 running Android
 17 / API 37, verifies
@@ -435,6 +470,22 @@ python3 tooling/wear_recovery_probe.py \
   --output build/wear-recovery-probe
 ```
 
+The frozen app checkpoint is `6f6f6cd9531040072bc153b365c0c515b0a40781`; its installed debug
+APK SHA-256 is `28076fc03319ca15df92760a8d20b993af2f8ae8e129ffe61e021876eed0169d`.
+The device's installed `base.apk` matched that hash byte-for-byte and verified with an APK
+Signature Scheme v2 signer. The same build produced unsigned release APK
+`e23febe396dba1c3b8f34fcda4243ae5a598187ec4b9d8cb7d2b902243da5642` and unsigned AAB
+`f3335a55b28cddb4ed202fc3d929ef72524b44d3507d56f192836a3fb796557f`.
+The clean gate passed five Python unit tests, `py_compile`, `xmllint`, and Gradle clean/test/lint/
+debug/release APK/release bundle with all 132 Gradle tasks executed. Dense-metric, live-HUD,
+match, and shadow large-text thresholds have JVM layout regressions.
+The 180-minute runner uses probe tooling checkpoint
+`6a6c568e0e156fd551ae1388b9502d261b61b796`. It locates the compact live Finish/Finir control
+through the full localized Stop-and-save accessibility name, with a regression for that contract.
+The evidence ledger separates earlier candidate
+artifacts from final-APK retests so that a visually convincing screenshot is never allowed to
+hide source drift.
+
 The endurance probe requires the foreground service and health type to remain present, the screen
 to stay asleep/dozing, sensor checkpoints to advance at every interval, exactly one new durable
 session, and saved duration within five seconds of observed wall time. The recovery probe also
@@ -445,10 +496,10 @@ battery-drain claim.
 
 The target-36 granted/denied-HR proof and observed journal sample counts are retained in
 [accessibility-localization.md](accessibility-localization.md#target-sdk-36-heart-rate-permission-evidence-2026-07-26).
-The current v0.3 screenshot and recovery artifacts are indexed in the
+The current v0.3 screenshot, platform-surface, and recovery artifacts are indexed in the
 [Pixel Watch 4 evidence ledger](evidence/v0.3-pixel-watch-4/README.md). Remaining physical gates
-are explicit in [device-validation.md](device-validation.md); generated artifacts without a
-matching ledger entry do not count as evidence.
+are explicit in [device-validation.md](device-validation.md): only the powered 180-minute report
+remains. Generated artifacts without a matching ledger entry do not count as evidence.
 
 CI runs the same software gate on every `master` push and release tag. A release workflow also
 verifies package ID, version, APK signature, and checksums before publication.

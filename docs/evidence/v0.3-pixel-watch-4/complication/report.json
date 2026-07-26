@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "capturedAtUtc": "2026-07-26T03:05:42Z",
+  "outcome": "pass",
+  "sourceRevision": "c5a1a67aa8b1b85a665b74ddf735ee9138308e0c",
+  "debugApkSha256": "d5daeaf26d3e9b93b4b88d307b845f0ce049fd7248eadc324eb26b54e96dc39a",
+  "device": {
+    "model": "Pixel Watch 4",
+    "apiLevel": 37,
+    "fingerprint": "google/kenari_btwifi/kenari_btwifi:17/CP2A.260603.001.S1/15396605:user/release-keys"
+  },
+  "watchFace": {
+    "component": "com.google.android.wearable.watchface.rwf/com.google.android.wearable.watchface.koru.modular.ModularWatchFaceService",
+    "colorway": "Moonstone",
+    "originalLayout": "linear",
+    "temporaryValidationLayout": "default_arcs",
+    "restoredLayout": "linear",
+    "restorationVerifiedByCurrentUserStyle": true
+  },
+  "slot": {
+    "id": 8,
+    "originalProvider": "com.google.android.wearable.assistant/com.google.android.wearable.assistant.complications.AssistantComplicationService",
+    "originalType": 6,
+    "testedProvider": "com.badwatch.badwatch/com.badwatch.app.complication.WeeklyHitsComplicationDataSourceService",
+    "testedType": 3,
+    "systemBindingResult": 1,
+    "dumpsysConfirmedBadWatchProvider": true,
+    "renderedText": [
+      "7D HITS",
+      "0"
+    ],
+    "tapOpenedBadWatch": true,
+    "originalProviderRestored": true,
+    "restoredProviderConfirmedByDumpsys": true
+  },
+  "evidence": {
+    "liveScreenshot": "../screenshots/33-final-complication-live.png"
+  }
+}

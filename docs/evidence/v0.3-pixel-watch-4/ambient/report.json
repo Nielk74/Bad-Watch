@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "capturedAtUtc": "2026-07-26T03:19:35Z",
+  "outcome": "pass",
+  "sourceRevision": "008a4f46cb899c2dba1e96f80abe9ac9a23c60d7",
+  "debugApkSha256": "6aa03ab9564394a671ab5a52af958efcf10447c9c75a54285050c7c4c6811eb9",
+  "device": {
+    "model": "Pixel Watch 4",
+    "apiLevel": 37,
+    "fingerprint": "google/kenari_btwifi/kenari_btwifi:17/CP2A.260603.001.S1/15396605:user/release-keys"
+  },
+  "session": {
+    "id": "bcef192f-237f-4ce3-a0b7-47cd482d7928",
+    "samplesBeforeAmbient": 2389,
+    "samplesAfterAmbientEntry": 7189,
+    "samplesBeforeWake": 9589,
+    "sameSessionThroughout": true,
+    "foregroundServiceType": "0x00000100"
+  },
+  "ambient": {
+    "entryLog": "2026-07-26 05:18:59.454+02:00 I/BadWatchAmbient: entered",
+    "updateLog": "2026-07-26 05:19:04.614+02:00 D/BadWatchAmbient: updated",
+    "exitLog": "2026-07-26 05:19:35.447+02:00 I/BadWatchAmbient: exited",
+    "wakefulnessDuring": "Dozing",
+    "displayStateDuring": "DOZE",
+    "ambientDreamDozing": true,
+    "renderedClock": "05:19",
+    "renderedDetectedHits": 0,
+    "renderedUnavailableValues": "HR — · TIMER —",
+    "interactiveControlsHidden": true
+  },
+  "temporaryDeviceChanges": {
+    "batterySimulation": "dumpsys battery unplug",
+    "secureDozeAlwaysOn": "null -> 1 -> null",
+    "globalAmbientEnabled": "0 -> 1 -> 0",
+    "systemAmbientEnabled": "0 -> 1 -> 0",
+    "systemAmbientForceWhenDocked": "remained 0",
+    "batteryRestoredWith": "dumpsys battery reset",
+    "finalAcPowered": true
+  },
+  "evidence": {
+    "ambientHudScreenshot": "../screenshots/35-final-ambient-hud.png",
+    "captureSizePixels": "480x480"
+  }
+}

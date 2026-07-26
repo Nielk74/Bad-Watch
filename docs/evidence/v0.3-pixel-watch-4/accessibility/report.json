@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "capturedAtUtc": "2026-07-26T05:24:18Z",
+  "outcome": "pass",
+  "sourceRevision": "6f6f6cd9531040072bc153b365c0c515b0a40781",
+  "debugApkSha256": "28076fc03319ca15df92760a8d20b993af2f8ae8e129ffe61e021876eed0169d",
+  "installedBaseApkSha256": "28076fc03319ca15df92760a8d20b993af2f8ae8e129ffe61e021876eed0169d",
+  "device": {
+    "model": "Pixel Watch 4",
+    "resolution": "480x480",
+    "apiLevel": 37,
+    "fingerprint": "google/kenari_btwifi/kenari_btwifi:17/CP2A.260603.001.S1/15396605:user/release-keys"
+  },
+  "fontScale": {
+    "original": 1.0,
+    "tested": 1.3,
+    "restored": 1.0
+  },
+  "normalEnglishScreens": [
+    "../screenshots/32-final-tile-en.png",
+    "../screenshots/36-final-home-current.png",
+    "../screenshots/37-final-history-normal.png",
+    "../screenshots/38-final-progress-normal.png",
+    "../screenshots/39-final-detection-lab-zero.png",
+    "../screenshots/40-final-settings-normal.png",
+    "../screenshots/56-final-match-interval-normal.png",
+    "../screenshots/60-final-tile-existing-task-live.png"
+  ],
+  "enlargedEnglishScreens": [
+    "../screenshots/41-final-home-font-130.png",
+    "../screenshots/42-final-history-font-130.png",
+    "../screenshots/43-final-progress-font-130.png",
+    "../screenshots/44-final-settings-font-130.png",
+    "../screenshots/45-final-settings-bottom-font-130.png",
+    "../screenshots/46-final-heart-rate-permission-font-130.png",
+    "../screenshots/47-final-live-font-130.png",
+    "../screenshots/48-final-review-font-130.png",
+    "../screenshots/49-final-recap-font-130.png",
+    "../screenshots/50-final-session-failure-font-130.png",
+    "../screenshots/51-final-match-setup-font-130.png",
+    "../screenshots/52-final-match-live-font-130.png",
+    "../screenshots/53-final-match-interval-font-130.png",
+    "../screenshots/54-final-practice-font-130.png",
+    "../screenshots/55-final-shadow-font-130.png"
+  ],
+  "enlargedFrenchScreens": [
+    "../screenshots/57-final-shadow-fr-font-130.png",
+    "../screenshots/58-final-shadow-paused-fr-font-130.png",
+    "../screenshots/59-final-shadow-finish-fr-font-130.png"
+  ],
+  "checks": {
+    "homeScrollableAt130Percent": true,
+    "historyScrollableAt130Percent": true,
+    "progressReflowsMetricsAt130Percent": true,
+    "settingsScrollableAt130Percent": true,
+    "settingsBackActionReachableAt130Percent": true,
+    "heartRatePermissionActionsReachableAt130Percent": true,
+    "liveFinishActionHasDedicatedLaneAt130Percent": true,
+    "liveFinishSemanticNameIsComplete": true,
+    "reviewAndRecapScrollableAt130Percent": true,
+    "safeFailureActionAppearsBeforeDestructiveDiscardAt130Percent": true,
+    "matchUndoLabelVisibleAt130Percent": true,
+    "matchIntervalActionsReachableAt130Percent": true,
+    "normalMatchIntervalKeepsVisibleUndoLabel": true,
+    "practiceSetupScrollableAt130Percent": true,
+    "shadowCueAndPauseActionsReachableAt130Percent": true,
+    "longestFrenchShadowCueUsesTwoLinesWithoutClockOverlap": true,
+    "pausedFrenchShadowActionsScrollableAt130Percent": true,
+    "frenchFinishDialogConfirmReachableAt130Percent": true,
+    "criticalTextTruncationObserved": false,
+    "criticalActionOverlapObserved": false
+  },
+  "detectionLabZeroState": {
+    "screenshot": "../screenshots/39-final-detection-lab-zero.png",
+    "dropLastEnabled": false,
+    "saveDrillEnabled": false,
+    "cancelEnabled": true,
+    "captureCancelledThroughVisibleUi": true,
+    "captureFileCreated": false
+  },
+  "localeEvidence": {
+    "english": "Final app checkpoint navigation, permission, recording, review, recap, match and practice states",
+    "french": [
+      "../screenshots/09-live-fr-after-activity-recreation.png",
+      "../screenshots/10-review-fr.png",
+      "../screenshots/11-recap-fr-reviewed.png",
+      "../screenshots/57-final-shadow-fr-font-130.png",
+      "../screenshots/58-final-shadow-paused-fr-font-130.png",
+      "../screenshots/59-final-shadow-finish-fr-font-130.png"
+    ],
+    "fluentHumanReviewClaimed": false
+  },
+  "assistiveTechnology": {
+    "composeSemanticsAndTouchTargetsCoveredBySourceUnitAndLint": true,
+    "physicalTalkBackTraversalPerformed": false
+  },
+  "cleanup": {
+    "fontScaleRestored": 1.0,
+    "appLocalesRestored": [],
+    "heartRatePermissionRestored": true,
+    "activeCheckpointCount": 0,
+    "foregroundServicePresent": false
+  }
+}
