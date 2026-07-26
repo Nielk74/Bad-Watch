@@ -226,6 +226,61 @@ fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
 internal fun shouldStackStats(statCount: Int, fontScale: Float): Boolean =
     statCount >= 3 && fontScale >= 1.2f
 
+internal enum class DurationStatRowLayout {
+    ThreeUp,
+    WideDuration,
+    AccessibilityStack
+}
+
+/**
+ * Three related metrics where the final value is an exact elapsed duration.
+ *
+ * Sub-hour values retain the glanceable three-up layout. Once [formatDuration] adds an hours
+ * field, the exact value receives a full-width row instead of competing for a narrow third of a
+ * round display. Enlarged text uses [StatRow]'s existing label/value accessibility stack.
+ */
+@Composable
+fun DurationStatRow(
+    first: Stat,
+    second: Stat,
+    durationLabel: String,
+    durationMillis: Long,
+    modifier: Modifier = Modifier,
+    durationWeight: Float = 1f
+) {
+    val duration = Stat(
+        label = durationLabel,
+        value = formatDuration(durationMillis.coerceAtLeast(0L)),
+        weight = durationWeight
+    )
+    when (durationStatRowLayout(durationMillis, LocalDensity.current.fontScale)) {
+        DurationStatRowLayout.WideDuration -> {
+            Column(
+                modifier = modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                StatRow(first, second)
+                StatRow(duration)
+            }
+        }
+
+        DurationStatRowLayout.ThreeUp,
+        DurationStatRowLayout.AccessibilityStack ->
+            StatRow(first, second, duration, modifier = modifier)
+    }
+}
+
+internal fun durationStatRowLayout(
+    durationMillis: Long,
+    fontScale: Float
+): DurationStatRowLayout = when {
+    shouldStackStats(statCount = 3, fontScale = fontScale) ->
+        DurationStatRowLayout.AccessibilityStack
+    durationMillis.coerceAtLeast(0L) >= TimeUnit.HOURS.toMillis(1L) ->
+        DurationStatRowLayout.WideDuration
+    else -> DurationStatRowLayout.ThreeUp
+}
+
 /** A left-label / right-value line, for dense detail lists inside cards. */
 @Composable
 fun DetailRow(

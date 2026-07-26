@@ -108,6 +108,32 @@ class ServerAuthenticationTest {
     }
 
     @Test
+    fun dashboardShellWiresAccessibleFiltersToEveryAggregateRefresh() = runBlocking {
+        val repository = SessionRepository(temporaryFolder.newFolder("filter-shell-sessions"))
+
+        testApplication {
+            application { badWatchModule(repository, token = null) }
+
+            val shell = client.get("/").bodyAsText()
+
+            assertThat(shell).contains("id=\"dashboardFilterForm\"")
+            assertThat(shell).contains("id=\"filterStatus\" role=\"status\" aria-live=\"polite\"")
+            assertThat(shell).contains("params.set(\"activityMode\", filterActivity.value)")
+            assertThat(shell).contains("params.set(\"completion\", filterCompletion.value)")
+            assertThat(shell).contains("params.set(\"recordingQuality\", filterQuality.value)")
+            assertThat(shell).contains("params.set(\"comparisonTag\", comparisonTag)")
+            assertThat(shell).contains(
+                "const ALL_RECORDING_QUALITIES = \"Unreviewed,Complete,Partial,Unusable\""
+            )
+            assertThat(shell).contains("hydrateDashboardFilters(new URLSearchParams(window.location.search))")
+            assertThat(shell).contains("writeDashboardFilterUrl(dashboardSearchParams())")
+            assertThat(shell).contains("setDashboardFiltersVisible(id === null)")
+            assertThat(shell).contains("No sessions match these filters")
+            assertThat(shell).doesNotContain("apiJson(\"api/v1/dashboard\")")
+        }
+    }
+
+    @Test
     fun dataApisDoNotOptInToCrossOriginBrowserReads() = runBlocking {
         val repository = SessionRepository(temporaryFolder.newFolder("cors-sessions"))
 

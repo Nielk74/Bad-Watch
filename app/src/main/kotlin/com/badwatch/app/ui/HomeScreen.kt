@@ -41,12 +41,11 @@ import androidx.wear.compose.material3.TitleCard
 import com.badwatch.app.data.StoredSession
 import com.badwatch.app.R
 import com.badwatch.app.ui.components.DetailRow
+import com.badwatch.app.ui.components.DurationStatRow
 import com.badwatch.app.ui.components.InfoCard
 import com.badwatch.app.ui.components.Sparkline
 import com.badwatch.app.ui.components.Stat
-import com.badwatch.app.ui.components.StatRow
 import com.badwatch.app.ui.components.WatchScreen
-import com.badwatch.app.ui.components.formatDuration
 import com.badwatch.app.ui.components.formatSessionDate
 import com.badwatch.app.ui.theme.BadWatchTheme
 import com.badwatch.app.viewmodel.BadWatchViewModel
@@ -180,8 +179,8 @@ private fun HomeContent(
                     title = { Text(stringResource(R.string.home_last_session)) },
                     time = { Text(formatSessionDate(last.export.session.startedAtMillis)) }
                 ) {
-                    StatRow(
-                        Stat(
+                    DurationStatRow(
+                        first = Stat(
                             stringResource(
                                 if (effective.hasCorrections) {
                                     R.string.label_reviewed_hits
@@ -191,14 +190,12 @@ private fun HomeContent(
                             ),
                             effective.correctedDetectedHitCount.toString()
                         ),
-                        Stat(
+                        second = Stat(
                             stringResource(R.string.label_exchanges),
                             reviewed.rallyProfile.rallyCount.toString()
                         ),
-                        Stat(
-                            stringResource(R.string.label_time),
-                            formatDuration(reviewed.window.durationMillis)
-                        )
+                        durationLabel = stringResource(R.string.label_time),
+                        durationMillis = reviewed.window.durationMillis
                     )
                 }
             }
@@ -361,15 +358,16 @@ private fun ThisWeekCard(history: List<StoredSession>) {
             val estimatedActiveMillis = week.sumOf {
                 it.export.reviewedAnalysis().rallyProfile.totalWorkMillis
             }
-            StatRow(
-                Stat(stringResource(R.string.label_sessions), week.size.toString()),
-                Stat(
+            DurationStatRow(
+                first = Stat(stringResource(R.string.label_sessions), week.size.toString()),
+                second = Stat(
                     stringResource(
                         if (hasCorrections) R.string.label_reviewed_hits else R.string.label_detected_hits
                     ),
                     totalShots.toString()
                 ),
-                Stat(stringResource(R.string.home_estimated_active_short), formatDuration(estimatedActiveMillis))
+                durationLabel = stringResource(R.string.home_estimated_active_short),
+                durationMillis = estimatedActiveMillis
             )
             val recentShots = usable.take(8).reversed()
                 .map { it.export.effectiveMetrics().correctedDetectedHitCount.toFloat() }

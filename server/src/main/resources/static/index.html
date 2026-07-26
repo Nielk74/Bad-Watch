@@ -95,6 +95,41 @@
   .transfer-status { min-height: 20px; margin-top: 8px; color: var(--text-secondary); font-size: 12.5px; }
   .transfer-status.error { color: var(--status-critical); }
 
+  .filter-panel {
+    margin-top: 18px; padding: 15px 16px 13px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px;
+  }
+  .filter-form { display: grid; gap: 13px; }
+  .filter-heading { display: flex; align-items: baseline; justify-content: space-between;
+                    gap: 12px; flex-wrap: wrap; }
+  .filter-heading h2 { font-size: 14px; }
+  .filter-heading p { margin: 0; color: var(--text-muted); font-size: 12px; }
+  .filter-grid { display: grid; grid-template-columns: repeat(4, minmax(145px, 1fr));
+                 gap: 10px; align-items: end; }
+  .filter-field { display: grid; gap: 5px; min-width: 0; }
+  .filter-field label { color: var(--text-secondary); font-size: 11.5px; font-weight: 620; }
+  .filter-field input, .filter-field select {
+    width: 100%; min-width: 0; height: 38px; padding: 7px 9px;
+    color: var(--text-primary); background: var(--surface-0);
+    border: 1px solid var(--border); border-radius: 9px; font: inherit; font-size: 13px;
+  }
+  .filter-field input:focus, .filter-field select:focus {
+    border-color: var(--series-1);
+    outline: 3px solid color-mix(in srgb, var(--series-1) 18%, transparent);
+  }
+  .filter-actions { display: flex; align-items: center; justify-content: space-between;
+                    gap: 10px; flex-wrap: wrap; }
+  .filter-status { min-height: 19px; color: var(--text-secondary); font-size: 12px; }
+  .filter-status.error { color: var(--status-critical); }
+  .filter-buttons { display: flex; gap: 7px; }
+  .filter-button {
+    border: 1px solid var(--border); border-radius: 999px; padding: 7px 13px;
+    background: var(--surface-2); color: var(--text-primary); font: inherit;
+    font-size: 12.5px; font-weight: 620; cursor: pointer;
+  }
+  .filter-button.primary { border-color: var(--series-1); background: var(--series-1); color: white; }
+  .filter-button:disabled { cursor: wait; opacity: .58; }
+
   .auth-dialog {
     width: min(420px, calc(100vw - 32px)); padding: 0;
     color: var(--text-primary); background: var(--surface-1);
@@ -258,6 +293,11 @@
     .wrap { padding-left: 14px; padding-right: 14px; }
     .grid { grid-template-columns: minmax(0, 1fr); }
     .diary-grid { grid-template-columns: minmax(0, 1fr); }
+    .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .filter-field.tag { grid-column: 1 / -1; }
+  }
+  @media (min-width: 521px) and (max-width: 860px) {
+    .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 </style>
 </head>
@@ -275,6 +315,63 @@
   </header>
   <div class="transfer-status" id="transferStatus" role="status" aria-live="polite"></div>
   <input id="archiveFile" type="file" accept="application/json,.json" hidden>
+
+  <section class="filter-panel" id="dashboardFilters" aria-labelledby="filterTitle">
+    <form class="filter-form" id="dashboardFilterForm">
+      <div class="filter-heading">
+        <h2 id="filterTitle">Focus your history</h2>
+        <p>Only the dashboard view changes; your archive stays untouched.</p>
+      </div>
+      <div class="filter-grid">
+        <div class="filter-field">
+          <label for="filterActivity">Activity</label>
+          <select id="filterActivity" name="activityMode">
+            <option value="">All activities</option>
+            <option value="Unspecified">Not reported</option>
+            <option value="SinglesMatch">Singles match</option>
+            <option value="DoublesMatch">Doubles match</option>
+            <option value="ConditionedGame">Conditioned game</option>
+            <option value="Drill">Drill</option>
+            <option value="Shadow">Shadow</option>
+            <option value="FreePlay">Free play</option>
+            <option value="Conditioning">Conditioning</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="filterCompletion">Completion</label>
+          <select id="filterCompletion" name="completion">
+            <option value="">Any completion</option>
+            <option value="Unreported">Not reported</option>
+            <option value="Completed">Completed</option>
+            <option value="StoppedEarly">Stopped early</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label for="filterQuality">Recording</label>
+          <select id="filterQuality" name="recordingQuality">
+            <option value="">Usable recordings</option>
+            <option value="all">All, including unusable</option>
+            <option value="Unreviewed">Not reviewed</option>
+            <option value="Complete">Complete</option>
+            <option value="Partial">Partial</option>
+            <option value="Unusable">Unusable · audit only</option>
+          </select>
+        </div>
+        <div class="filter-field tag">
+          <label for="filterTag">Comparison tag</label>
+          <input id="filterTag" name="comparisonTag" type="text" maxlength="64"
+                 placeholder="e.g. Tuesday league">
+        </div>
+      </div>
+      <div class="filter-actions">
+        <div class="filter-status" id="filterStatus" role="status" aria-live="polite"></div>
+        <div class="filter-buttons">
+          <button class="filter-button" id="resetFilters" type="button">Reset</button>
+          <button class="filter-button primary" id="applyFilters" type="submit">Apply</button>
+        </div>
+      </div>
+    </form>
+  </section>
 
   <div id="content"></div>
 </div>
@@ -417,6 +514,129 @@ async function apiJson(resource) {
   return response.json();
 }
 
+/* ---------- Dashboard filters ---------- */
+
+const ALL_RECORDING_QUALITIES = "Unreviewed,Complete,Partial,Unusable";
+const dashboardFilters = document.getElementById("dashboardFilters");
+const dashboardFilterForm = document.getElementById("dashboardFilterForm");
+const filterActivity = document.getElementById("filterActivity");
+const filterCompletion = document.getElementById("filterCompletion");
+const filterQuality = document.getElementById("filterQuality");
+const filterTag = document.getElementById("filterTag");
+const filterStatus = document.getElementById("filterStatus");
+const applyFilters = document.getElementById("applyFilters");
+const resetFilters = document.getElementById("resetFilters");
+
+function dashboardSearchParams() {
+  const params = new URLSearchParams();
+  if (filterActivity.value) params.set("activityMode", filterActivity.value);
+  if (filterCompletion.value) params.set("completion", filterCompletion.value);
+  if (filterQuality.value === "all") {
+    params.set("recordingQuality", ALL_RECORDING_QUALITIES);
+  } else if (filterQuality.value) {
+    params.set("recordingQuality", filterQuality.value);
+  }
+  const comparisonTag = filterTag.value.trim();
+  if (comparisonTag) params.set("comparisonTag", comparisonTag);
+  return params;
+}
+
+function dashboardResource() {
+  const query = dashboardSearchParams().toString();
+  return query ? `api/v1/dashboard?${query}` : "api/v1/dashboard";
+}
+
+function hasExplicitDashboardFilters() {
+  return Boolean(
+    filterActivity.value || filterCompletion.value || filterQuality.value || filterTag.value.trim()
+  );
+}
+
+function selectedFilterLabel(select) {
+  const selected = select.options[select.selectedIndex];
+  return selected ? selected.textContent : "";
+}
+
+function dashboardFilterSummary(sessionCount) {
+  const scopes = [];
+  if (filterActivity.value) scopes.push(selectedFilterLabel(filterActivity));
+  if (filterCompletion.value) scopes.push(selectedFilterLabel(filterCompletion));
+  scopes.push(filterQuality.value ? selectedFilterLabel(filterQuality) : "Usable recordings");
+  if (filterTag.value.trim()) scopes.push(`Tag: ${filterTag.value.trim()}`);
+  return `${sessionCount} matching session${sessionCount === 1 ? "" : "s"} · ${scopes.join(" · ")}`;
+}
+
+function hydrateDashboardFilters(params) {
+  const chooseKnown = (select, value) => {
+    if ([...select.options].some(option => option.value === value)) select.value = value;
+  };
+  chooseKnown(filterActivity, params.get("activityMode") || "");
+  chooseKnown(filterCompletion, params.get("completion") || "");
+
+  const qualityValues = params.getAll("recordingQuality")
+    .flatMap(value => value.split(","))
+    .map(value => value.trim())
+    .filter(Boolean);
+  const allQualities = ALL_RECORDING_QUALITIES.split(",");
+  if (qualityValues.length === allQualities.length &&
+      allQualities.every(value => qualityValues.includes(value))) {
+    filterQuality.value = "all";
+  } else if (qualityValues.length === 1) {
+    chooseKnown(filterQuality, qualityValues[0]);
+  }
+  filterTag.value = (params.get("comparisonTag") || "").slice(0, 64);
+}
+
+function writeDashboardFilterUrl(params) {
+  const query = params.toString();
+  const next = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+  window.history.replaceState(null, "", next);
+}
+
+function setDashboardFiltersVisible(visible) {
+  dashboardFilters.hidden = !visible;
+}
+
+function reportFilterStatus(message, isError = false) {
+  filterStatus.textContent = message;
+  filterStatus.classList.toggle("error", isError);
+}
+
+async function refreshDashboardFilters(writeUrl = true) {
+  const params = dashboardSearchParams();
+  applyFilters.disabled = true;
+  resetFilters.disabled = true;
+  dashboardFilters.setAttribute("aria-busy", "true");
+  reportFilterStatus("Loading matching sessions…");
+  try {
+    const data = await apiJson(dashboardResource());
+    window.__data = data;
+    sessionCache.clear();
+    if (writeUrl) writeDashboardFilterUrl(params);
+    reportFilterStatus(dashboardFilterSummary(data.sessionCount));
+    if (sessionIdFromHash()) location.hash = "#/";
+    else route();
+  } catch (error) {
+    reportFilterStatus(error.message || "Could not apply filters.", true);
+  } finally {
+    applyFilters.disabled = false;
+    resetFilters.disabled = false;
+    dashboardFilters.removeAttribute("aria-busy");
+  }
+}
+
+dashboardFilterForm.addEventListener("submit", event => {
+  event.preventDefault();
+  refreshDashboardFilters();
+});
+
+resetFilters.addEventListener("click", () => {
+  dashboardFilterForm.reset();
+  refreshDashboardFilters();
+});
+
+hydrateDashboardFilters(new URLSearchParams(window.location.search));
+
 /* ---------- Data ownership ---------- */
 
 const transferStatus = document.getElementById("transferStatus");
@@ -504,7 +724,8 @@ archiveFile.addEventListener("change", async () => {
         `${result.sessions.unchanged + result.captures.unchanged} already current.`
     );
     sessionCache.clear();
-    window.__data = await apiJson("api/v1/dashboard");
+    window.__data = await apiJson(dashboardResource());
+    reportFilterStatus(dashboardFilterSummary(window.__data.sessionCount));
     location.hash = "#/";
     route();
   } catch (error) {
@@ -834,13 +1055,27 @@ function render(data) {
   content.innerHTML = "";
 
   if (!data.sessionCount) {
-    subtitle.textContent = "No sessions yet";
-    content.innerHTML = `
-      <div class="empty">
-        <h2>No sessions yet</h2>
-        <p>Record a session on the watch, then point it at this server.<br>
-        Sessions upload to <code>POST /api/v1/sessions</code>.</p>
-      </div>`;
+    if (hasExplicitDashboardFilters()) {
+      subtitle.textContent = "No matching sessions";
+      content.innerHTML = `
+        <div class="empty">
+          <h2>No sessions match these filters</h2>
+          <p>Your recordings are unchanged. Adjust the filters above or reset the dashboard.</p>
+          <button class="filter-button" id="emptyResetFilters" type="button">Reset filters</button>
+        </div>`;
+      document.getElementById("emptyResetFilters").addEventListener("click", () => {
+        dashboardFilterForm.reset();
+        refreshDashboardFilters();
+      });
+    } else {
+      subtitle.textContent = "No usable sessions yet";
+      content.innerHTML = `
+        <div class="empty">
+          <h2>No usable sessions yet</h2>
+          <p>Record a session on the watch, then point it at this server.<br>
+          Recordings marked unusable remain available through the Recording filter.</p>
+        </div>`;
+    }
     return;
   }
 
@@ -1026,6 +1261,7 @@ function sessionIdFromHash() {
 
 function route() {
   const id = sessionIdFromHash();
+  setDashboardFiltersVisible(id === null);
   if (id != null) {
     renderSessionDetail(id);
     return;
@@ -1338,7 +1574,10 @@ function buildDiaryEditor(data) {
       renderSession(updated);
       const savedStatus = document.getElementById("diaryStatus");
       if (savedStatus) savedStatus.textContent = "Diary saved. Recorded session data is unchanged.";
-      apiJson("api/v1/dashboard").then(value => { window.__data = value; }).catch(() => {});
+      apiJson(dashboardResource()).then(value => {
+        window.__data = value;
+        reportFilterStatus(dashboardFilterSummary(value.sessionCount));
+      }).catch(() => {});
     } catch (error) {
       status.textContent = diarySaved
         ? "Diary saved, but the reviewed detail could not refresh. Reload to see it."
@@ -1648,14 +1887,17 @@ Promise.all([
   if (window.__data && !sessionIdFromHash()) renderClassifier(evaluation, summary);
 });
 
-apiJson("api/v1/dashboard")
+apiJson(dashboardResource())
   .then(data => {
     window.__data = data;
+    writeDashboardFilterUrl(dashboardSearchParams());
+    reportFilterStatus(dashboardFilterSummary(data.sessionCount));
     route();
   })
   .catch(err => {
     if (sessionIdFromHash()) return; // a deep-linked detail view has its own error state
     const locked = err && err.status === 401;
+    reportFilterStatus(locked ? "Access required" : "Could not load filtered sessions", true);
     document.getElementById("subtitle").textContent = locked
       ? "Access required" : "Could not reach the server";
     document.getElementById("content").innerHTML =

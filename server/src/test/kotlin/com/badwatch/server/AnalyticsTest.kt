@@ -244,6 +244,33 @@ class AnalyticsTest {
     }
 
     @Test
+    fun partialAndUnusableRecordingsNeverGenerateGapSensitiveInsights() {
+        val seed = reviewableSession()
+        val complete = seed.copy(
+            context = seed.context.copy(
+                recordingQuality = RecordingQuality.Complete
+            )
+        )
+        assertThat(Analytics.detail(complete, listOf(complete)).reviewed.insights).isNotEmpty()
+
+        listOf(RecordingQuality.Partial, RecordingQuality.Unusable).forEach { quality ->
+            val recording = complete.copy(
+                context = complete.context.copy(recordingQuality = quality)
+            )
+            val filter = if (quality == RecordingQuality.Unusable) {
+                SessionAnalyticsFilter(recordingQualities = setOf(RecordingQuality.Unusable))
+            } else {
+                SessionAnalyticsFilter()
+            }
+
+            val dashboard = Analytics.build(listOf(recording), filter)
+
+            assertThat(dashboard.sessions.single().insights).isEmpty()
+            assertThat(Analytics.detail(recording, listOf(recording)).reviewed.insights).isEmpty()
+        }
+    }
+
+    @Test
     fun analyticsFiltersAndGroupsOnlyComparableSessionContexts() {
         fun contextual(
             start: Long,
@@ -294,7 +321,9 @@ class AnalyticsTest {
             it.key.activityMode == ActivityMode.Drill &&
                 it.key.comparisonTag == "rear court"
         }
-        assertThat(rearCourt.sessionCount).isEqualTo(3)
+        // The filtered dashboard may explicitly show a partial record, but process gaps make it
+        // unsafe to advertise as part of the like-for-like personal-baseline corpus.
+        assertThat(rearCourt.sessionCount).isEqualTo(2)
         assertThat(rearCourt.baselineEligible).isTrue()
 
         val untaggedDrill = dashboard.comparisonGroups.single {
@@ -303,6 +332,77 @@ class AnalyticsTest {
         assertThat(untaggedDrill.sessionCount).isEqualTo(1)
         assertThat(untaggedDrill.baselineEligible).isFalse()
         assertThat(dashboard.comparisonGroups).hasSize(4)
+    }
+
+    @Test
+    fun defaultDashboardExcludesUnusableRecordingsFromAggregatesAndGroups() {
+        val usable = SyntheticSessions.session(
+            startedAtMillis = 1_000L,
+            rallies = 2,
+            shotsPerRally = 3
+        ).copy(
+            context = SessionContext(
+                activityMode = ActivityMode.SinglesMatch,
+                recordingQuality = RecordingQuality.Complete
+            )
+        )
+        val unusable = SyntheticSessions.session(
+            startedAtMillis = 2_000L,
+            rallies = 5,
+            shotsPerRally = 7
+        ).copy(
+            context = SessionContext(
+                activityMode = ActivityMode.DoublesMatch,
+                recordingQuality = RecordingQuality.Unusable
+            )
+        )
+
+        val dashboard = Analytics.build(listOf(usable, unusable))
+
+        assertThat(dashboard.sessionCount).isEqualTo(1)
+        assertThat(dashboard.sessions.map { it.id }).containsExactly(usable.session.id)
+        assertThat(dashboard.totalShots)
+            .isEqualTo(usable.reviewedAnalysis().metrics.correctedDetectedHitCount)
+        assertThat(dashboard.volumeTrend.last().dailyDetectedHits)
+            .isEqualTo(usable.reviewedAnalysis().metrics.correctedDetectedHitCount)
+        assertThat(dashboard.comparisonGroups.map { it.key.activityMode })
+            .containsExactly(ActivityMode.SinglesMatch)
+        assertThat(dashboard.appliedFilter.recordingQualities)
+            .containsExactly(
+                RecordingQuality.Unreviewed,
+                RecordingQuality.Complete,
+                RecordingQuality.Partial
+            )
+    }
+
+    @Test
+    fun explicitUnusableFilterKeepsBrokenRecordingAvailableForAudit() {
+        val usable = SyntheticSessions.session(
+            startedAtMillis = 1_000L,
+            rallies = 2,
+            shotsPerRally = 3
+        ).copy(
+            context = SessionContext(recordingQuality = RecordingQuality.Complete)
+        )
+        val unusable = SyntheticSessions.session(
+            startedAtMillis = 2_000L,
+            rallies = 5,
+            shotsPerRally = 7
+        ).copy(
+            context = SessionContext(recordingQuality = RecordingQuality.Unusable)
+        )
+
+        val dashboard = Analytics.build(
+            sessions = listOf(usable, unusable),
+            filter = SessionAnalyticsFilter(
+                recordingQualities = setOf(RecordingQuality.Unusable)
+            )
+        )
+
+        assertThat(dashboard.sessionCount).isEqualTo(1)
+        assertThat(dashboard.sessions.map { it.id }).containsExactly(unusable.session.id)
+        assertThat(dashboard.appliedFilter.recordingQualities)
+            .containsExactly(RecordingQuality.Unusable)
     }
 
     private fun session(

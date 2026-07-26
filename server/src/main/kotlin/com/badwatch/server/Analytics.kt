@@ -1,6 +1,7 @@
 package com.badwatch.server
 
 import com.badwatch.core.insight.Insight
+import com.badwatch.core.insight.InsightBaseline
 import com.badwatch.core.insight.SessionInsightEngine
 import com.badwatch.core.model.ShotType
 import com.badwatch.core.model.MINIMUM_CARDIOVASCULAR_LOAD_COVERAGE
@@ -43,13 +44,15 @@ data class DashboardData(
     val volumeTrend: List<VolumePoint>,
     /** The selection used to produce every aggregate above. */
     val appliedFilter: SessionAnalyticsFilter = SessionAnalyticsFilter(),
-    /** Available like-for-like groups across the unfiltered input corpus. */
+    /** Available like-for-like groups across the baseline-safe, otherwise-unfiltered corpus. */
     val comparisonGroups: List<SessionComparisonGroup> = emptyList()
 )
 
 /**
- * Optional server-side diary selection. Empty sets mean "all"; [comparisonTag] is matched
- * after trimming and case-folding with the same rules used by [SessionComparisonKey].
+ * Optional server-side diary selection. Empty sets mean "all" except recording quality: the
+ * default aggregate omits explicitly unusable recordings, while a non-empty
+ * [recordingQualities] set remains an exact audit selection. [comparisonTag] is matched after
+ * trimming and case-folding with the same rules used by [SessionComparisonKey].
  */
 @Serializable
 data class SessionAnalyticsFilter(
@@ -160,8 +163,14 @@ object Analytics {
         sessions: List<SessionExport>,
         filter: SessionAnalyticsFilter = SessionAnalyticsFilter()
     ): DashboardData {
-        val comparisonGroups = buildComparisonGroups(sessions)
-        val selectedSessions = sessions.filter { matchesFilter(it, filter) }
+        val appliedFilter = canonicalize(filter)
+        val comparisonGroups = buildComparisonGroups(
+            sessions.filter {
+                it.context.recordingQuality != RecordingQuality.Partial &&
+                    it.context.recordingQuality != RecordingQuality.Unusable
+            }
+        )
+        val selectedSessions = sessions.filter { matchesFilter(it, appliedFilter) }
         if (selectedSessions.isEmpty()) {
             return DashboardData(
                 sessionCount = 0,
@@ -175,7 +184,7 @@ object Analytics {
                 rallyHistogram = emptyList(),
                 sessions = emptyList(),
                 volumeTrend = emptyList(),
-                appliedFilter = canonicalize(filter),
+                appliedFilter = appliedFilter,
                 comparisonGroups = comparisonGroups
             )
         }
@@ -211,7 +220,7 @@ object Analytics {
             rallyHistogram = buildRallyHistogram(allRallies.map { it.shotCount }),
             sessions = cards,
             volumeTrend = buildVolumeTrend(cards),
-            appliedFilter = canonicalize(filter),
+            appliedFilter = appliedFilter,
             comparisonGroups = comparisonGroups
         )
     }
@@ -225,11 +234,7 @@ object Analytics {
                 session = analysis.session,
                 rallyProfile = analysis.rallyProfile,
                 effectiveMetrics = analysis.metrics,
-                insights = insightEngine.generate(
-                    session = analysis.session,
-                    rallyProfile = analysis.rallyProfile,
-                    baseline = baseline
-                )
+                insights = insightsFor(export, analysis, baseline)
             )
         )
     }
@@ -278,7 +283,7 @@ object Analytics {
             shotDistribution = shotOrder.mapNotNull { type ->
                 summary.shotCounts[type]?.takeIf { it > 0 }?.let { ShotSlice(type.name, it) }
             },
-            insights = insightEngine.generate(analysis.session, rallies, baseline),
+            insights = insightsFor(export, analysis, baseline),
             context = export.context,
             report = export.report,
             effectiveMetrics = effectiveMetrics,
@@ -302,6 +307,26 @@ object Analytics {
         }
         .sortedWith(compareBy({ it.key.activityMode.ordinal }, { it.key.comparisonTag.orEmpty() }))
 
+    /**
+     * Partial recordings can contain an unobserved process gap, and unusable recordings are kept
+     * only for audit. Their reviewed detector values remain visible, but neither can safely turn
+     * inferred quiet/rest into a player-facing observation.
+     */
+    private fun insightsFor(
+        export: SessionExport,
+        analysis: ReviewedSessionAnalysis,
+        baseline: InsightBaseline
+    ): List<Insight> = when (export.context.recordingQuality) {
+        RecordingQuality.Partial,
+        RecordingQuality.Unusable -> emptyList()
+        RecordingQuality.Unreviewed,
+        RecordingQuality.Complete -> insightEngine.generate(
+            session = analysis.session,
+            rallyProfile = analysis.rallyProfile,
+            baseline = baseline
+        )
+    }
+
     private fun matchesFilter(
         export: SessionExport,
         filter: SessionAnalyticsFilter
@@ -316,7 +341,12 @@ object Analytics {
     }
 
     private fun canonicalize(filter: SessionAnalyticsFilter): SessionAnalyticsFilter =
-        filter.copy(comparisonTag = canonicalTag(filter.comparisonTag))
+        filter.copy(
+            comparisonTag = canonicalTag(filter.comparisonTag),
+            recordingQualities = filter.recordingQualities.ifEmpty {
+                DEFAULT_AGGREGATE_RECORDING_QUALITIES
+            }
+        )
 
     private fun canonicalTag(value: String?): String? =
         value?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
@@ -401,4 +431,10 @@ object Analytics {
 
     /** Convenience for the HTML layer, which wants whole percentages. */
     fun percent(fraction: Float): Int = (fraction * 100).roundToInt()
+
+    private val DEFAULT_AGGREGATE_RECORDING_QUALITIES = setOf(
+        RecordingQuality.Unreviewed,
+        RecordingQuality.Complete,
+        RecordingQuality.Partial
+    )
 }

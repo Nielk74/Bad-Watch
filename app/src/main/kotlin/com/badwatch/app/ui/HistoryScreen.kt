@@ -23,12 +23,11 @@ import androidx.wear.compose.material3.TitleCard
 import com.badwatch.app.data.StoredSession
 import com.badwatch.app.R
 import com.badwatch.app.localization.classifySyncRejection
+import com.badwatch.app.ui.components.DurationStatRow
 import com.badwatch.app.ui.components.InfoCard
 import com.badwatch.app.ui.components.ScreenHeader
 import com.badwatch.app.ui.components.Stat
-import com.badwatch.app.ui.components.StatRow
 import com.badwatch.app.ui.components.WatchScreen
-import com.badwatch.app.ui.components.formatDuration
 import com.badwatch.app.ui.components.formatSessionDate
 import com.badwatch.app.ui.theme.CourtColors
 import com.badwatch.app.viewmodel.BadWatchViewModel
@@ -97,8 +96,8 @@ fun HistoryScreen(
                         )
                     }
                 ) {
-                    StatRow(
-                        Stat(
+                    DurationStatRow(
+                        first = Stat(
                             stringResource(
                                 if (reviewed.metrics.hasCorrections) {
                                     R.string.label_reviewed_hits
@@ -108,14 +107,12 @@ fun HistoryScreen(
                             ),
                             reviewed.metrics.correctedDetectedHitCount.toString()
                         ),
-                        Stat(
+                        second = Stat(
                             stringResource(R.string.label_exchanges),
                             reviewed.rallyProfile.rallyCount.toString()
                         ),
-                        Stat(
-                            stringResource(R.string.label_time),
-                            formatDuration(reviewed.window.durationMillis)
-                        )
+                        durationLabel = stringResource(R.string.label_time),
+                        durationMillis = reviewed.window.durationMillis
                     )
                     if (rejection != null) {
                         Text(
