@@ -224,10 +224,14 @@ fun MeterRow(
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
         ) {
             Text(
                 text = label,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -235,7 +239,8 @@ fun MeterRow(
                 Text(
                     text = valueText,
                     style = MaterialTheme.typography.labelSmall,
-                    color = color
+                    color = color,
+                    textAlign = TextAlign.End
                 )
             }
         }
