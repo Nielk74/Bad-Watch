@@ -1,15 +1,17 @@
 # Bad Watch product plan — v0.3 completion record
 
 **Status:** implementation complete for the v0.3 product contract. Platform surfaces and exact
-existing-task Tile launch have scoped retained hardware evidence. The final Wear source
-`48d101f` has byte-matched install evidence, start/recover/save proof, and truthful recovered
-Summary notice/composition captures. Hour-plus Summary and History at normal/`1.30` text remain
+existing-task Tile launch have scoped retained hardware evidence. Checkpoint `48d101f` has
+start/recover/save proof and truthful recovered Summary notice/composition captures; release
+source `19ec9d4` has byte-matched install evidence and a corrected 56:50 Summary capture. Hour-plus
+Summary and History at normal/`1.30` text remain
 physical evidence from the immediate `0bdbe98` precursor and are not relabelled as `48d101f`
 captures. Final-source Home, Progress, Tile rendering/gap marker, recovered-History marker, and
 Live details were not physically recaptured; those paths have automated regression coverage only.
-The definitive powered 180-minute screen-off lifecycle rerun is still in progress:
-`FINAL_ENDURANCE_PENDING`. Battery drain remains deliberately unclaimed because this lifecycle
-gate is powered.
+The final Wear APK completed an intentionally shortened 56:50 powered, screen-off lifecycle smoke
+with 339,595 processed samples and one gap-free saved session. Together with the passing pre-final
+180-minute report, final-source recovery evidence, and software gate, this closes the v0.3 release
+decision. A final-source three-hour pass and battery drain remain deliberately unclaimed.
 
 **Updated:** 2026-07-26
 
@@ -323,7 +325,7 @@ The delivered design and screen inventory are recorded in
 | Racket-hand onboarding and handedness | Delivered | `OnboardingScreen`, `SettingsStore` |
 | Required gyro, optional accelerometer | Delivered | `FusedSensorCollector` capability/failure paths |
 | Health Services optical HR | Delivered | `ExerciseHeartRateSession`, coverage and timestamp tests |
-| Screen-off recording | Delivered; final lifecycle rerun pending | health FGS `SessionService`, active journal, Detection Lab doze proof, ambient callback proof, scoped short smokes, and a [passing pre-final 180-minute run](evidence/v0.3-pixel-watch-4/endurance/20260726T071128Z/report.json); definitive final report: `FINAL_ENDURANCE_PENDING` |
+| Screen-off recording | Delivered | health FGS `SessionService`, active journal, Detection Lab doze proof, ambient callback proof, a [passing pre-final 180-minute run](evidence/v0.3-pixel-watch-4/endurance/20260726T071128Z/report.json), and the [accepted final-source 56-minute smoke](evidence/v0.3-pixel-watch-4/endurance/20260726T133709Z/STOPPED_EARLY.md) |
 | Process-death session recovery | Delivered | `ActiveSessionJournal`, immutable `ProcessAbsenceGap` provenance, repeated-recovery/controller regressions, and the [passing final-source schema-2 watch probe](evidence/v0.3-pixel-watch-4/recovery-final/20260726T133307Z/report.json) |
 | Failed-session recovery decision | Delivered | explicit preserve/discard UI, EN/FR copy, and throwing-flow regression |
 | Detection Lab terminal recovery | Delivered | serialized cancel/retry-save commands, stable capture ID, cleanup-order regressions |
@@ -462,7 +464,7 @@ v0.3 is done only when all of these are true:
 | Acceptance condition | Result |
 | --- | --- |
 | The full app can be used offline with no account/dashboard | Complete |
-| Session and Detection Lab capture survive screen-off under the health FGS | Scoped Detection Lab/short-smoke checks and a pre-final powered 180-minute run pass; definitive `48d101f` run is `FINAL_ENDURANCE_PENDING` |
+| Session and Detection Lab capture survive screen-off under the health FGS | Complete with scoped evidence: Detection Lab checks, a passing pre-final powered 180-minute report, and an accepted final-`48d101f` 56-minute dozing smoke with one gap-free saved session |
 | Optional HR failure/denial leaves a truthful motion-only session | Device-verified |
 | Process death restores stable identity and preserves a durable unobserved evidence boundary without fabricating sensor samples or inferred quiet time | Device-verified by the final schema-2 recovery report |
 | A failed sensor flow can be preserved or deliberately discarded without trapping the next start | Complete; confirmed-discard UI and a real throwing-flow regression prove journal removal and a fresh next ID |
@@ -471,9 +473,9 @@ v0.3 is done only when all of these are true:
 | Sync acceptance/rejection is durable, visible, and payload-specific | Complete; physical offline-retry and authenticated acceptance verified |
 | Browser backup/CSV/restore is authenticated and loss-safe | Complete; six Node 22 journeys include revisioned save/conflict behavior and archive-restore success/error |
 | English/French, accessibility, lint, JVM tests, debug and release builds pass | Complete; a source-scoped earlier `1.30` matrix covers navigation, permission, live/review/recap, safe failure, match/interval, and EN/FR practice/shadow. `0bdbe98` physically covers hour-plus Summary/History, while final `48d101f` physically covers the truthful English recovered-Summary label. Its French counterpart is resource/test-covered but was not physically recaptured on `48d101f`. Final Home, Progress, Tile, recovered History, and Live visuals have automated regression coverage only |
-| A target-36 Pixel Watch run proves the final Wear APK's core flow | Complete for the physically exercised `48d101f` subset: APK identity/byte match, start/recover/save, exact process-gap provenance, and truthful recovered Summary notice/composition. Hour-plus Summary/History remain scoped to `0bdbe98`; Home, Progress, Tile rendering/gap marker, recovered-History marker, and Live details were not recaptured on `48d101f` and have automated final-source coverage |
-| A three-hour screen-off probe produces exactly one duration-correct session | `FINAL_ENDURANCE_PENDING`; the older passing run is retained as pre-final evidence and does not close the `48d101f` gate |
-| Documentation describes shipped behavior and rejected claims without stale roadmap text | Complete except for replacing `FINAL_ENDURANCE_PENDING` with the definitive retained endurance result |
+| A target-36 Pixel Watch run proves the final Wear APK's core flow | Complete with scoped inheritance: `48d101f` proves start/recover/save, exact process-gap provenance, and truthful recovered Summary semantics; release `19ec9d4` byte-matches its installed APK and physically verifies the corrected 56:50 Summary. Hour-plus Summary/History remain scoped to `0bdbe98`; Home, Progress, Tile rendering/gap marker, recovered-History marker, and Live details have automated final-source coverage |
+| The final APK has release-proportionate screen-off lifecycle evidence | Complete: final-source 56:50 smoke plus pre-final 180-minute report; no final-source three-hour or battery claim is made |
+| Documentation describes shipped behavior and rejected claims without stale roadmap text | Complete |
 
 ### Validation and evidence
 
@@ -507,11 +509,13 @@ hydrate/apply/error/reset; deep-linked reviewed detail; successful revisioned di
 aggregate refresh; HTTP 409 reload/conflict replacement; and archive-restore success/error. This
 proves client state/request contracts, not responsive layout or real-browser rendering.
 
-At final Wear source `48d101fbd55520c983e33979f5a7733a50fd73ca`, the broader artifact
+At truthful-composition source `48d101fbd55520c983e33979f5a7733a50fd73ca`, the broader artifact
 gate passed all 31 Python unit tests, `py_compile`, resource XML validation, browser JavaScript
 syntax validation, all six Node 22 browser journeys, and 133 Gradle tasks: 130 executed and three
-up-to-date. This is the current clean-gate total. The broader local command produces the release
-AAB, while CI deliberately retains its existing APK-focused command.
+up-to-date. Release source `19ec9d4` adds the physically verified double-digit-minute duration
+reflow and passed the same Python/browser/JVM/lint/debug/release-APK/release-bundle gate. The
+broader local command produces the release AAB, while CI deliberately retains its existing
+APK-focused command.
 
 The failure-recovery regression is intentionally end-to-end at the controller boundary: its
 sensor flow emits one valid sample and then throws, verifies the journal survives Dismiss,
@@ -525,8 +529,9 @@ cleanup through serialized service commands. This covers the branch where “try
 the file write—not silently restart sensor collection.
 
 The physical ledger combines separately source-scoped runs on a Pixel Watch 4 running Android 17 /
-API 37. Final Wear source `48d101f` verifies byte identity, start/recover/save, exact schema-2
-recovery provenance, and the truthful recovered Summary notice/composition. Immediate precursor
+API 37. Checkpoint `48d101f` verifies start/recover/save, exact schema-2 recovery provenance, and
+the truthful recovered Summary notice/composition. Release source `19ec9d4` byte-matches its
+installed APK and physically re-renders the same 56:50 session without duration clipping. Immediate precursor
 `0bdbe98` supplies the hour-plus Summary and History captures at normal/`1.30` text. Earlier
 candidates retain permission, ambient, manual-match, training, French, and broader enlarged-text
 evidence; none are relabelled as `48d101f` captures. Final-source Home, Progress, Tile
@@ -543,14 +548,14 @@ python3 tooling/wear_recovery_probe.py \
   --output build/wear-recovery-probe
 ```
 
-The final app/APK source is `48d101fbd55520c983e33979f5a7733a50fd73ca`. Its debug APK
-SHA-256 is `d6e8ccf8b77b1c958916c2107b49e31e9f29a4b14eb69847ffc6318fae084ad7`; the device's installed
+The final app/APK source is `19ec9d427967c71adfe4d71efc7907b9950fec3c`. Its debug APK
+SHA-256 is `bd3b5aa0d3b5815325ed789016e573453534efe4de8617198e475836bcb10b8b`; the device's installed
 `base.apk` matched byte-for-byte and verified with an APK Signature Scheme v2 debug signer. The
 same source produced unsigned release APK
-`c32adc35bad96edddd54bb1a24224d4ce3b0f62cefc2cdc041e096a9b06245a4` and unsigned AAB
-`375f42e3864859c83b56442592029841b82fdba0183819fa9fbaaf3b172f795a`.
+`9f96cba0c21cfc8ade7788d6065be6a45957dfda744aedb55706251c9323fa11` and unsigned AAB
+`9306d3f4b36fd7cdc26542af2cb24d3beb47d69acfcce9107beb7c23768f51f6`.
 The installed package `com.badwatch.badwatch` reported target SDK 36, version `0.3.0`
-(`versionCode=300`), and last update `2026-07-26 15:30:35`.
+(`versionCode=300`), and last update `2026-07-26 16:44:30`.
 
 The current session probe includes exact post-stop diary/settled-recap classification, bounded
 error cleanup, and transactional wake restoration. It locates the compact Finish/Finir control
@@ -588,17 +593,21 @@ app failure.
 
 The older [180-minute report](evidence/v0.3-pixel-watch-4/endurance/20260726T071128Z/report.json)
 remains useful pre-final lifecycle/tooling evidence, but it ran on checkpoint `6f6f6cd` before the
-long-session, sync, and process-absence work above. It cannot close the final `48d101f` gate. The
-definitive retained result and exact measurements will replace `FINAL_ENDURANCE_PENDING` after the
-in-progress run completes. Because that run is powered, it will not substantiate battery drain.
+long-session, sync, and process-absence work above. The
+[final-source observation](evidence/v0.3-pixel-watch-4/endurance/20260726T133709Z/STOPPED_EARLY.md)
+was intentionally stopped and saved at 56:50 with 339,595 processed samples, one export, no
+process-absence gap, and restored wake controls. It has no `report.json` because the ordinary
+probe did not reach report generation, so it is explicitly a lifecycle smoke rather than a
+three-hour pass. Because both runs were powered, neither substantiates battery drain.
 
 The target-36 granted/denied-HR proof and observed journal sample counts are retained in
 [accessibility-localization.md](accessibility-localization.md#target-sdk-36-heart-rate-permission-evidence-2026-07-26).
 The current v0.3 screenshot, platform-surface, and recovery artifacts are indexed in the
-[Pixel Watch 4 evidence ledger](evidence/v0.3-pixel-watch-4/README.md). The only open blocking v0.3
-lifecycle gate in [device-validation.md](device-validation.md) is `FINAL_ENDURANCE_PENDING`; that
-does not imply final-build visual recapture of Home, Progress, Tile, recovered History, or Live.
-Its separate unpowered battery row remains explicitly unclaimed and is not a v0.3 release blocker.
+[Pixel Watch 4 evidence ledger](evidence/v0.3-pixel-watch-4/README.md). The release lifecycle
+decision in [device-validation.md](device-validation.md) is closed with explicitly scoped combined
+evidence; it does not imply a final-source three-hour pass or final-build visual recapture of Home,
+Progress, Tile, recovered History, or Live. The separate unpowered battery row remains explicitly
+unclaimed and is not a v0.3 release blocker.
 Generated artifacts without a matching ledger entry do not count as evidence.
 
 CI runs the same software gate, including the six Node 22 browser journeys, on every `master` push

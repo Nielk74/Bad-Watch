@@ -140,6 +140,8 @@
   personal records, rolling goals, Tile headlines, or seven-day surface totals.
 - Detection Lab correction actions no longer sit underneath the Save edge action on 480 px round
   displays, and an empty labelled drill can no longer be saved by mistake.
+- Double-digit-minute Summary durations no longer clip at the round-screen edge; exact elapsed
+  time moves to a physically verified full-width row from ten minutes onward.
 
 ## [0.2.0] - 2026-07-25
 

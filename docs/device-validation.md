@@ -39,10 +39,11 @@ hydrate/apply/error/reset; deep-linked reviewed detail; successful revisioned di
 aggregate refresh; HTTP 409 reload/conflict replacement; and archive-restore success/error. This
 proves client state/request contracts, not responsive layout or real-browser rendering.
 
-At final Wear source `48d101fbd55520c983e33979f5a7733a50fd73ca`, the broader artifact
+At truthful-composition source `48d101fbd55520c983e33979f5a7733a50fd73ca`, the broader artifact
 gate passed all 31 Python tests, `py_compile`, resource XML validation, browser JavaScript syntax
 validation, all six Node 22 browser journeys, and 133 Gradle tasks: 130 executed and three
-up-to-date. This is the current clean-gate total.
+up-to-date. Release source `19ec9d4` adds the physically verified double-digit-minute duration
+reflow and passed the same Python/browser/JVM/lint/debug/release-APK/release-bundle gate.
 
 These checks cover deterministic core behavior, durable stores and recovery, Health Services
 decisions, sync/server contracts, and Python tooling. They do not prove OEM lifecycle behavior,
@@ -111,6 +112,12 @@ reading reports the watch unpowered; battery endurance remains unmeasured until 
 run is performed off charger under recorded, repeatable conditions. Release APK installation,
 version/signature inspection, and dashboard setup must be checked separately.
 
+For v0.3, the maintainer explicitly accepted a shorter final-source run rather than repeat a full
+three hours. That decision is documented as combined evidence: a 56:50 final-source dozing smoke,
+the passing pre-final 180-minute machine report, the final-source recovery report, and the complete
+software gate. It does not redefine the generic three-hour probe, manufacture a final report, or
+support a battery-drain claim.
+
 Process-death recovery probe:
 
 ```bash
@@ -139,11 +146,11 @@ The active v0.3 ledger is
 [`evidence/v0.3-pixel-watch-4/README.md`](evidence/v0.3-pixel-watch-4/README.md). It records the
 2026-07-26 UTC run of app version 0.3.0 on
 `google/kenari_btwifi/kenari_btwifi:17/CP2A.260603.001.S1/15396605:user/release-keys`. The final
-app/APK source is `48d101fbd55520c983e33979f5a7733a50fd73ca`; its installed debug APK
-SHA-256 is `d6e8ccf8b77b1c958916c2107b49e31e9f29a4b14eb69847ffc6318fae084ad7`.
+app/APK source is `19ec9d427967c71adfe4d71efc7907b9950fec3c`; its installed debug APK
+SHA-256 is `bd3b5aa0d3b5815325ed789016e573453534efe4de8617198e475836bcb10b8b`.
 The device's pulled `base.apk` matched byte-for-byte, its v2 debug signature verified, and package
 inspection reported `com.badwatch.badwatch`, target SDK 36, version `0.3.0` (`versionCode=300`),
-and last update `2026-07-26 15:30:35`. The session and recovery probe implementations are
+and last update `2026-07-26 16:44:30`. The session and recovery probe implementations are
 traceable to
 `e9719a57d6a44463ff554e596de55ee95de41ef6` and
 `5318deb910ea3aae0f77d41e8c5e227ae77f39f8`, respectively. Earlier retained permission, sync,
@@ -151,14 +158,14 @@ ongoing, match, shadow, Tile, complication, and broad visual evidence names its 
 in the ledger rather than being relabelled as final-build evidence.
 
 The final source also produced unsigned release APK
-`c32adc35bad96edddd54bb1a24224d4ce3b0f62cefc2cdc041e096a9b06245a4` and unsigned AAB
-`375f42e3864859c83b56442592029841b82fdba0183819fa9fbaaf3b172f795a`.
+`9f96cba0c21cfc8ade7788d6065be6a45957dfda744aedb55706251c9323fa11` and unsigned AAB
+`9306d3f4b36fd7cdc26542af2cb24d3beb47d69acfcce9107beb7c23768f51f6`.
 Those are reproducible assembly artifacts, not installed/signed release-distribution evidence.
 The final source's clean gate passed all 31 Python tests, `py_compile`, resource XML and browser
 JavaScript syntax validation, all six Node 22 browser journeys, and Gradle
 clean/test/lint/debug/release-APK/release-bundle. It reported 133 tasks: 130 executed and three
 up-to-date. JVM layout regressions lock in the `1.20` threshold for dense metrics, the 48 dp
-live-action lane, compact match/shadow layouts, and the hour-plus full-width duration row; the live
+live-action lane, compact match/shadow layouts, and the ten-minute-plus full-width duration row; the live
 action keeps the full Stop-and-save semantic name behind visible **Finish** / **Finir** text.
 
 The authoritative final-source schema-2
@@ -182,11 +189,17 @@ precursor for the long-layout and recovery work, not the authoritative final-sou
 
 The older [powered 180-minute report](evidence/v0.3-pixel-watch-4/endurance/20260726T071128Z/report.json)
 passed on app checkpoint `6f6f6cd`, but it predates the final candidate's long-duration, sync, and
-process-absence changes. It is retained as explicitly pre-final evidence and cannot close the
-current gate. The definitive final-source report is `FINAL_ENDURANCE_PENDING`.
+process-absence changes. It is retained as explicitly pre-final long-duration evidence. The
+[release lifecycle observation](evidence/v0.3-pixel-watch-4/endurance/20260726T133709Z/STOPPED_EARLY.md)
+was intentionally stopped at 56:50 after 339,595 processed samples; it saved exactly one session
+with no process-absence gap on `48d101f`; release `19ec9d4` then physically verified the corrected
+56:50 recap. This scoped evidence plus the earlier three-hour report, final recovery probe, and
+software gate is the accepted v0.3 lifecycle evidence. A release-source three-hour report is not
+claimed.
 
-Final-source `48d101f` device retests cover artifact identity, start/recover/save, exact schema-2
-provenance, and the truthful recovered Summary notice/composition. Hour-plus Summary and History at
+Checkpoint `48d101f` device retests cover start/recover/save, exact schema-2 provenance, and the
+truthful recovered Summary notice/composition; release `19ec9d4` covers current artifact identity
+and the corrected 56:50 recap. Hour-plus Summary and History at
 normal/`1.30` text remain physical evidence from immediate precursor `0bdbe98` and are not
 relabelled as `48d101f` captures. Final-source Home, Progress, Tile rendering/gap marker,
 recovered-History marker, and Live details were not physically recaptured; those paths have
@@ -195,10 +208,10 @@ their physical evidence.
 
 | Gate | Evidence to retain | v0.3 release-candidate status |
 | --- | --- | --- |
-| Debug RC install and first-run permissions | APK hash/version/signature, package inspection, first-run images, permission notes | **Passed with explicit scope (2026-07-26 UTC):** final `48d101f` install/hash/version/signature identity is retained; [first-run evidence](evidence/v0.3-pixel-watch-4/README.md#install-onboarding-and-optional-permissions) is from earlier checkpoint `99b5f62` and was not repeated on `48d101f`. |
+| Debug RC install and first-run permissions | APK hash/version/signature, package inspection, first-run images, permission notes | **Passed with explicit scope (2026-07-26 UTC):** release `19ec9d4` install/hash/version/signature identity is retained; [first-run evidence](evidence/v0.3-pixel-watch-4/README.md#install-onboarding-and-optional-permissions) is from earlier checkpoint `99b5f62` and was not repeated on the release APK. |
 | Start, live HUD, stop, and save with HR granted and denied | Start/live/review/recap images plus session IDs and checkpoints | **Passed with explicit scope (2026-07-26 UTC):** [granted and denied session evidence](evidence/v0.3-pixel-watch-4/README.md#session-recording-with-heart-rate-access-granted) is from `99b5f62`; final `48d101f` start/recover/save is retained by the schema-2 recovery probe, but final Live details were not recaptured. The granted watch was off wrist, so this does not claim optical BPM acquisition. |
 | Activity recreation during recording | Stable session ID/start-time and advancing-checkpoint comparison | **Passed for checkpoint `99b5f62` (2026-07-26 UTC):** [English-to-French recreation evidence](evidence/v0.3-pixel-watch-4/README.md#heart-rate-denial-and-activity-recreation) was not repeated on `48d101f`. |
-| Process death and journal recovery | Before/after export, stable identity, `Partial` quality, exact checkpoint/session process-absence intervals, and visible boundary copy | **Passed on final `48d101f` (2026-07-26 UTC):** the [schema-2 report and screenshots](evidence/v0.3-pixel-watch-4/README.md#process-death-and-journal-recovery) prove every provenance boolean and the exact 16,307 ms boundary. The disqualified default-settle attempt and passing 30-second-settle follow-up are both disclosed there. |
+| Process death and journal recovery | Before/after export, stable identity, `Partial` quality, exact checkpoint/session process-absence intervals, and visible boundary copy | **Passed on checkpoint `48d101f` (2026-07-26 UTC):** the [schema-2 report and screenshots](evidence/v0.3-pixel-watch-4/README.md#process-death-and-journal-recovery) prove every provenance boolean and the exact 16,307 ms boundary. Release `19ec9d4` changes only the shared duration-row breakpoint and retains the automated recovery suite. |
 | Detection Lab screen-off acquisition | Before/after images plus stable process/FGS and advancing Android sensor-client duration | **Passed for checkpoint `99b5f62` (2026-07-26 UTC):** [doze acquisition evidence](evidence/v0.3-pixel-watch-4/README.md#detection-lab-through-screen-off). No stationary example was misrepresented as a saved swing; this was not repeated on `48d101f`. |
 | Offline save then retry/sync | Session ID and before/after state against an authenticated debug server over `adb reverse`; automated release cleartext-block assertion | **Passed for checkpoint `99b5f62` (2026-07-26 UTC):** [offline failure and authenticated acceptance](evidence/v0.3-pixel-watch-4/README.md#offline-save-and-authenticated-retry) prove that scoped path. Final incomplete-acknowledgement behavior has automated coverage only. |
 | Ongoing Activity and one-tap return | Watch-face indicator, notification/service state, stable session identity/checkpoint, and return image | **Passed for checkpoint `c5a1a67` (2026-07-26 UTC):** [motion-only ongoing evidence](evidence/v0.3-pixel-watch-4/README.md#ongoing-session-surface-and-one-tap-return); it was not physically repeated on `48d101f`. |
@@ -211,17 +224,18 @@ their physical evidence.
 | English/French spot checks | Screenshot matrix plus recreation/semantics notes | **Passed on earlier scoped candidates (2026-07-26 UTC):** English navigation/active states, French live/review/recap recreation, and French longest-cue/paused/finish-dialog shadow states are retained. They were not repeated on final `48d101f`; no fluent-review claim is made. |
 | Enlarged text | `1.30` Home, History, Progress, Settings, live, review/recap, safe failure, match/interval, practice/shadow, and permission matrix with reflow, scroll reachability, and no collision/clipping defects | **Passed as combined scoped evidence (2026-07-26 UTC):** the historical [26-image matrix](evidence/v0.3-pixel-watch-4/accessibility/report.json) covers the broader destinations; precursor `0bdbe98` physically retests hour-plus Summary/History at `1.30`. The final `48d101f` recovered Summary/composition captures are separate evidence, not part of the enlarged matrix. Final Home, Progress, Tile, recovered History, and Live have automated coverage only. |
 | Hour-plus duration and recovery-coverage UI | `0bdbe98` normal/`1.30` Summary and History plus final `48d101f` gap notice/composition images | **Passed with split source scope (2026-07-26 UTC):** [retained 480×480 captures](evidence/v0.3-pixel-watch-4/README.md#final-frozen-apk-long-session-and-recovery-coverage) show precursor `3:00:12` layouts plus the final `0:16` known-unobserved notice and Detected/No detected play/Unobserved legend. Screenshots 65/66 are pre-label history; 67/68 prove the final wording. |
-| 180-minute powered screen-off lifecycle | Probe `report.json`, `start.png`, optional post-stop diary, verified `recap.png`, charger state, and lifecycle result | **Pending active final gate:** `FINAL_ENDURANCE_PENDING`; the retained `6f6f6cd` run is pre-final and is not counted for this row. |
+| Release lifecycle evidence | Lifecycle observation, `start.png`, optional post-stop diary, original/fixed recap, charger state, and saved-session identity | **Accepted with explicit scope (2026-07-26 UTC):** checkpoint `48d101f` ran dozing for 56:50, reached 339,595 processed samples, and saved exactly one gap-free session; release `19ec9d4` byte-matched its installed APK and physically fixed the complete 56:50 Summary render. The passing `6f6f6cd` 180-minute report is pre-final long-duration corroboration; a release-source three-hour report is not claimed. |
 | 180-minute unpowered battery measurement | Probe report with every reading unpowered and measured battery delta | **Not claimed:** no qualifying run is documented. |
 
-The physical ledger combines source-scoped native-watch evidence across candidates. Final
-`48d101f` device retests cover artifact identity, start/recover/save, exact schema-2 provenance,
-and the truthful recovered Summary notice/composition. Precursor `0bdbe98` supplies the hour-plus
+The physical ledger combines source-scoped native-watch evidence across candidates. Checkpoint
+`48d101f` device retests cover start/recover/save, exact schema-2 provenance, and the truthful
+recovered Summary notice/composition; release `19ec9d4` covers artifact identity and the corrected
+56:50 recap. Precursor `0bdbe98` supplies the hour-plus
 Summary and History captures at normal/`1.30` text. Final-source Home, Progress, Tile
 rendering/gap marker, recovered-History marker, and Live details were not physically recaptured;
-those paths have automated regression coverage only. `FINAL_ENDURANCE_PENDING` is the sole
-remaining blocking physical lifecycle gate, not a claim that every visual surface was recaptured
-on the final build.
+those paths have automated regression coverage only. The explicitly shortened combined
+lifecycle observation closes the v0.3 release decision without claiming a release-source
+three-hour pass or recapture of every visual surface.
 An emulator screenshot does not prove touch comfort, ambient behavior, OEM Health Services
 behavior, or endurance on the Pixel Watch 4. The separate unpowered battery measurement is
 intentionally not claimed and is not a v0.3 release blocker; a powered probe cannot prove battery
