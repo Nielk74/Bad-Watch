@@ -114,6 +114,7 @@ fun HistoryScreen(
                         durationLabel = stringResource(R.string.label_time),
                         durationMillis = reviewed.window.durationMillis
                     )
+                    KnownUnobservedMarker(stored.export)
                     if (rejection != null) {
                         Text(
                             text = stringResource(

@@ -197,6 +197,7 @@ private fun HomeContent(
                         durationLabel = stringResource(R.string.label_time),
                         durationMillis = reviewed.window.durationMillis
                     )
+                    KnownUnobservedMarker(last.export)
                 }
             }
         }

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="session_known_unobserved_compact">Unobserved · %1$s</string>
     <string name="brand_wordmark">BAD WATCH</string>
 
     <string name="action_back">Back</string>

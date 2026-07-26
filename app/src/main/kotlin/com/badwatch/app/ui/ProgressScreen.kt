@@ -67,7 +67,7 @@ private fun ProgressContent(
     val nowMillis = System.currentTimeMillis()
     val usable = selectProgressUsableHistory(history, nowMillis)
     val recent = selectProgressRollingWeek(usable, nowMillis)
-    val recentMinutes = recent.sumOf { it.export.effectiveMetrics().window.durationMillis } / 60_000
+    val recentMinutes = progressObservedMillis(recent) / 60_000
     val playProfile = PlayProfileBuilder.build(usable.map { it.export })
 
     WatchScreen {
@@ -221,9 +221,7 @@ private fun ProgressContent(
             val longestBurst = usable.maxOf {
                 it.export.reviewedAnalysis().rallyProfile.longestRally?.shotCount ?: 0
             }
-            val longestRecording = usable.maxOf {
-                it.export.effectiveMetrics().window.durationMillis
-            }
+            val longestRecording = progressLongestObservedMillis(usable)
             item {
                 InfoCard(title = stringResource(R.string.progress_personal_records)) {
                     DetailRow(
@@ -286,6 +284,13 @@ internal fun selectProgressRollingWeek(
         stored.export.session.startedAtMillis >= sevenDaysAgo
     }
 }
+
+/** Progress duration excludes immutable process gaps without dropping the session itself. */
+internal fun progressObservedMillis(history: List<StoredSession>): Long =
+    history.sumOf { it.export.observedEffectiveDurationMillis }
+
+internal fun progressLongestObservedMillis(history: List<StoredSession>): Long =
+    history.maxOfOrNull { it.export.observedEffectiveDurationMillis } ?: 0L
 
 @Composable
 private fun GoalStepper(

@@ -2,6 +2,7 @@ package com.badwatch.app.ui
 
 import com.badwatch.app.data.StoredSession
 import com.badwatch.core.model.PlayerProfile
+import com.badwatch.core.model.ProcessAbsenceGap
 import com.badwatch.core.model.RallyProfile
 import com.badwatch.core.model.TrainingSession
 import com.badwatch.core.model.TrainingSummary
@@ -48,7 +49,54 @@ class ProgressSessionSelectionTest {
         assertThat(selected).containsExactly(atStart, atNow).inOrder()
     }
 
-    private fun stored(startedAtMillis: Long, quality: RecordingQuality): StoredSession {
+    @Test
+    fun completeRecoveredSessionCountsAsASessionButOnlyObservedTimeSetsGoalsAndRecords() {
+        val now = 2_000_000_000_000L
+        val recoveredStart = now - 120_000L
+        val recovered = stored(
+            startedAtMillis = recoveredStart,
+            quality = RecordingQuality.Complete,
+            durationMillis = 120_000L,
+            gaps = listOf(
+                ProcessAbsenceGap(recoveredStart + 30_000L, recoveredStart + 60_000L),
+                ProcessAbsenceGap(recoveredStart + 50_000L, recoveredStart + 80_000L)
+            )
+        )
+        val clean = stored(
+            startedAtMillis = now - 220_000L,
+            quality = RecordingQuality.Complete,
+            durationMillis = 100_000L
+        )
+
+        val recent = selectProgressRollingWeek(listOf(recovered, clean), now)
+
+        assertThat(recent).hasSize(2)
+        // Overlapping recovery gaps are a 50-second union, not a 60-second sum.
+        assertThat(recovered.export.observedEffectiveDurationMillis).isEqualTo(70_000L)
+        assertThat(progressObservedMillis(recent)).isEqualTo(170_000L)
+        assertThat(progressObservedMillis(recent) / 60_000L).isEqualTo(2L)
+        assertThat(progressLongestObservedMillis(recent)).isEqualTo(100_000L)
+    }
+
+    @Test
+    fun gapFreeProgressDurationRemainsTheReviewedDuration() {
+        val clean = stored(
+            startedAtMillis = 1_000L,
+            quality = RecordingQuality.Unreviewed,
+            durationMillis = 90_000L
+        )
+
+        assertThat(clean.export.observedEffectiveDurationMillis).isEqualTo(90_000L)
+        assertThat(progressObservedMillis(listOf(clean))).isEqualTo(90_000L)
+        assertThat(progressLongestObservedMillis(listOf(clean))).isEqualTo(90_000L)
+    }
+
+    private fun stored(
+        startedAtMillis: Long,
+        quality: RecordingQuality,
+        durationMillis: Long = 60_000L,
+        gaps: List<ProcessAbsenceGap> = emptyList()
+    ): StoredSession {
         val id = "session-$startedAtMillis-${quality.name}"
         return StoredSession(
             file = File("$id.json"),
@@ -59,11 +107,11 @@ class ProgressSessionSelectionTest {
                 session = TrainingSession(
                     id = id,
                     startedAtMillis = startedAtMillis,
-                    endedAtMillis = startedAtMillis + 60_000L,
+                    endedAtMillis = startedAtMillis + durationMillis,
                     summary = TrainingSummary(
                         totalShots = 0,
                         shotCounts = emptyMap(),
-                        durationMillis = 60_000L,
+                        durationMillis = durationMillis,
                         averageHeartRate = null,
                         maxHeartRate = null,
                         recoveryScore = 0f,
@@ -71,7 +119,8 @@ class ProgressSessionSelectionTest {
                         effortScore = 0f,
                         heartRateZoneHistogram = emptyMap()
                     ),
-                    shots = emptyList()
+                    shots = emptyList(),
+                    processAbsenceGaps = gaps
                 ),
                 rallyProfile = RallyProfile.EMPTY,
                 context = SessionContext(recordingQuality = quality)

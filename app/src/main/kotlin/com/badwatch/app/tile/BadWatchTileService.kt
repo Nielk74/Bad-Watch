@@ -23,8 +23,6 @@ import com.badwatch.app.R
 import com.badwatch.app.data.SessionStore
 import com.badwatch.app.data.StoredSession
 import com.badwatch.app.ui.components.formatDuration
-import com.badwatch.core.sync.effectiveMetrics
-import com.badwatch.core.sync.reviewedAnalysis
 import com.google.common.util.concurrent.ListenableFuture
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -112,33 +110,33 @@ class BadWatchTileService : TileService() {
         // Home and Tile deliberately promote the same newest usable recording. Unusable
         // evidence remains available in History but cannot become a trusted headline.
         val selection = selectTileSessions(sessions, System.currentTimeMillis())
-        val last = selection.latest
-        val week = selection.rollingWeek
+        val summary = selection.summary()
 
-        val content: LayoutElementBuilders.LayoutElement = if (last == null) {
+        val content: LayoutElementBuilders.LayoutElement = if (summary == null) {
             bodyText(getString(R.string.tile_empty), color = COLOR_TEXT_DIM)
         } else {
-            val reviewed = last.export.reviewedAnalysis()
-            val hits = reviewed.metrics.correctedDetectedHitCount
-            val exchanges = reviewed.rallyProfile.rallyCount
+            val latestText = getString(
+                R.string.tile_last,
+                resources.getQuantityString(
+                    R.plurals.common_detected_hits_count,
+                    summary.detectedHitCount,
+                    summary.detectedHitCount
+                ),
+                resources.getQuantityString(
+                    R.plurals.common_exchanges_count,
+                    summary.exchangeCount,
+                    summary.exchangeCount
+                ),
+                formatDuration(summary.reviewedDurationMillis)
+            ) + summary.knownUnobservedMillis?.let { unobservedMillis ->
+                " · " + getString(
+                    R.string.session_known_unobserved_compact,
+                    formatDuration(unobservedMillis)
+                )
+            }.orEmpty()
             LayoutElementBuilders.Column.Builder()
                 .addContent(
-                    bodyText(
-                        getString(
-                            R.string.tile_last,
-                            resources.getQuantityString(
-                                R.plurals.common_detected_hits_count,
-                                hits,
-                                hits
-                            ),
-                            resources.getQuantityString(
-                                R.plurals.common_exchanges_count,
-                                exchanges,
-                                exchanges
-                            ),
-                            formatDuration(reviewed.window.durationMillis)
-                        )
-                    )
+                    bodyText(latestText)
                 )
                 .addContent(
                     bodyText(
@@ -146,18 +144,14 @@ class BadWatchTileService : TileService() {
                             R.string.tile_this_week,
                             resources.getQuantityString(
                                 R.plurals.common_sessions_count,
-                                week.size,
-                                week.size
+                                summary.rollingWeekSessionCount,
+                                summary.rollingWeekSessionCount
                             ),
-                            week.sumOf {
-                                it.export.effectiveMetrics().correctedDetectedHitCount
-                            }.let { hitsThisWeek ->
-                                resources.getQuantityString(
-                                    R.plurals.common_detected_hits_count,
-                                    hitsThisWeek,
-                                    hitsThisWeek
-                                )
-                            }
+                            resources.getQuantityString(
+                                R.plurals.common_detected_hits_count,
+                                summary.rollingWeekDetectedHitCount,
+                                summary.rollingWeekDetectedHitCount
+                            )
                         ),
                         color = COLOR_TEXT_DIM
                     )
