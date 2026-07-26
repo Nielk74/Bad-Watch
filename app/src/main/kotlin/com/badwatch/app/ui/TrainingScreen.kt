@@ -33,6 +33,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -416,39 +417,68 @@ private fun ActiveShadowCue(
     val corner = requireNotNull(routine.currentCorner)
     val cueNumber = routine.completedRepetitions + 1
     val accent = corner.accentColor()
+    val usesLargeTextLayout = shadowUsesLargeTextLayout(LocalDensity.current.fontScale)
+    val warningReflow = usesLargeTextLayout && storageWarning != null
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 22.dp, vertical = 21.dp),
+            .padding(
+                horizontal = 22.dp,
+                vertical = if (usesLargeTextLayout) 4.dp else 21.dp
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = stringResource(
+        if (!warningReflow) {
+            val progressLabel = stringResource(
                 R.string.training_cue_progress,
                 cueNumber,
                 routine.targetRepetitions
-            ),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(3.dp))
-        CourtCueGrid(corner = corner, accent = accent)
-        Spacer(modifier = Modifier.height(3.dp))
+            )
+            if (usesLargeTextLayout) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CourtCueGrid(corner = corner, accent = accent, compact = true)
+                    Text(
+                        text = "$cueNumber/${routine.targetRepetitions}",
+                        modifier = Modifier.semantics { contentDescription = progressLabel },
+                        style = MaterialTheme.typography.bodyExtraSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                Text(
+                    text = progressLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                CourtCueGrid(corner = corner, accent = accent)
+            }
+            Spacer(modifier = Modifier.height(if (usesLargeTextLayout) 1.dp else 3.dp))
+        }
         Text(
             text = stringResource(corner.displayNameResource).uppercase(Locale.getDefault()),
             modifier = Modifier.fillMaxWidth(),
-            style = MaterialTheme.typography.titleLarge,
+            style = if (usesLargeTextLayout) {
+                MaterialTheme.typography.titleMedium
+            } else {
+                MaterialTheme.typography.titleLarge
+            },
             color = accent,
             textAlign = TextAlign.Center,
-            maxLines = 1
+            maxLines = if (usesLargeTextLayout) 2 else 1
         )
-        Text(
-            text = stringResource(R.string.training_racket_side_reference),
-            style = MaterialTheme.typography.bodyExtraSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        if (!usesLargeTextLayout) {
+            Text(
+                text = stringResource(R.string.training_racket_side_reference),
+                style = MaterialTheme.typography.bodyExtraSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         storageWarning?.let { warning ->
             Text(
                 text = warning,
@@ -457,13 +487,21 @@ private fun ActiveShadowCue(
                 textAlign = TextAlign.Center
             )
         }
-        Spacer(modifier = Modifier.height(5.dp))
-        Button(
-            onClick = onConfirm,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(stringResource(R.string.training_confirm_base)) },
-            secondaryLabel = { Text(stringResource(R.string.training_confirm_next)) }
-        )
+        Spacer(modifier = Modifier.height(if (usesLargeTextLayout) 2.dp else 5.dp))
+        if (usesLargeTextLayout) {
+            Button(
+                onClick = onConfirm,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.training_confirm_base)) }
+            )
+        } else {
+            Button(
+                onClick = onConfirm,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.training_confirm_base)) },
+                secondaryLabel = { Text(stringResource(R.string.training_confirm_next)) }
+            )
+        }
         val pauseLabel = stringResource(R.string.training_pause_routine)
         Row(
             modifier = Modifier
@@ -487,7 +525,7 @@ private fun ActiveShadowCue(
 }
 
 @Composable
-private fun CourtCueGrid(corner: CourtCorner, accent: Color) {
+private fun CourtCueGrid(corner: CourtCorner, accent: Color, compact: Boolean = false) {
     val outline = MaterialTheme.colorScheme.outline
     val gridLine = MaterialTheme.colorScheme.outlineVariant
     val cueDescription = stringResource(
@@ -496,8 +534,8 @@ private fun CourtCueGrid(corner: CourtCorner, accent: Color) {
     )
     Canvas(
         modifier = Modifier
-            .width(112.dp)
-            .height(57.dp)
+            .width(if (compact) 80.dp else 112.dp)
+            .height(if (compact) 38.dp else 57.dp)
             .semantics { contentDescription = cueDescription }
     ) {
         val cellWidth = size.width / 2f
@@ -550,52 +588,63 @@ private fun PausedShadowRoutine(
     onFinishEarly: () -> Unit
 ) {
     var confirmFinish by remember { mutableStateOf(false) }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 27.dp, vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = stringResource(R.string.training_paused),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = "${routine.completedRepetitions}/${routine.targetRepetitions}",
-            style = MaterialTheme.typography.numeralLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            text = if (restored) {
-                stringResource(R.string.training_restored)
-            } else {
-                stringResource(R.string.training_timing_stopped)
-            },
-            style = MaterialTheme.typography.bodyExtraSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
+    WatchScreen(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = stringResource(R.string.training_paused),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "${routine.completedRepetitions}/${routine.targetRepetitions}",
+                    style = MaterialTheme.typography.numeralLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = if (restored) {
+                        stringResource(R.string.training_restored)
+                    } else {
+                        stringResource(R.string.training_timing_stopped)
+                    },
+                    style = MaterialTheme.typography.bodyExtraSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
         storageWarning?.let { warning ->
-            Text(
-                text = warning,
-                style = MaterialTheme.typography.bodyExtraSmall,
-                color = MaterialTheme.colorScheme.error,
-                textAlign = TextAlign.Center
+            item {
+                Text(
+                    text = warning,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodyExtraSmall,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+        item {
+            Button(
+                onClick = onResume,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.training_resume)) }
             )
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(
-            onClick = onResume,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(stringResource(R.string.training_resume)) }
-        )
-        CompactButton(
-            onClick = { confirmFinish = true },
-            colors = ButtonDefaults.filledTonalButtonColors(),
-            label = { Text(stringResource(R.string.training_finish_early)) }
-        )
+        item {
+            Button(
+                onClick = { confirmFinish = true },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.filledTonalButtonColors(),
+                label = { Text(stringResource(R.string.training_finish_early)) }
+            )
+        }
+        item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 
     AlertDialog(
@@ -621,6 +670,8 @@ private fun PausedShadowRoutine(
         }
     )
 }
+
+internal fun shadowUsesLargeTextLayout(fontScale: Float): Boolean = fontScale >= 1.2f
 
 @Composable
 private fun CompletedShadowRoutine(

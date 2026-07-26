@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
@@ -58,6 +59,7 @@ import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.CompactButton
+import androidx.wear.compose.material3.FilledTonalIconButton
 import androidx.wear.compose.material3.HorizontalPagerScaffold
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
@@ -347,6 +349,7 @@ private fun ScorePage(
     onUndo: () -> Unit
 ) {
     val haptics = LocalHapticFeedback.current
+    val usesLargeTextLayout = matchUsesLargeTextLayout(LocalDensity.current.fontScale)
 
     Box(
         modifier = Modifier
@@ -409,7 +412,7 @@ private fun ScorePage(
             enabled = canUndo,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .width(92.dp),
+                .width(if (usesLargeTextLayout) 120.dp else 92.dp),
             colors = ButtonDefaults.filledTonalButtonColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 contentColor = MaterialTheme.colorScheme.onSurface
@@ -608,6 +611,7 @@ private fun MatchInterval(
     onUndo: () -> Unit,
     onResume: () -> Unit
 ) {
+    val usesLargeTextLayout = matchUsesLargeTextLayout(LocalDensity.current.fontScale)
     val endMillis = match.intervalEndsAtMillis
     var nowMillis by remember(endMillis) { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(endMillis) {
@@ -668,48 +672,76 @@ private fun MatchInterval(
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
-        Button(
-            onClick = onResume,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(stringResource(R.string.match_resume)) }
-        )
         val undoIntervalLabel = stringResource(R.string.match_undo_interval_point)
-        Row(
-            modifier = Modifier
-                .clip(CircleShape)
-                .defaultMinSize(minHeight = 48.dp)
-                .clickable(
-                    enabled = canUndo,
-                    role = Role.Button,
-                    onClickLabel = undoIntervalLabel,
-                    onClick = onUndo
+        if (usesLargeTextLayout) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = onResume,
+                    modifier = Modifier.weight(1f),
+                    label = { Text(stringResource(R.string.match_resume)) }
                 )
-                .padding(horizontal = 12.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = if (canUndo) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.outline
+                FilledTonalIconButton(
+                    onClick = onUndo,
+                    enabled = canUndo,
+                    modifier = Modifier.semantics {
+                        contentDescription = undoIntervalLabel
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null
+                    )
                 }
+            }
+        } else {
+            Button(
+                onClick = onResume,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.match_resume)) }
             )
-            Text(
-                text = stringResource(R.string.match_undo_point),
-                style = MaterialTheme.typography.labelMedium,
-                color = if (canUndo) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.outline
-                }
-            )
+            Row(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .defaultMinSize(minHeight = 48.dp)
+                    .clickable(
+                        enabled = canUndo,
+                        role = Role.Button,
+                        onClickLabel = undoIntervalLabel,
+                        onClick = onUndo
+                    )
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = if (canUndo) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.outline
+                    }
+                )
+                Text(
+                    text = stringResource(R.string.match_undo_point),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (canUndo) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.outline
+                    }
+                )
+            }
         }
     }
 }
+
+internal fun matchUsesLargeTextLayout(fontScale: Float): Boolean = fontScale >= 1.2f
 
 @Composable
 private fun MatchComplete(
