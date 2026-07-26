@@ -33,9 +33,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -141,6 +144,8 @@ private fun HudPage(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
+    val needsStopClearance = liveHudNeedsStopClearance(LocalDensity.current.fontScale)
+    val stopSaveDescription = stringResource(R.string.live_stop_save)
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Heart-rate as a ring: both zone and fill use this player's estimated maximum.
@@ -161,7 +166,10 @@ private fun HudPage(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 28.dp),
+                .padding(horizontal = 28.dp)
+                // At enlarged text the fixed bottom-edge action grows into the centered HUD.
+                // Reserve its visual lane while leaving the normal glance composition unchanged.
+                .padding(bottom = if (needsStopClearance) 48.dp else 0.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -210,17 +218,29 @@ private fun HudPage(
 
         EdgeButton(
             onClick = onStop,
-            modifier = Modifier.align(Alignment.BottomCenter),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .semantics { contentDescription = stopSaveDescription },
             buttonSize = EdgeButtonSize.Small,
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.errorContainer,
                 contentColor = MaterialTheme.colorScheme.onErrorContainer
             )
         ) {
-            Text(stringResource(R.string.live_stop_save))
+            Text(
+                // Edge buttons narrow sharply on a round display. Keep a compact visible
+                // verb in every locale while the full stop-and-save name remains semantic.
+                text = stringResource(R.string.live_finish),
+                style = MaterialTheme.typography.labelSmall,
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
         }
     }
 }
+
+/** The compact edge action needs a separate lane once system text reaches accessibility size. */
+internal fun liveHudNeedsStopClearance(fontScale: Float): Boolean = fontScale >= 1.2f
 
 /**
  * The count snaps back to rest with a spring every time it changes — the player *feels* a

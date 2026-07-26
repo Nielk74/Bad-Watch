@@ -7,6 +7,7 @@
     <string name="live_heart_rate_line">%1$s bpm · %2$s</string>
     <string name="live_heart_rate_only">%1$s bpm</string>
     <string name="live_stop_save">Stop &amp; save</string>
+    <string name="live_finish">Finish</string>
     <string name="live_detected_play">Detected play</string>
     <string name="live_rally_bursts">Detected exchanges</string>
     <string name="live_average_hits">Avg hits</string>
