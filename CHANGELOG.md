@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-26
+
 ### Product and interface
 
 - Completed the Wear Material 3 compliance pass: idle-time browsing now runs on
