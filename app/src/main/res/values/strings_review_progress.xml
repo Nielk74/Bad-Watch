@@ -29,6 +29,7 @@
     <string name="summary_hr_zones">Distinct HR samples · Z1 to Z5</string>
     <string name="summary_hr_distribution">Heart-rate samples across personalized zones Z1 to Z5</string>
     <string name="summary_stroke_mix">Provisional stroke mix</string>
+    <string name="summary_stroke_mix_distribution">Provisional stroke mix across detected shot types</string>
     <string name="summary_review_trail">Review trail</string>
     <string name="summary_raw_events">Raw detected events</string>
     <string name="summary_outside_time">Outside reviewed time</string>

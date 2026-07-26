@@ -82,7 +82,6 @@
     <string name="training_racket_side_reference">Repère côté raquette</string>
     <string name="training_confirm_base">Je suis revenu au centre</string>
     <string name="training_confirm_next">Confirmer · indication suivante</string>
-    <string name="training_pause_routine">Mettre la routine de shadow en pause</string>
     <string name="training_court_cue">Indication de terrain : %1$s</string>
     <string name="training_paused">SHADOW EN PAUSE</string>
     <string name="training_restored">Routine restaurée. Le temps de redémarrage non observé ne sera pas compté.</string>

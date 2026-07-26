@@ -3,7 +3,6 @@ package com.badwatch.app.ui
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -109,7 +108,5 @@ fun OnboardingScreen(onConfirm: (Handedness) -> Unit) {
                 label = { Text(stringResource(R.string.handedness_left)) }
             )
         }
-
-        item { Spacer(modifier = Modifier.height(48.dp)) }
     }
 }

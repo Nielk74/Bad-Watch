@@ -1,8 +1,7 @@
 package com.badwatch.app.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
@@ -13,22 +12,21 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.material3.CompactButton
+import androidx.wear.compose.material3.CheckboxButton
 import androidx.wear.compose.material3.EdgeButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.Stepper
 import androidx.wear.compose.material3.Text
-import androidx.wear.compose.material3.TitleCard
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import com.badwatch.app.ui.components.InfoCard
 import com.badwatch.app.R
 import com.badwatch.app.ui.components.ScreenHeader
@@ -124,33 +122,99 @@ fun SessionCorrectionScreen(
         }
 
         item {
-            CorrectionStepper(
-                label = stringResource(R.string.correction_missed_hits),
-                value = missedHitCount.toString(),
-                enabled = !isSaving,
-                onDecrease = { missedHitCount = (missedHitCount - 1).coerceAtLeast(0) },
-                onIncrease = { missedHitCount = (missedHitCount + 1).coerceAtMost(999) }
-            )
+            val label = stringResource(R.string.correction_missed_hits)
+            InfoCard(title = label) {
+                Stepper(
+                    value = missedHitCount,
+                    onValueChange = { missedHitCount = it },
+                    valueProgression = 0..999,
+                    decreaseIcon = {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.a11y_decrease, label)
+                        )
+                    },
+                    increaseIcon = {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowUp,
+                            contentDescription = stringResource(R.string.a11y_increase, label)
+                        )
+                    },
+                    enabled = !isSaving
+                ) {
+                    Text(
+                        text = missedHitCount.toString(),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
         }
 
         item {
-            CorrectionStepper(
-                label = stringResource(R.string.correction_trim_start),
-                value = formatDuration(trimFromStartMillis),
-                enabled = !isSaving,
-                onDecrease = { changeStart(-TRIM_STEP_MILLIS) },
-                onIncrease = { changeStart(TRIM_STEP_MILLIS) }
-            )
+            val label = stringResource(R.string.correction_trim_start)
+            val maxSteps = ((duration - trimFromEndMillis).coerceAtLeast(0L) / TRIM_STEP_MILLIS).toInt()
+            InfoCard(title = label) {
+                Stepper(
+                    value = (trimFromStartMillis / TRIM_STEP_MILLIS).toInt(),
+                    onValueChange = { steps ->
+                        changeStart(steps * TRIM_STEP_MILLIS - trimFromStartMillis)
+                    },
+                    valueProgression = 0..maxSteps,
+                    decreaseIcon = {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.a11y_decrease, label)
+                        )
+                    },
+                    increaseIcon = {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowUp,
+                            contentDescription = stringResource(R.string.a11y_increase, label)
+                        )
+                    },
+                    enabled = !isSaving
+                ) {
+                    Text(
+                        text = formatDuration(trimFromStartMillis),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
         }
 
         item {
-            CorrectionStepper(
-                label = stringResource(R.string.correction_trim_end),
-                value = formatDuration(trimFromEndMillis),
-                enabled = !isSaving,
-                onDecrease = { changeEnd(-TRIM_STEP_MILLIS) },
-                onIncrease = { changeEnd(TRIM_STEP_MILLIS) }
-            )
+            val label = stringResource(R.string.correction_trim_end)
+            val maxSteps = ((duration - trimFromStartMillis).coerceAtLeast(0L) / TRIM_STEP_MILLIS).toInt()
+            InfoCard(title = label) {
+                Stepper(
+                    value = (trimFromEndMillis / TRIM_STEP_MILLIS).toInt(),
+                    onValueChange = { steps ->
+                        changeEnd(steps * TRIM_STEP_MILLIS - trimFromEndMillis)
+                    },
+                    valueProgression = 0..maxSteps,
+                    decreaseIcon = {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.a11y_decrease, label)
+                        )
+                    },
+                    increaseIcon = {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowUp,
+                            contentDescription = stringResource(R.string.a11y_increase, label)
+                        )
+                    },
+                    enabled = !isSaving
+                ) {
+                    Text(
+                        text = formatDuration(trimFromEndMillis),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
         }
 
         val recent = export.session.shots.takeLast(MAX_REVIEWABLE_HITS).asReversed()
@@ -186,20 +250,38 @@ fun SessionCorrectionScreen(
                         R.string.correction_state_detected
                     }
                 )
-                TitleCard(
-                    enabled = !isSaving,
-                    onClick = {
-                        falseHitIds = if (markedFalse) {
-                            falseHitIds - hit.id
-                        } else {
+                CheckboxButton(
+                    checked = markedFalse,
+                    onCheckedChange = { checked ->
+                        falseHitIds = if (checked) {
                             falseHitIds + hit.id
+                        } else {
+                            falseHitIds - hit.id
                         }
                     },
-                    modifier = Modifier.semantics {
-                        selected = markedFalse
-                        stateDescription = hitState
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { stateDescription = hitState },
+                    enabled = !isSaving,
+                    secondaryLabel = {
+                        Column {
+                            Text(stringResource(R.string.correction_offset, formatDuration(offset)))
+                            Text(
+                                text = if (markedFalse) {
+                                    stringResource(R.string.correction_restore)
+                                } else {
+                                    stringResource(R.string.correction_mark_false)
+                                },
+                                style = MaterialTheme.typography.bodyExtraSmall,
+                                color = if (markedFalse) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                        }
                     },
-                    title = {
+                    label = {
                         Text(
                             if (markedFalse) {
                                 stringResource(R.string.correction_marked_false)
@@ -207,65 +289,9 @@ fun SessionCorrectionScreen(
                                 hit.type.provisionalDisplayName()
                             }
                         )
-                    },
-                    time = {
-                        Text(stringResource(R.string.correction_offset, formatDuration(offset)))
                     }
-                ) {
-                    Text(
-                        text = if (markedFalse) {
-                            stringResource(R.string.correction_restore)
-                        } else {
-                            stringResource(R.string.correction_mark_false)
-                        },
-                        style = MaterialTheme.typography.bodyExtraSmall,
-                        color = if (markedFalse) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    )
-                }
+                )
             }
-        }
-
-        item { Spacer(modifier = Modifier.size(40.dp)) }
-    }
-}
-
-@Composable
-private fun CorrectionStepper(
-    label: String,
-    value: String,
-    enabled: Boolean,
-    onDecrease: () -> Unit,
-    onIncrease: () -> Unit
-) {
-    val decreaseDescription = stringResource(R.string.a11y_decrease, label)
-    val increaseDescription = stringResource(R.string.a11y_increase, label)
-    InfoCard(title = label) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            CompactButton(
-                onClick = onDecrease,
-                enabled = enabled,
-                modifier = Modifier.semantics { contentDescription = decreaseDescription },
-                label = { Text("−") }
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            CompactButton(
-                onClick = onIncrease,
-                enabled = enabled,
-                modifier = Modifier.semantics { contentDescription = increaseDescription },
-                label = { Text("+") }
-            )
         }
     }
 }

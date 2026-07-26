@@ -1,19 +1,16 @@
 package com.badwatch.app.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.wear.compose.material3.CompactButton
+import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.Stepper
 import androidx.wear.compose.material3.Text
 import com.badwatch.app.R
 import com.badwatch.app.data.StoredSession
@@ -39,7 +36,7 @@ import java.util.concurrent.TimeUnit
 
 /** Goals, personal records, and a context-specific history profile in one watch-sized view. */
 @Composable
-fun ProgressScreen(viewModel: BadWatchViewModel, onBack: () -> Unit) {
+fun ProgressScreen(viewModel: BadWatchViewModel) {
     val history by viewModel.history.collectAsStateWithLifecycle()
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     val sessionGoal by viewModel.weeklySessionGoal.collectAsStateWithLifecycle()
@@ -50,8 +47,7 @@ fun ProgressScreen(viewModel: BadWatchViewModel, onBack: () -> Unit) {
         experience = profile.experience,
         sessionGoal = sessionGoal,
         minuteGoal = minuteGoal,
-        onGoalsChanged = viewModel::setWeeklyGoals,
-        onBack = onBack
+        onGoalsChanged = viewModel::setWeeklyGoals
     )
 }
 
@@ -61,8 +57,7 @@ private fun ProgressContent(
     experience: SelfReportedExperience,
     sessionGoal: Int,
     minuteGoal: Int,
-    onGoalsChanged: (Int, Int) -> Unit,
-    onBack: () -> Unit
+    onGoalsChanged: (Int, Int) -> Unit
 ) {
     val nowMillis = System.currentTimeMillis()
     val usable = selectProgressUsableHistory(history, nowMillis)
@@ -95,23 +90,61 @@ private fun ProgressContent(
         }
 
         item {
-            GoalStepper(
-                label = stringResource(R.string.progress_session_goal),
-                value = sessionGoal,
-                valueLabel = stringResource(R.string.progress_sessions_seven_days, sessionGoal),
-                onDecrease = { onGoalsChanged((sessionGoal - 1).coerceAtLeast(1), minuteGoal) },
-                onIncrease = { onGoalsChanged((sessionGoal + 1).coerceAtMost(7), minuteGoal) }
-            )
+            val label = stringResource(R.string.progress_session_goal)
+            InfoCard(title = label) {
+                Stepper(
+                    value = sessionGoal,
+                    onValueChange = { onGoalsChanged(it, minuteGoal) },
+                    valueProgression = 1..7,
+                    decreaseIcon = {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.a11y_decrease, label)
+                        )
+                    },
+                    increaseIcon = {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowUp,
+                            contentDescription = stringResource(R.string.a11y_increase, label)
+                        )
+                    }
+                ) {
+                    Text(
+                        text = stringResource(R.string.progress_sessions_seven_days, sessionGoal),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
         }
 
         item {
-            GoalStepper(
-                label = stringResource(R.string.progress_time_goal),
-                value = minuteGoal,
-                valueLabel = stringResource(R.string.progress_minutes_seven_days, minuteGoal),
-                onDecrease = { onGoalsChanged(sessionGoal, (minuteGoal - 30).coerceAtLeast(30)) },
-                onIncrease = { onGoalsChanged(sessionGoal, (minuteGoal + 30).coerceAtMost(600)) }
-            )
+            val label = stringResource(R.string.progress_time_goal)
+            InfoCard(title = label) {
+                Stepper(
+                    value = minuteGoal,
+                    onValueChange = { onGoalsChanged(sessionGoal, it) },
+                    valueProgression = 30..600 step 30,
+                    decreaseIcon = {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.a11y_decrease, label)
+                        )
+                    },
+                    increaseIcon = {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowUp,
+                            contentDescription = stringResource(R.string.a11y_increase, label)
+                        )
+                    }
+                ) {
+                    Text(
+                        text = stringResource(R.string.progress_minutes_seven_days, minuteGoal),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
         }
 
         item {
@@ -254,14 +287,6 @@ private fun ProgressContent(
                 }
             }
         }
-
-        item {
-            CompactButton(
-                onClick = onBack,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.action_back)) }
-            )
-        }
     }
 }
 
@@ -291,41 +316,6 @@ internal fun progressObservedMillis(history: List<StoredSession>): Long =
 
 internal fun progressLongestObservedMillis(history: List<StoredSession>): Long =
     history.maxOfOrNull { it.export.observedEffectiveDurationMillis } ?: 0L
-
-@Composable
-private fun GoalStepper(
-    label: String,
-    value: Int,
-    valueLabel: String,
-    onDecrease: () -> Unit,
-    onIncrease: () -> Unit
-) {
-    val decreaseDescription = stringResource(R.string.a11y_decrease, label)
-    val increaseDescription = stringResource(R.string.a11y_increase, label)
-    InfoCard(title = label) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            CompactButton(
-                onClick = onDecrease,
-                modifier = Modifier.semantics { contentDescription = decreaseDescription },
-                label = { Text("−") }
-            )
-            Text(
-                text = valueLabel,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            CompactButton(
-                onClick = onIncrease,
-                modifier = Modifier.semantics { contentDescription = increaseDescription },
-                label = { Text("+") }
-            )
-        }
-    }
-}
 
 @Composable
 private fun com.badwatch.core.sync.SessionComparisonKey.displayName(): String {

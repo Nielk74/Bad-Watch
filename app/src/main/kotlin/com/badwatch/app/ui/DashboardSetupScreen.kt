@@ -23,6 +23,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.wear.compose.material3.AlertDialog
+import androidx.wear.compose.material3.AlertDialogDefaults
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CompactButton
@@ -39,11 +41,12 @@ import com.badwatch.app.ui.theme.CourtColors
 
 /** Release-safe self-hosted dashboard setup using the watch's normal keyboard/voice input. */
 @Composable
-fun DashboardSetupScreen(viewModel: BadWatchViewModel, onBack: () -> Unit) {
+fun DashboardSetupScreen(viewModel: BadWatchViewModel) {
     val savedUrl by viewModel.dashboardUrl.collectAsStateWithLifecycle()
     val connection by viewModel.dashboardConnection.collectAsStateWithLifecycle()
     var url by remember(savedUrl) { mutableStateOf(savedUrl.orEmpty()) }
     var replacementToken by remember { mutableStateOf("") }
+    var showRemoveConfirm by remember { mutableStateOf(false) }
 
     WatchScreen {
         item { ScreenHeader(stringResource(R.string.dashboard_setup_title)) }
@@ -135,11 +138,7 @@ fun DashboardSetupScreen(viewModel: BadWatchViewModel, onBack: () -> Unit) {
         if (savedUrl != null) {
             item {
                 CompactButton(
-                    onClick = {
-                        viewModel.clearDashboard()
-                        url = ""
-                        replacementToken = ""
-                    },
+                    onClick = { showRemoveConfirm = true },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -149,15 +148,27 @@ fun DashboardSetupScreen(viewModel: BadWatchViewModel, onBack: () -> Unit) {
                 )
             }
         }
-
-        item {
-            CompactButton(
-                onClick = onBack,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.action_back)) }
-            )
-        }
     }
+
+    AlertDialog(
+        visible = showRemoveConfirm,
+        onDismissRequest = { showRemoveConfirm = false },
+        confirmButton = {
+            AlertDialogDefaults.ConfirmButton(
+                onClick = {
+                    showRemoveConfirm = false
+                    viewModel.clearDashboard()
+                    url = ""
+                    replacementToken = ""
+                }
+            )
+        },
+        dismissButton = {
+            AlertDialogDefaults.DismissButton(onClick = { showRemoveConfirm = false })
+        },
+        title = { Text(stringResource(R.string.dashboard_remove_question)) },
+        text = { Text(stringResource(R.string.dashboard_remove_body)) }
+    )
 }
 
 @Composable

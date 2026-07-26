@@ -30,8 +30,10 @@ import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.EdgeButton
 import androidx.wear.compose.material3.EdgeButtonSize
+import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TitleCard
 import com.badwatch.app.R
@@ -112,7 +114,7 @@ fun CapturePickerScreen(
         }
 
         item {
-            CompactButton(
+            FilledTonalButton(
                 onClick = onBack,
                 colors = ButtonDefaults.filledTonalButtonColors(),
                 label = { Text(stringResource(R.string.action_back)) }
@@ -141,79 +143,81 @@ fun CaptureScreen(
 ) {
     var confirmCancel by remember { mutableStateOf(false) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                // Reserve the lower arc for the EdgeButton. Without this inset the compact
-                // correction row sat underneath "Save drill" on a 480 px round display.
-                .padding(start = 28.dp, end = 28.dp, bottom = 96.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = state.label.displayName().uppercase(Locale.getDefault()),
-                style = MaterialTheme.typography.labelSmall,
-                color = state.label.color()
-            )
-            Text(
-                text = state.keptCount.toString(),
-                style = MaterialTheme.typography.numeralExtraLarge,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = stringResource(
-                    if (state.keptCount == 1) {
-                        R.string.capture_swing_unit_one
-                    } else {
-                        R.string.capture_swing_unit_other
-                    }
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            val lastKept = state.swings.lastOrNull { !it.discarded }
-            Text(
-                text = if (lastKept == null) {
-                    stringResource(R.string.capture_waiting_swing)
-                } else {
-                    stringResource(R.string.capture_last_peak, lastKept.peakAngularVelocity)
-                },
-                style = MaterialTheme.typography.bodyExtraSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-            Row(
-                modifier = Modifier.padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ScreenScaffold { contentPadding ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    // The scaffold's insets replace the hand-rolled reserve for the lower arc
+                    // the EdgeButton docks into.
+                    .padding(contentPadding),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                CompactButton(
-                    onClick = onDiscardLast,
-                    enabled = state.keptCount > 0,
-                    colors = ButtonDefaults.filledTonalButtonColors(),
-                    label = { Text(stringResource(R.string.capture_drop_last)) }
+                Text(
+                    text = state.label.displayName().uppercase(Locale.getDefault()),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = state.label.color()
                 )
-                CompactButton(
-                    onClick = {
-                        if (state.keptCount == 0) onCancel() else confirmCancel = true
-                    },
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
-                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                Text(
+                    text = state.keptCount.toString(),
+                    style = MaterialTheme.typography.numeralExtraLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = stringResource(
+                        if (state.keptCount == 1) {
+                            R.string.capture_swing_unit_one
+                        } else {
+                            R.string.capture_swing_unit_other
+                        }
                     ),
-                    label = { Text(stringResource(R.string.action_cancel)) }
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                val lastKept = state.swings.lastOrNull { !it.discarded }
+                Text(
+                    text = if (lastKept == null) {
+                        stringResource(R.string.capture_waiting_swing)
+                    } else {
+                        stringResource(R.string.capture_last_peak, lastKept.peakAngularVelocity)
+                    },
+                    style = MaterialTheme.typography.bodyExtraSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                Row(
+                    modifier = Modifier.padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CompactButton(
+                        onClick = onDiscardLast,
+                        enabled = state.keptCount > 0,
+                        colors = ButtonDefaults.filledTonalButtonColors(),
+                        label = { Text(stringResource(R.string.capture_drop_last)) }
+                    )
+                    CompactButton(
+                        onClick = {
+                            if (state.keptCount == 0) onCancel() else confirmCancel = true
+                        },
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        ),
+                        label = { Text(stringResource(R.string.action_cancel)) }
+                    )
+                }
             }
-        }
 
-        EdgeButton(
-            onClick = onFinish,
-            enabled = state.keptCount > 0,
-            modifier = Modifier.align(Alignment.BottomCenter),
-            buttonSize = EdgeButtonSize.Small
-        ) {
-            Text(stringResource(R.string.capture_save_drill))
+            EdgeButton(
+                onClick = onFinish,
+                enabled = state.keptCount > 0,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                buttonSize = EdgeButtonSize.Small
+            ) {
+                Text(stringResource(R.string.capture_save_drill))
+            }
         }
     }
 

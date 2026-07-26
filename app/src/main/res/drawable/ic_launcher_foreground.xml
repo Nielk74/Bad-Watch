@@ -8,37 +8,66 @@
         android:fillColor="#05080B"
         android:pathData="M54,4a50,50 0,1 1,0 100a50,50 0,1 1,0 -100" />
 
-    <!-- A quiet badminton-court grid gives the mark structure at launcher size. -->
-    <path
-        android:fillColor="@android:color/transparent"
-        android:pathData="M17,27L91,27L91,81L17,81Z M54,27L54,81 M17,54L91,54"
-        android:strokeColor="#24414B"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:strokeWidth="2" />
+    <!-- Shuttlecock, tilted for motion, sized to fill the safe zone. -->
+    <group
+        android:rotation="-14"
+        android:pivotX="54"
+        android:pivotY="54">
 
-    <!-- Three clean feathers, tilted into motion. -->
-    <path
-        android:fillColor="#9CCBFF"
-        android:pathData="M26,23L37,19L60,59L52,64Z" />
-    <path
-        android:fillColor="#CDBDFF"
-        android:pathData="M40,17L52,16L66,57L58,61Z" />
-    <path
-        android:fillColor="#3EF2BE"
-        android:pathData="M55,18L67,22L72,57L65,59Z" />
+        <!-- Five feathers fanning from the cork, outer first so the center
+             lavender quill sits on top. Round caps give rounded tips. -->
+        <path
+            android:fillColor="@android:color/transparent"
+            android:pathData="M48,66L25.7,35.3"
+            android:strokeColor="#5E9BFF"
+            android:strokeLineCap="round"
+            android:strokeWidth="6.5" />
+        <path
+            android:fillColor="@android:color/transparent"
+            android:pathData="M60,66L82.3,35.3"
+            android:strokeColor="#3EF2BE"
+            android:strokeLineCap="round"
+            android:strokeWidth="6.5" />
+        <path
+            android:fillColor="@android:color/transparent"
+            android:pathData="M51,66L38,26.1"
+            android:strokeColor="#9CCBFF"
+            android:strokeLineCap="round"
+            android:strokeWidth="6.5" />
+        <path
+            android:fillColor="@android:color/transparent"
+            android:pathData="M57,66L70,26.1"
+            android:strokeColor="#6FE3C1"
+            android:strokeLineCap="round"
+            android:strokeWidth="6.5" />
+        <path
+            android:fillColor="@android:color/transparent"
+            android:pathData="M54,66L54,22"
+            android:strokeColor="#CDBDFF"
+            android:strokeLineCap="round"
+            android:strokeWidth="6.5" />
 
-    <!-- Feather binding and warm cork make the shuttle readable at 24 px. -->
-    <path
-        android:fillColor="@android:color/transparent"
-        android:pathData="M52,63L72,56"
-        android:strokeColor="#E2EAF2"
-        android:strokeLineCap="round"
-        android:strokeWidth="3" />
-    <path
-        android:fillColor="#FFB967"
-        android:pathData="M70,56C78,56 84,62 84,70C84,78 78,84 70,84C62,84 56,78 56,70C56,62 62,56 70,56Z" />
-    <path
-        android:fillColor="#00291F"
-        android:pathData="M70,61C75,61 79,65 79,70C79,75 75,79 70,79C65,79 61,75 61,70C61,65 65,61 70,61Z" />
+        <!-- Wrapped tape: main band plus a thin second seam. -->
+        <path
+            android:fillColor="@android:color/transparent"
+            android:pathData="M43,56L65,56"
+            android:strokeColor="#E2EAF2"
+            android:strokeLineCap="round"
+            android:strokeWidth="5" />
+        <path
+            android:fillColor="@android:color/transparent"
+            android:pathData="M44.5,60.5L63.5,60.5"
+            android:strokeAlpha="0.75"
+            android:strokeColor="#E2EAF2"
+            android:strokeLineCap="round"
+            android:strokeWidth="1.8" />
+
+        <!-- Solid cork with a small highlight instead of a dark center hole. -->
+        <path
+            android:fillColor="#FFB967"
+            android:pathData="M54,62a12,12 0,1 1,0 24a12,12 0,1 1,0 -24" />
+        <path
+            android:fillColor="#FFD9A3"
+            android:pathData="M50,66.8a3.2,3.2 0,1 1,0 6.4a3.2,3.2 0,1 1,0 -6.4" />
+    </group>
 </vector>

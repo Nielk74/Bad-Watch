@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.AlertDialog
 import androidx.wear.compose.material3.AlertDialogDefaults
+import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.CompactButton
@@ -126,7 +127,7 @@ fun ErrorScreen(
         // only appear at the end of a Wear list; at enlarged text that made Discard look like
         // the primary choice while Dismiss was still below the fold.
         item {
-            CompactButton(
+            Button(
                 onClick = {
                     if (confirmPrimaryAction) confirmDiscard = true else onDismiss()
                 },
@@ -162,6 +163,9 @@ fun ErrorScreen(
                     if (confirmPrimaryAction) onDismiss() else onDiscardRecovery?.invoke()
                 }
             )
+        },
+        dismissButton = {
+            AlertDialogDefaults.DismissButton(onClick = { confirmDiscard = false })
         },
         title = { Text(stringResource(discardQuestionResource)) },
         text = { Text(stringResource(discardBodyResource)) }

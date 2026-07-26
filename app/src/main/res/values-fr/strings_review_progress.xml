@@ -29,6 +29,7 @@
     <string name="summary_hr_zones">Échantillons FC distincts · Z1 à Z5</string>
     <string name="summary_hr_distribution">Échantillons de fréquence cardiaque dans les zones personnalisées Z1 à Z5</string>
     <string name="summary_stroke_mix">Répartition provisoire des frappes</string>
+    <string name="summary_stroke_mix_distribution">Répartition provisoire des types de frappes détectées</string>
     <string name="summary_review_trail">Historique de vérification</string>
     <string name="summary_raw_events">Événements bruts détectés</string>
     <string name="summary_outside_time">Hors de la durée vérifiée</string>

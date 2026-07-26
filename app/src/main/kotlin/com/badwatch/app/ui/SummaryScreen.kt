@@ -37,6 +37,7 @@ import com.badwatch.app.ui.components.color
 import com.badwatch.app.ui.components.formatDuration
 import com.badwatch.app.ui.components.formatHeartRate
 import com.badwatch.app.ui.components.formatRestRatio
+import com.badwatch.app.ui.components.hrZoneColor
 import com.badwatch.app.ui.components.hrZoneLabel
 import com.badwatch.app.ui.components.provisionalDisplayName
 import com.badwatch.core.insight.Insight
@@ -272,11 +273,20 @@ fun SummaryScreen(
                     stringResource(R.string.label_average),
                     stringResource(R.string.format_bpm, formatHeartRate(summary.averageHeartRate))
                 )
-                DetailRow(
-                    stringResource(R.string.label_peak),
-                    stringResource(R.string.format_bpm, formatHeartRate(summary.maxHeartRate)),
-                    valueColor = MaterialTheme.colorScheme.error
-                )
+                if (stored.profile.hasConfiguredMaxHeartRate) {
+                    DetailRow(
+                        stringResource(R.string.label_peak),
+                        stringResource(R.string.format_bpm, formatHeartRate(summary.maxHeartRate)),
+                        // A peak is a measurement, not an error — tint it with the player's
+                        // own zone color rather than the reserved error role.
+                        valueColor = hrZoneColor(summary.maxHeartRate, stored.profile.maxHeartRate)
+                    )
+                } else {
+                    DetailRow(
+                        stringResource(R.string.label_peak),
+                        stringResource(R.string.format_bpm, formatHeartRate(summary.maxHeartRate))
+                    )
+                }
                 if (stored.profile.hasConfiguredMaxHeartRate) {
                     DetailRow(
                         stringResource(R.string.summary_peak_zone),
@@ -346,7 +356,8 @@ fun SummaryScreen(
                                 color = type.color(),
                                 fraction = count.toFloat() / total
                             )
-                        }
+                        },
+                        contentDescription = stringResource(R.string.summary_stroke_mix_distribution)
                     )
                     sorted.forEach { (type, count) ->
                         Row(

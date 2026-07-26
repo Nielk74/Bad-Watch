@@ -12,7 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.ButtonDefaults
-import androidx.wear.compose.material3.CompactButton
+import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TitleCard
@@ -152,7 +152,7 @@ fun SessionReviewScreen(
                     }
                 }
                 item {
-                    CompactButton(
+                    FilledTonalButton(
                         onClick = onSkip,
                         enabled = !isSaving,
                         modifier = Modifier.fillMaxWidth(),

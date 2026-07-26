@@ -17,9 +17,12 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavHostController
 import androidx.wear.compose.material3.AppScaffold
+import androidx.wear.compose.navigation.SwipeDismissableNavHost
+import androidx.wear.compose.navigation.composable
+import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 import com.badwatch.app.R
-import com.badwatch.app.data.StoredSession
 import com.badwatch.app.domain.CaptureFailureRecovery
 import com.badwatch.app.domain.CaptureState
 import com.badwatch.app.domain.MatchControllerState
@@ -37,9 +40,12 @@ import kotlinx.coroutines.flow.StateFlow
  *
  * Screen selection is driven primarily by [SessionState] rather than by a navigation stack:
  * during play there is exactly one screen that matters, and the app lands on it whenever the
- * player raises their wrist. Local navigation (history, settings, drills) only exists while
- * nothing is recording. Transitions are short crossfades keyed on the *kind* of screen, so
- * live data updates never re-trigger animation.
+ * player raises their wrist. Idle-time browsing (history, settings, drills, match and training
+ * setup) lives in a [SwipeDismissableNavHost] with the platform swipe-to-dismiss gesture, kept
+ * underneath the state-owned frames so an active recording, drill, match, or routine always wins
+ * the screen and the back stack survives it. Transitions between a state frame and the nav host
+ * are short crossfades keyed on the *kind* of frame, so live data updates never re-trigger
+ * animation.
  */
 @Composable
 fun BadWatchApp(
@@ -63,8 +69,7 @@ fun BadWatchApp(
     val ambient by isAmbient.collectAsStateWithLifecycle()
     val ambientNowMillis by ambientTimeMillis.collectAsStateWithLifecycle()
     val detectedHitHaptics by viewModel.detectedHitHaptics.collectAsStateWithLifecycle()
-    var screen by remember { mutableStateOf(Screen.Home) }
-    var detailSession by remember { mutableStateOf<StoredSession?>(null) }
+    val navController = rememberSwipeDismissableNavController()
     val captureFailure = captureState as? CaptureState.Failed
 
     val matchOwnsScreen = (matchState is MatchControllerState.Active ||
@@ -75,12 +80,15 @@ fun BadWatchApp(
         matchState is MatchControllerState.Idle &&
         sessionState is SessionState.Idle && captureState is CaptureState.Idle
 
+    // Only transient end states are handled here; idle-time browsing back is the nav host's
+    // back stack via swipe-to-dismiss, and while match/training owns the screen back dismisses
+    // to the watch face exactly as before.
     BackHandler(
-        enabled = !matchOwnsScreen && !trainingOwnsScreen && (screen != Screen.Home ||
+        enabled = !matchOwnsScreen && !trainingOwnsScreen && (
             sessionState is SessionState.Completed ||
-            sessionState is SessionState.Failed ||
-            captureState is CaptureState.Saved ||
-            captureState is CaptureState.Failed)
+                sessionState is SessionState.Failed ||
+                captureState is CaptureState.Saved ||
+                captureState is CaptureState.Failed)
     ) {
         when {
             sessionState is SessionState.Completed -> viewModel.acknowledge()
@@ -93,9 +101,6 @@ fun BadWatchApp(
                 CaptureFailureRecovery.CancelCapture -> onCancelCapture()
                 CaptureFailureRecovery.RetrySave -> onRetryCaptureSave()
             }
-
-            screen == Screen.SessionDetail -> screen = Screen.History
-            else -> screen = Screen.Home
         }
     }
 
@@ -116,9 +121,7 @@ fun BadWatchApp(
         sessionState = sessionState,
         captureState = captureState,
         matchState = matchState,
-        shadowRoutineState = shadowRoutineState,
-        screen = screen,
-        detailSession = detailSession
+        shadowRoutineState = shadowRoutineState
     )
 
     BadWatchTheme {
@@ -216,7 +219,7 @@ fun BadWatchApp(
                                 insights = target.state.insights,
                                 onDone = {
                                     viewModel.acknowledge()
-                                    screen = Screen.Home
+                                    navController.popBackStackOrNavigate(Routes.HOME)
                                 },
                                 onEditDiary = {
                                     saveError = null
@@ -263,7 +266,7 @@ fun BadWatchApp(
                             onFinish = onFinishCapture,
                             onCancel = {
                                 onCancelCapture()
-                                screen = Screen.Home
+                                navController.popBackStackOrNavigate(Routes.HOME)
                             }
                         )
                     }
@@ -273,17 +276,10 @@ fun BadWatchApp(
                             export = target.state.export,
                             onDone = {
                                 viewModel.acknowledgeCapture()
-                                screen = Screen.Home
+                                navController.popBackStackOrNavigate(Routes.HOME)
                             }
                         )
                     }
-
-                    ScreenFrame.CapturePicker -> CapturePickerScreen(
-                        totalSwings = viewModel.labelledSwingCount
-                            .collectAsStateWithLifecycle().value,
-                        onPick = onStartCapture,
-                        onBack = { screen = Screen.Home }
-                    )
 
                     is ScreenFrame.SessionFailed -> {
                         ErrorScreen(
@@ -321,7 +317,7 @@ fun BadWatchApp(
                         onAcknowledgePrompt = viewModel::acknowledgeMatchPrompt,
                         onClear = {
                             viewModel.clearMatch()
-                            screen = Screen.Home
+                            navController.popBackStackOrNavigate(Routes.HOME)
                         },
                         isAmbient = ambient
                     )
@@ -335,143 +331,17 @@ fun BadWatchApp(
                         onFinishShadowEarly = viewModel::finishShadowRoutineEarly,
                         onClearShadow = {
                             viewModel.clearShadowRoutine()
-                            screen = Screen.Training
+                            navController.popBackStackOrNavigate(Routes.TRAINING)
                         },
                         isAmbient = ambient
                     )
 
-                    ScreenFrame.History -> HistoryScreen(
+                    ScreenFrame.Local -> LocalNavHost(
+                        navController = navController,
                         viewModel = viewModel,
-                        onOpenSession = { stored ->
-                            detailSession = stored
-                            screen = Screen.SessionDetail
-                        },
-                        onBack = { screen = Screen.Home }
-                    )
-
-                    ScreenFrame.Settings -> SettingsScreen(
-                        viewModel = viewModel,
-                        onOpenDashboard = { screen = Screen.Dashboard },
-                        onBack = { screen = Screen.Home }
-                    )
-
-                    ScreenFrame.Dashboard -> DashboardSetupScreen(
-                        viewModel = viewModel,
-                        onBack = { screen = Screen.Settings }
-                    )
-
-                    ScreenFrame.Progress -> ProgressScreen(
-                        viewModel = viewModel,
-                        onBack = { screen = Screen.Home }
-                    )
-
-                    is ScreenFrame.SessionDetail -> {
-                        var detailPage by remember(target.session.export.session.id) {
-                            mutableStateOf(RecapPage.Summary)
-                        }
-                        var saveInProgress by remember(target.session.export.session.id) {
-                            mutableStateOf(false)
-                        }
-                        var saveError by remember(target.session.export.session.id) {
-                            mutableStateOf<String?>(null)
-                        }
-                        val diarySaveFailed = stringResource(R.string.review_save_failed)
-                        val correctionSaveFailed = stringResource(R.string.correction_save_failed)
-                        when (detailPage) {
-                            RecapPage.Review -> SessionReviewScreen(
-                                existingContext = target.session.export.context,
-                                existingReport = target.session.export.report,
-                                onSave = { context, report ->
-                                    if (!saveInProgress) {
-                                        saveInProgress = true
-                                        saveError = null
-                                        viewModel.saveStoredSessionReview(
-                                            export = target.session.export,
-                                            context = context,
-                                            report = report
-                                        ) { result ->
-                                            saveInProgress = false
-                                            result.onSuccess { revised ->
-                                                detailSession = target.session.copy(
-                                                    export = revised,
-                                                    synced = false,
-                                                    syncRejection = null,
-                                                    syncPayloadFingerprint = ""
-                                                )
-                                                detailPage = RecapPage.Summary
-                                            }.onFailure {
-                                                saveError = diarySaveFailed
-                                            }
-                                        }
-                                    }
-                                },
-                                onSkip = { detailPage = RecapPage.Summary },
-                                isSaving = saveInProgress,
-                                saveError = saveError
-                            )
-
-                            RecapPage.Summary -> SummaryScreen(
-                                stored = target.session.export,
-                                insights = viewModel.storedSessionInsights(target.session.export),
-                                onDone = { screen = Screen.History },
-                                onEditDiary = {
-                                    saveError = null
-                                    detailPage = RecapPage.Review
-                                },
-                                onCorrectRecording = {
-                                    saveError = null
-                                    detailPage = RecapPage.Corrections
-                                }
-                            )
-
-                            RecapPage.Corrections -> SessionCorrectionScreen(
-                                export = target.session.export,
-                                onSave = { falseHits, missedHits, trimStart, trimEnd ->
-                                    if (!saveInProgress) {
-                                        saveInProgress = true
-                                        saveError = null
-                                        viewModel.saveStoredSessionCorrections(
-                                            export = target.session.export,
-                                            falseHitIds = falseHits,
-                                            missedHitCount = missedHits,
-                                            trimFromStartMillis = trimStart,
-                                            trimFromEndMillis = trimEnd
-                                        ) { result ->
-                                            saveInProgress = false
-                                            result.onSuccess { revised ->
-                                                detailSession = target.session.copy(
-                                                    export = revised,
-                                                    synced = false,
-                                                    syncRejection = null,
-                                                    syncPayloadFingerprint = ""
-                                                )
-                                                detailPage = RecapPage.Summary
-                                            }.onFailure {
-                                                saveError = correctionSaveFailed
-                                            }
-                                        }
-                                    }
-                                },
-                                onBack = { detailPage = RecapPage.Summary },
-                                isSaving = saveInProgress,
-                                saveError = saveError
-                            )
-                        }
-                    }
-
-                    ScreenFrame.Home -> HomeScreen(
-                        viewModel = viewModel,
-                        onStart = onStartSession,
-                        onOpenHistory = { screen = Screen.History },
-                        onOpenSettings = { screen = Screen.Settings },
-                        onOpenCapture = { screen = Screen.Capture },
-                        onOpenMatch = { screen = Screen.Match },
-                        onOpenTraining = { screen = Screen.Training },
-                        onOpenProgress = { screen = Screen.Progress },
-                        onOpenSession = { stored ->
-                            detailSession = stored
-                            screen = Screen.SessionDetail
-                        }
+                        onStartSession = onStartSession,
+                        onStartCapture = onStartCapture,
+                        ambient = ambient
                     )
                 }
             }
@@ -479,8 +349,233 @@ fun BadWatchApp(
     }
 }
 
-private enum class Screen {
-    Home, History, Settings, Dashboard, Progress, Capture, Match, Training, SessionDetail
+/** Idle-time destinations reachable from Home; back is the platform swipe-to-dismiss gesture. */
+private object Routes {
+    const val HOME = "home"
+    const val HISTORY = "history"
+    const val SETTINGS = "settings"
+    const val DASHBOARD = "dashboard"
+    const val PROGRESS = "progress"
+    const val CAPTURE = "capture"
+    const val MATCH = "match"
+    const val TRAINING = "training"
+    const val SESSION = "session/{sessionId}"
+
+    fun session(sessionId: String) = "session/$sessionId"
+}
+
+/**
+ * Pops to [route] when it is on the back stack, otherwise navigates there. Tiles can start a
+ * session, match, or routine without the destination ever having been pushed, so "return to the
+ * hub" cannot assume the entry is present.
+ */
+private fun NavHostController.popBackStackOrNavigate(route: String) {
+    if (!popBackStack(route, inclusive = false)) {
+        navigate(route) { launchSingleTop = true }
+    }
+}
+
+@Composable
+private fun LocalNavHost(
+    navController: NavHostController,
+    viewModel: BadWatchViewModel,
+    onStartSession: () -> Unit,
+    onStartCapture: (ShotType) -> Unit,
+    ambient: Boolean
+) {
+    val matchState by viewModel.matchState.collectAsStateWithLifecycle()
+    val shadowRoutineState by viewModel.shadowRoutineState.collectAsStateWithLifecycle()
+    SwipeDismissableNavHost(
+        navController = navController,
+        startDestination = Routes.HOME
+    ) {
+        composable(Routes.HOME) {
+            HomeScreen(
+                viewModel = viewModel,
+                onStart = onStartSession,
+                onOpenHistory = { navController.navigate(Routes.HISTORY) },
+                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                onOpenCapture = { navController.navigate(Routes.CAPTURE) },
+                onOpenMatch = { navController.navigate(Routes.MATCH) },
+                onOpenTraining = { navController.navigate(Routes.TRAINING) },
+                onOpenProgress = { navController.navigate(Routes.PROGRESS) },
+                onOpenSession = { stored ->
+                    navController.navigate(Routes.session(stored.export.session.id))
+                }
+            )
+        }
+
+        composable(Routes.HISTORY) {
+            HistoryScreen(
+                viewModel = viewModel,
+                onOpenSession = { stored ->
+                    navController.navigate(Routes.session(stored.export.session.id))
+                }
+            )
+        }
+
+        composable(Routes.SESSION) { entry ->
+            SessionDetailDestination(
+                navController = navController,
+                viewModel = viewModel,
+                sessionId = entry.arguments?.getString("sessionId")
+            )
+        }
+
+        composable(Routes.SETTINGS) {
+            SettingsScreen(
+                viewModel = viewModel,
+                onOpenDashboard = { navController.navigate(Routes.DASHBOARD) }
+            )
+        }
+
+        composable(Routes.DASHBOARD) {
+            DashboardSetupScreen(viewModel = viewModel)
+        }
+
+        composable(Routes.PROGRESS) {
+            ProgressScreen(viewModel = viewModel)
+        }
+
+        composable(Routes.CAPTURE) {
+            CapturePickerScreen(
+                totalSwings = viewModel.labelledSwingCount
+                    .collectAsStateWithLifecycle().value,
+                onPick = onStartCapture,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.MATCH) {
+            MatchScreen(
+                controllerState = matchState,
+                onStart = viewModel::startMatch,
+                onAwardPoint = viewModel::awardMatchPoint,
+                onUndo = viewModel::undoMatchPoint,
+                onAcknowledgePrompt = viewModel::acknowledgeMatchPrompt,
+                onClear = {
+                    viewModel.clearMatch()
+                    navController.popBackStackOrNavigate(Routes.HOME)
+                },
+                isAmbient = ambient
+            )
+        }
+
+        composable(Routes.TRAINING) {
+            TrainingScreen(
+                controllerState = shadowRoutineState,
+                onStartShadow = viewModel::startShadowRoutine,
+                onConfirmShadow = viewModel::confirmShadowRepetition,
+                onPauseShadow = viewModel::pauseShadowRoutine,
+                onResumeShadow = viewModel::resumeShadowRoutine,
+                onFinishShadowEarly = viewModel::finishShadowRoutineEarly,
+                onClearShadow = {
+                    viewModel.clearShadowRoutine()
+                    navController.popBackStackOrNavigate(Routes.TRAINING)
+                },
+                isAmbient = ambient
+            )
+        }
+    }
+}
+
+/**
+ * Historical recap reached by session id. The record is always read from the store-backed
+ * history flow, never from a stale UI copy, so reviews and corrections saved here appear as soon
+ * as the store emits them.
+ */
+@Composable
+private fun SessionDetailDestination(
+    navController: NavHostController,
+    viewModel: BadWatchViewModel,
+    sessionId: String?
+) {
+    val history by viewModel.history.collectAsStateWithLifecycle()
+    val stored = history.firstOrNull { it.export.session.id == sessionId }
+    if (stored == null) {
+        // The record was deleted or the id never existed; never render a dead detail.
+        LaunchedEffect(sessionId) { navController.popBackStack() }
+        return
+    }
+    var detailPage by remember(stored.export.session.id) {
+        mutableStateOf(RecapPage.Summary)
+    }
+    var saveInProgress by remember(stored.export.session.id) {
+        mutableStateOf(false)
+    }
+    var saveError by remember(stored.export.session.id) {
+        mutableStateOf<String?>(null)
+    }
+    val diarySaveFailed = stringResource(R.string.review_save_failed)
+    val correctionSaveFailed = stringResource(R.string.correction_save_failed)
+    when (detailPage) {
+        RecapPage.Review -> SessionReviewScreen(
+            existingContext = stored.export.context,
+            existingReport = stored.export.report,
+            onSave = { context, report ->
+                if (!saveInProgress) {
+                    saveInProgress = true
+                    saveError = null
+                    viewModel.saveStoredSessionReview(
+                        export = stored.export,
+                        context = context,
+                        report = report
+                    ) { result ->
+                        saveInProgress = false
+                        result.onSuccess {
+                            detailPage = RecapPage.Summary
+                        }.onFailure {
+                            saveError = diarySaveFailed
+                        }
+                    }
+                }
+            },
+            onSkip = { detailPage = RecapPage.Summary },
+            isSaving = saveInProgress,
+            saveError = saveError
+        )
+
+        RecapPage.Summary -> SummaryScreen(
+            stored = stored.export,
+            insights = viewModel.storedSessionInsights(stored.export),
+            onDone = { navController.popBackStack() },
+            onEditDiary = {
+                saveError = null
+                detailPage = RecapPage.Review
+            },
+            onCorrectRecording = {
+                saveError = null
+                detailPage = RecapPage.Corrections
+            }
+        )
+
+        RecapPage.Corrections -> SessionCorrectionScreen(
+            export = stored.export,
+            onSave = { falseHits, missedHits, trimStart, trimEnd ->
+                if (!saveInProgress) {
+                    saveInProgress = true
+                    saveError = null
+                    viewModel.saveStoredSessionCorrections(
+                        export = stored.export,
+                        falseHitIds = falseHits,
+                        missedHitCount = missedHits,
+                        trimFromStartMillis = trimStart,
+                        trimFromEndMillis = trimEnd
+                    ) { result ->
+                        saveInProgress = false
+                        result.onSuccess {
+                            detailPage = RecapPage.Summary
+                        }.onFailure {
+                            saveError = correctionSaveFailed
+                        }
+                    }
+                }
+            },
+            onBack = { detailPage = RecapPage.Summary },
+            isSaving = saveInProgress,
+            saveError = saveError
+        )
+    }
 }
 
 private enum class RecapPage { Review, Summary, Corrections }
@@ -502,7 +597,6 @@ private sealed interface ScreenFrame {
     data class DrillSaved(val state: CaptureState.Saved) : ScreenFrame {
         override val kind = ScreenKind.DrillSaved
     }
-    data object CapturePicker : ScreenFrame { override val kind = ScreenKind.CapturePicker }
     data class SessionFailed(val state: SessionState.Failed) : ScreenFrame {
         override val kind = ScreenKind.SessionFailed
     }
@@ -515,14 +609,7 @@ private sealed interface ScreenFrame {
     data class Training(val state: ShadowControllerState) : ScreenFrame {
         override val kind = ScreenKind.Training
     }
-    data object History : ScreenFrame { override val kind = ScreenKind.History }
-    data object Settings : ScreenFrame { override val kind = ScreenKind.Settings }
-    data object Dashboard : ScreenFrame { override val kind = ScreenKind.Dashboard }
-    data object Progress : ScreenFrame { override val kind = ScreenKind.Progress }
-    data class SessionDetail(val session: StoredSession) : ScreenFrame {
-        override val kind = ScreenKind.SessionDetail
-    }
-    data object Home : ScreenFrame { override val kind = ScreenKind.Home }
+    data object Local : ScreenFrame { override val kind = ScreenKind.Local }
 }
 
 private fun resolveScreenFrame(
@@ -530,9 +617,7 @@ private fun resolveScreenFrame(
     sessionState: SessionState,
     captureState: CaptureState,
     matchState: MatchControllerState,
-    shadowRoutineState: ShadowControllerState,
-    screen: Screen,
-    detailSession: StoredSession?
+    shadowRoutineState: ShadowControllerState
 ): ScreenFrame = when {
     onboarded == null -> ScreenFrame.Loading
     onboarded == false -> ScreenFrame.Onboarding
@@ -547,19 +632,10 @@ private fun resolveScreenFrame(
     shadowRoutineState is ShadowControllerState.Active ||
         shadowRoutineState is ShadowControllerState.Failed ->
         ScreenFrame.Training(shadowRoutineState)
-    screen == Screen.Capture -> ScreenFrame.CapturePicker
-    screen == Screen.Match -> ScreenFrame.Match(matchState)
-    screen == Screen.Training -> ScreenFrame.Training(shadowRoutineState)
-    screen == Screen.History -> ScreenFrame.History
-    screen == Screen.Settings -> ScreenFrame.Settings
-    screen == Screen.Dashboard -> ScreenFrame.Dashboard
-    screen == Screen.Progress -> ScreenFrame.Progress
-    screen == Screen.SessionDetail && detailSession != null -> ScreenFrame.SessionDetail(detailSession)
-    else -> ScreenFrame.Home
+    else -> ScreenFrame.Local
 }
 
 private enum class ScreenKind {
     Loading, Onboarding, Live, Recap, Drill, DrillSaved,
-    CapturePicker, SessionFailed, CaptureFailed, Match, Training, History, Settings, Dashboard, Progress,
-    SessionDetail, Home
+    SessionFailed, CaptureFailed, Match, Training, Local
 }

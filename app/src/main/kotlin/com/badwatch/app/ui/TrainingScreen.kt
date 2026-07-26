@@ -3,11 +3,9 @@ package com.badwatch.app.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,9 +34,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -46,10 +42,12 @@ import androidx.wear.compose.material3.AlertDialog
 import androidx.wear.compose.material3.AlertDialogDefaults
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
+import androidx.wear.compose.material3.ButtonGroup
 import androidx.wear.compose.material3.CircularProgressIndicator
-import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
+import androidx.wear.compose.material3.TextButton
+import androidx.wear.compose.material3.TextToggleButton
 import androidx.wear.compose.material3.TitleCard
 import com.badwatch.app.R
 import com.badwatch.app.domain.ShadowControllerState
@@ -102,8 +100,7 @@ fun TrainingScreen(
                 )
             } else {
                 PracticeDrillDetail(
-                    drill = requireNotNull(selectedDrill),
-                    onBack = { selectedDrill = null }
+                    drill = requireNotNull(selectedDrill)
                 )
             }
         }
@@ -248,34 +245,22 @@ private fun TargetPicker(selected: Int, onSelect: (Int) -> Unit) {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
+        ButtonGroup(modifier = Modifier.fillMaxWidth()) {
             SHADOW_TARGETS.forEach { count ->
-                val isSelected = selected == count
-                CompactButton(
-                    onClick = { onSelect(count) },
-                    modifier = Modifier
-                        .weight(1f)
-                        .semantics { this.selected = isSelected },
-                    colors = if (isSelected) {
-                        ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
-                    } else {
-                        ButtonDefaults.filledTonalButtonColors()
-                    },
-                    label = { Text(count.toString()) }
-                )
+                TextToggleButton(
+                    checked = selected == count,
+                    onCheckedChange = { onSelect(count) },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(count.toString())
+                }
             }
         }
     }
 }
 
 @Composable
-private fun PracticeDrillDetail(drill: PracticeDrill, onBack: () -> Unit) {
+private fun PracticeDrillDetail(drill: PracticeDrill) {
     val localized = drill.localizedText()
     WatchScreen(verticalArrangement = Arrangement.spacedBy(7.dp)) {
         item { ScreenHeader(localized.title) }
@@ -346,14 +331,6 @@ private fun PracticeDrillDetail(drill: PracticeDrill, onBack: () -> Unit) {
                 style = MaterialTheme.typography.bodyExtraSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
-            )
-        }
-        item {
-            CompactButton(
-                onClick = onBack,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.filledTonalButtonColors(),
-                label = { Text(stringResource(R.string.training_back_to_practice)) }
             )
         }
         item { Spacer(modifier = Modifier.height(24.dp)) }
@@ -502,19 +479,7 @@ private fun ActiveShadowCue(
                 secondaryLabel = { Text(stringResource(R.string.training_confirm_next)) }
             )
         }
-        val pauseLabel = stringResource(R.string.training_pause_routine)
-        Row(
-            modifier = Modifier
-                .clip(CircleShape)
-                .defaultMinSize(minHeight = 48.dp)
-                .clickable(
-                    role = Role.Button,
-                    onClickLabel = pauseLabel,
-                    onClick = onPause
-                )
-                .padding(horizontal = 12.dp, vertical = 5.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        TextButton(onClick = onPause) {
             Text(
                 text = stringResource(R.string.action_pause),
                 style = MaterialTheme.typography.labelMedium,
@@ -657,6 +622,9 @@ private fun PausedShadowRoutine(
                     onFinishEarly()
                 }
             )
+        },
+        dismissButton = {
+            AlertDialogDefaults.DismissButton(onClick = { confirmFinish = false })
         },
         title = { Text(stringResource(R.string.training_finish_question)) },
         text = {

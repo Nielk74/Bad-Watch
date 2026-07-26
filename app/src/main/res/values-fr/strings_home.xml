@@ -59,5 +59,7 @@
     <string name="dashboard_save_test">Enregistrer et tester</string>
     <string name="dashboard_save_test_subtitle">Vérification authentifiée</string>
     <string name="dashboard_remove_server">Supprimer le serveur</string>
+    <string name="dashboard_remove_question">Supprimer le serveur ?</string>
+    <string name="dashboard_remove_body">L’adresse et le jeton enregistrés seront effacés de cette montre. Les séances déjà synchronisées restent sur le serveur.</string>
     <string name="dashboard_http_warning">HTTP n’est pas chiffré : le jeton d’accès et les données de séance peuvent être lus pendant le transit. Utilisez-le uniquement sur un réseau local privé de confiance ; préférez HTTPS.</string>
 </resources>

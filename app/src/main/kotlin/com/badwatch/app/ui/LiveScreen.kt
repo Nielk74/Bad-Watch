@@ -33,7 +33,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -49,13 +48,14 @@ import androidx.wear.compose.material3.AlertDialogDefaults
 import androidx.wear.compose.material3.AnimatedText
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
-import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.EdgeButton
 import androidx.wear.compose.material3.EdgeButtonSize
+import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.HorizontalPagerScaffold
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ProgressIndicatorDefaults
+import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.rememberAnimatedTextFontRegistry
 import com.badwatch.app.R
@@ -144,103 +144,102 @@ private fun HudPage(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
-    val needsStopClearance = liveHudNeedsStopClearance(LocalDensity.current.fontScale)
     val stopSaveDescription = stringResource(R.string.live_stop_save)
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Heart-rate as a ring: both zone and fill use this player's estimated maximum.
-        if (hasPersonalizedZones) {
-            CircularProgressIndicator(
-                progress = { ((heartRate ?: 0f) / maxHeartRate).coerceIn(0.02f, 1f) },
+    ScreenScaffold { contentPadding ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Heart-rate as a ring: both zone and fill use this player's estimated maximum.
+            // The ring is a background layer and stays edge-to-edge, so unlike the content
+            // column it does not consume the scaffold's content padding.
+            if (hasPersonalizedZones) {
+                CircularProgressIndicator(
+                    progress = { ((heartRate ?: 0f) / maxHeartRate).coerceIn(0.02f, 1f) },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clearAndSetSemantics {},
+                    colors = ProgressIndicatorDefaults.colors(
+                        indicatorColor = zoneColor,
+                        trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                    ),
+                    strokeWidth = 5.dp
+                )
+            }
+
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clearAndSetSemantics {},
-                colors = ProgressIndicatorDefaults.colors(
-                    indicatorColor = zoneColor,
-                    trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-                ),
-                strokeWidth = 5.dp
-            )
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 28.dp)
-                // At enlarged text the fixed bottom-edge action grows into the centered HUD.
-                // Reserve its visual lane while leaving the normal glance composition unchanged.
-                .padding(bottom = if (needsStopClearance) 48.dp else 0.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = stringResource(R.string.live_hits_upper),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            PulsingShotCount(count = snapshot.totalShots)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    // The scaffold's insets replace the hand-rolled bottom clearance this
+                    // column used to reserve for the stop action.
+                    .padding(contentPadding),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Favorite,
-                    contentDescription = null,
-                    tint = zoneColor,
-                    modifier = Modifier.size(14.dp)
-                )
                 Text(
-                    text = if (hasPersonalizedZones) {
-                        stringResource(
-                            R.string.live_heart_rate_line,
-                            formatHeartRate(heartRate),
-                            hrZoneLabel(heartRate, maxHeartRate)
-                        )
-                    } else {
-                        stringResource(
-                            R.string.live_heart_rate_only,
-                            formatHeartRate(heartRate)
-                        )
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = zoneColor
+                    text = stringResource(R.string.live_hits_upper),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                PulsingShotCount(count = snapshot.totalShots)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Favorite,
+                        contentDescription = null,
+                        tint = zoneColor,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = if (hasPersonalizedZones) {
+                            stringResource(
+                                R.string.live_heart_rate_line,
+                                formatHeartRate(heartRate),
+                                hrZoneLabel(heartRate, maxHeartRate)
+                            )
+                        } else {
+                            stringResource(
+                                R.string.live_heart_rate_only,
+                                formatHeartRate(heartRate)
+                            )
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = zoneColor
+                    )
+                }
+                Text(
+                    text = formatDuration(snapshot.durationMillis),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                snapshot.lastShot?.let { shot ->
+                    LastShotBadge(shot = shot)
+                }
+            }
+
+            EdgeButton(
+                onClick = onStop,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .semantics { contentDescription = stopSaveDescription },
+                buttonSize = EdgeButtonSize.Small,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+            ) {
+                Text(
+                    // Edge buttons narrow sharply on a round display. Keep a compact visible
+                    // verb in every locale while the full stop-and-save name remains semantic.
+                    text = stringResource(R.string.live_finish),
+                    style = MaterialTheme.typography.labelSmall,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
                 )
             }
-            Text(
-                text = formatDuration(snapshot.durationMillis),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            snapshot.lastShot?.let { shot ->
-                LastShotBadge(shot = shot)
-            }
-        }
-
-        EdgeButton(
-            onClick = onStop,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .semantics { contentDescription = stopSaveDescription },
-            buttonSize = EdgeButtonSize.Small,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.onErrorContainer
-            )
-        ) {
-            Text(
-                // Edge buttons narrow sharply on a round display. Keep a compact visible
-                // verb in every locale while the full stop-and-save name remains semantic.
-                text = stringResource(R.string.live_finish),
-                style = MaterialTheme.typography.labelSmall,
-                textAlign = TextAlign.Center,
-                maxLines = 1
-            )
         }
     }
 }
-
-/** The compact edge action needs a separate lane once system text reaches accessibility size. */
-internal fun liveHudNeedsStopClearance(fontScale: Float): Boolean = fontScale >= 1.2f
 
 /**
  * The count snaps back to rest with a spring every time it changes — the player *feels* a
@@ -506,7 +505,7 @@ private fun HudDetailsPage(
         }
 
         item {
-            CompactButton(
+            FilledTonalButton(
                 onClick = onDiscardRequest,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.filledTonalButtonColors(

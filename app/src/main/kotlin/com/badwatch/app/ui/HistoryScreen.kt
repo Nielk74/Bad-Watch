@@ -1,6 +1,5 @@
 package com.badwatch.app.ui
 
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.runtime.Composable
@@ -8,11 +7,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.lazy.items
-import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.AlertDialog
 import androidx.wear.compose.material3.AlertDialogDefaults
 import androidx.wear.compose.material3.Icon
@@ -43,8 +40,7 @@ import com.badwatch.core.sync.reviewedAnalysis
 @Composable
 fun HistoryScreen(
     viewModel: BadWatchViewModel,
-    onOpenSession: (StoredSession) -> Unit,
-    onBack: () -> Unit
+    onOpenSession: (StoredSession) -> Unit
 ) {
     val history by viewModel.history.collectAsStateWithLifecycle()
     var pendingDelete by remember { mutableStateOf<StoredSession?>(null) }
@@ -127,14 +123,6 @@ fun HistoryScreen(
                 }
             }
         }
-
-        item {
-            CompactButton(
-                onClick = onBack,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.action_back)) }
-            )
-        }
     }
 
     val selected = pendingDelete
@@ -148,6 +136,9 @@ fun HistoryScreen(
                     pendingDelete = null
                 }
             )
+        },
+        dismissButton = {
+            AlertDialogDefaults.DismissButton(onClick = { pendingDelete = null })
         },
         title = { Text(stringResource(R.string.history_delete_question)) },
         text = {

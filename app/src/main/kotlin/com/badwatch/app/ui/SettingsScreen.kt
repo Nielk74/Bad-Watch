@@ -1,20 +1,20 @@
 package com.badwatch.app.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.material3.CompactButton
+import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.RadioButton
+import androidx.wear.compose.material3.Stepper
 import androidx.wear.compose.material3.SwitchButton
 import androidx.wear.compose.material3.Text
 import androidx.wear.compose.material3.TitleCard
@@ -41,8 +41,7 @@ import com.badwatch.core.model.SelfReportedExperience
 @Composable
 fun SettingsScreen(
     viewModel: BadWatchViewModel,
-    onOpenDashboard: () -> Unit,
-    onBack: () -> Unit
+    onOpenDashboard: () -> Unit
 ) {
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     val dashboardUrl by viewModel.dashboardUrl.collectAsStateWithLifecycle()
@@ -131,63 +130,44 @@ fun SettingsScreen(
                             )
                         }
                     },
-                    stepperValue = ageYears?.let {
+                    stepperValue = ageYears,
+                    stepperValueLabel = ageYears?.let {
                         pluralStringResource(R.plurals.settings_age_value, it, it)
                     },
+                    stepperProgression = 18..100,
                     setDefaultLabel = stringResource(R.string.settings_set_age_default),
                     onSetDefault = { viewModel.setAgeYears(30) },
-                    onDecrease = ageYears?.let { age ->
-                        { viewModel.setAgeYears((age - 1).coerceAtLeast(18)) }
-                    },
-                    onIncrease = ageYears?.let { age ->
-                        { viewModel.setAgeYears((age + 1).coerceAtMost(100)) }
-                    }
+                    onStepperValueChange = viewModel::setAgeYears
                 )
                 HeartRateEndpoint(
                     label = stringResource(R.string.settings_resting_endpoint),
                     configuredValue = restingHeartRate?.let {
                         stringResource(R.string.settings_resting_value, it.toInt())
                     },
-                    stepperValue = restingHeartRate?.let {
+                    stepperValue = restingHeartRate?.toInt(),
+                    stepperValueLabel = restingHeartRate?.let {
                         stringResource(R.string.settings_resting_value, it.toInt())
                     },
+                    stepperProgression =
+                        35..minOf(120, exactMaxHeartRate?.toInt()?.minus(1) ?: 120),
                     setDefaultLabel = stringResource(R.string.settings_set_resting_default),
                     onSetDefault = { viewModel.setRestingHeartRate(60) },
-                    onDecrease = restingHeartRate?.let { bpm ->
-                        { viewModel.setRestingHeartRate((bpm.toInt() - 1).coerceAtLeast(35)) }
-                    },
-                    onIncrease = restingHeartRate?.let { bpm ->
-                        {
-                            viewModel.setRestingHeartRate(
-                                (bpm.toInt() + 1).coerceAtMost(
-                                    minOf(120, exactMaxHeartRate?.toInt()?.minus(1) ?: 120)
-                                )
-                            )
-                        }
-                    }
+                    onStepperValueChange = viewModel::setRestingHeartRate
                 )
                 HeartRateEndpoint(
                     label = stringResource(R.string.settings_max_endpoint),
                     configuredValue = exactMaxHeartRate?.let {
                         stringResource(R.string.settings_max_value, it.toInt())
                     },
-                    stepperValue = exactMaxHeartRate?.let {
+                    stepperValue = exactMaxHeartRate?.toInt(),
+                    stepperValueLabel = exactMaxHeartRate?.let {
                         stringResource(R.string.settings_resting_value, it.toInt())
                     },
+                    stepperProgression =
+                        maxOf(100, restingHeartRate?.toInt()?.plus(1) ?: 100)..240,
                     setDefaultLabel = stringResource(R.string.settings_set_max_default),
                     onSetDefault = { viewModel.setMaxHeartRate(187) },
-                    onDecrease = exactMaxHeartRate?.let { bpm ->
-                        {
-                            viewModel.setMaxHeartRate(
-                                (bpm.toInt() - 1).coerceAtLeast(
-                                    maxOf(100, restingHeartRate?.toInt()?.plus(1) ?: 100)
-                                )
-                            )
-                        }
-                    },
-                    onIncrease = exactMaxHeartRate?.let { bpm ->
-                        { viewModel.setMaxHeartRate((bpm.toInt() + 1).coerceAtMost(240)) }
-                    }
+                    onStepperValueChange = viewModel::setMaxHeartRate
                 )
                 if (ageYears != null || restingHeartRate != null || exactMaxHeartRate != null) {
                     CompactButton(
@@ -254,14 +234,6 @@ fun SettingsScreen(
                 )
             }
         }
-
-        item {
-            CompactButton(
-                onClick = onBack,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.action_back)) }
-            )
-        }
     }
 }
 
@@ -269,44 +241,45 @@ fun SettingsScreen(
 private fun HeartRateEndpoint(
     label: String,
     configuredValue: String?,
-    stepperValue: String?,
+    stepperValue: Int?,
+    stepperValueLabel: String?,
+    stepperProgression: IntProgression,
     setDefaultLabel: String,
     onSetDefault: () -> Unit,
-    onDecrease: (() -> Unit)?,
-    onIncrease: (() -> Unit)?
+    onStepperValueChange: (Int) -> Unit
 ) {
     DetailRow(
         label = label,
         value = configuredValue ?: stringResource(R.string.settings_not_configured)
     )
-    if (stepperValue == null || onDecrease == null || onIncrease == null) {
+    if (stepperValue == null || stepperValueLabel == null) {
         CompactButton(
             onClick = onSetDefault,
             modifier = Modifier.fillMaxWidth(),
             label = { Text(setDefaultLabel) }
         )
     } else {
-        val decreaseDescription = stringResource(R.string.a11y_decrease, label)
-        val increaseDescription = stringResource(R.string.a11y_increase, label)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Stepper(
+            value = stepperValue,
+            onValueChange = onStepperValueChange,
+            valueProgression = stepperProgression,
+            decreaseIcon = {
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = stringResource(R.string.a11y_decrease, label)
+                )
+            },
+            increaseIcon = {
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowUp,
+                    contentDescription = stringResource(R.string.a11y_increase, label)
+                )
+            }
         ) {
-            CompactButton(
-                onClick = onDecrease,
-                modifier = Modifier.semantics { contentDescription = decreaseDescription },
-                label = { Text("−") }
-            )
             Text(
-                text = stepperValue,
+                text = stepperValueLabel,
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface
-            )
-            CompactButton(
-                onClick = onIncrease,
-                modifier = Modifier.semantics { contentDescription = increaseDescription },
-                label = { Text("+") }
             )
         }
     }

@@ -81,7 +81,6 @@
     <string name="training_racket_side_reference">Racket-side reference</string>
     <string name="training_confirm_base">I’m back at base</string>
     <string name="training_confirm_next">Confirm · show next cue</string>
-    <string name="training_pause_routine">Pause shadow routine</string>
     <string name="training_court_cue">%1$s court cue</string>
     <string name="training_paused">SHADOW PAUSED</string>
     <string name="training_restored">Restored safely. Unobserved restart time will not count.</string>

@@ -32,6 +32,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnScope
@@ -103,7 +104,9 @@ fun ScreenHeader(title: String, modifier: Modifier = Modifier) {
             .padding(vertical = 2.dp),
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.primary,
-        textAlign = TextAlign.Center
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
     )
 }
 
@@ -161,7 +164,8 @@ fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
                             .padding(end = 8.dp),
                         style = MaterialTheme.typography.bodyExtraSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = stat.value,
@@ -172,7 +176,8 @@ fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
                         },
                         color = stat.color,
                         textAlign = TextAlign.End,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -204,7 +209,8 @@ fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
                     },
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
-                    maxLines = 2
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = stat.value,
@@ -215,7 +221,8 @@ fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
                     },
                     color = stat.color,
                     textAlign = TextAlign.Center,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -299,14 +306,18 @@ fun DetailRow(
             text = label,
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
         )
         Text(
             text = value,
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
             color = valueColor,
-            textAlign = TextAlign.End
+            textAlign = TextAlign.End,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -655,7 +666,7 @@ fun hrZoneColor(bpm: Float?, maxHeartRate: Float): Color = when (hrZoneOf(bpm, m
     3 -> CourtColors.Zone3
     4 -> CourtColors.Zone4
     5 -> CourtColors.Zone5
-    else -> Color(0xFFA7B4C2)
+    else -> CourtColors.UnknownShot
 }
 
 fun hrZoneLabel(bpm: Float?, maxHeartRate: Float): String =

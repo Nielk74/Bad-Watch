@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Product and interface
+
+- Completed the Wear Material 3 compliance pass: idle-time browsing now runs on
+  `SwipeDismissableNavHost` with the platform swipe-to-dismiss gesture, hand-built −/+ controls
+  became rotary-capable `Stepper`s, segmented choices use `ButtonGroup` toggle buttons, and
+  false-hit marking uses standard checkbox rows. Every destructive action, including dashboard
+  server removal, now confirms first; every confirmation dialog offers an explicit dismiss
+  affordance. Redundant in-app back buttons were dropped in favor of the system back gesture,
+  and edge text truncates predictably in long localizations.
+
 ## [0.3.0] - 2026-07-26
 
 ### Product and interface

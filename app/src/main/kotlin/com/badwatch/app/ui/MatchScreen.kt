@@ -11,7 +11,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -46,7 +45,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -57,6 +55,7 @@ import androidx.wear.compose.material3.AlertDialog
 import androidx.wear.compose.material3.AlertDialogDefaults
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.ButtonDefaults
+import androidx.wear.compose.material3.ButtonGroup
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.FilledTonalIconButton
@@ -64,6 +63,8 @@ import androidx.wear.compose.material3.HorizontalPagerScaffold
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
+import androidx.wear.compose.material3.TextButton
+import androidx.wear.compose.material3.TextToggleButton
 import com.badwatch.app.R
 import com.badwatch.app.domain.MatchControllerState
 import com.badwatch.app.localization.displayNameResource
@@ -258,38 +259,23 @@ private fun ChoiceRow(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            CompactButton(
-                onClick = onLeft,
-                modifier = Modifier
-                    .weight(1f)
-                    .semantics { selected = leftSelected },
-                colors = choiceColors(selected = leftSelected),
-                label = { Text(left) }
-            )
-            CompactButton(
-                onClick = onRight,
-                modifier = Modifier
-                    .weight(1f)
-                    .semantics { selected = !leftSelected },
-                colors = choiceColors(selected = !leftSelected),
-                label = { Text(right) }
-            )
+        ButtonGroup(modifier = Modifier.fillMaxWidth()) {
+            TextToggleButton(
+                checked = leftSelected,
+                onCheckedChange = { onLeft() },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(left)
+            }
+            TextToggleButton(
+                checked = !leftSelected,
+                onCheckedChange = { onRight() },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(right)
+            }
         }
     }
-}
-
-@Composable
-private fun choiceColors(selected: Boolean) = if (selected) {
-    ButtonDefaults.buttonColors(
-        containerColor = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary
-    )
-} else {
-    ButtonDefaults.filledTonalButtonColors()
 }
 
 @Composable
@@ -334,6 +320,9 @@ private fun ActiveMatch(
                     onAbandon()
                 }
             )
+        },
+        dismissButton = {
+            AlertDialogDefaults.DismissButton(onClick = { confirmAbandon = false })
         },
         title = { Text(stringResource(R.string.match_abandon_question)) },
         text = { Text(stringResource(R.string.match_abandon_body)) }
@@ -703,39 +692,34 @@ private fun MatchInterval(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text(stringResource(R.string.match_resume)) }
             )
-            Row(
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .defaultMinSize(minHeight = 48.dp)
-                    .clickable(
-                        enabled = canUndo,
-                        role = Role.Button,
-                        onClickLabel = undoIntervalLabel,
-                        onClick = onUndo
-                    )
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                verticalAlignment = Alignment.CenterVertically
+            TextButton(
+                onClick = onUndo,
+                enabled = canUndo
             ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = if (canUndo) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.outline
-                    }
-                )
-                Text(
-                    text = stringResource(R.string.match_undo_point),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (canUndo) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.outline
-                    }
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = if (canUndo) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.outline
+                        }
+                    )
+                    Text(
+                        text = stringResource(R.string.match_undo_point),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (canUndo) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.outline
+                        }
+                    )
+                }
             }
         }
     }
