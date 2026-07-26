@@ -194,18 +194,39 @@ class Device:
     def stop_session_through_ui(self) -> None:
         self.shell("input", "keyevent", "224", check=False)  # KEYCODE_WAKEUP
         self.shell("wm", "dismiss-keyguard", check=False)
-        self.shell("am", "start", "-n", ACTIVITY)
-        time.sleep(1.5)
+        # A sleeping Wear task can briefly expose the watch face or the pre-wake Compose tree
+        # even after `am start` reports success. Poll the actual visible hierarchy instead of
+        # treating that normal transition as a failed recording.
+        self.shell("am", "start", "-f", "0x04000000", "-n", ACTIVITY)
         remote = "/sdcard/badwatch-probe-window.xml"
-        self.shell("uiautomator", "dump", remote)
-        xml_text = self.shell("cat", remote)
-        try:
-            root = ET.fromstring(xml_text)
-        except ET.ParseError as error:
-            raise ProbeError(f"could not parse Wear UI tree: {error}") from error
-        target = next((node for node in root.iter("node") if node.attrib.get("text") == "Stop & save"), None)
+        deadline = time.monotonic() + 15
+        target: ET.Element | None = None
+        last_visible_text: list[str] = []
+        while time.monotonic() < deadline:
+            time.sleep(0.75)
+            dumped = self.shell("uiautomator", "dump", remote, check=False)
+            xml_text = self.shell("cat", remote, check=False) if "ERROR" not in dumped else ""
+            try:
+                root = ET.fromstring(xml_text)
+            except ET.ParseError:
+                continue
+            last_visible_text = [
+                text
+                for node in root.iter("node")
+                if (text := node.attrib.get("text"))
+            ]
+            target = next(
+                (node for node in root.iter("node") if node.attrib.get("text") == "Stop & save"),
+                None,
+            )
+            if target is not None:
+                break
         if target is None:
-            raise ProbeError("live UI did not expose the expected 'Stop & save' action")
+            preview = ", ".join(repr(text) for text in last_visible_text[:8]) or "no text"
+            raise ProbeError(
+                "live UI did not expose the expected 'Stop & save' action after 15 seconds; "
+                f"last hierarchy showed {preview}"
+            )
         bounds = target.attrib.get("bounds", "")
         match = re.fullmatch(r"\[([0-9]+),([0-9]+)]\[([0-9]+),([0-9]+)]", bounds)
         if match is None:
