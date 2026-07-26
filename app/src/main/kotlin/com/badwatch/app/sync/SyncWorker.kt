@@ -56,7 +56,7 @@ class SyncWorker(
 
         return when (outcome) {
             PendingSyncOutcome.Complete -> Result.success()
-            PendingSyncOutcome.EmptyAcknowledgement -> Result.retry()
+            is PendingSyncOutcome.IncompleteAcknowledgement -> Result.retry()
             is PendingSyncOutcome.Failed -> {
                 // Without this the only symptom of a misconfigured dashboard is a silent
                 // RETRY in the WorkManager log, which is close to undebuggable.
@@ -93,7 +93,10 @@ class SyncWorker(
 
 internal sealed interface PendingSyncOutcome {
     data object Complete : PendingSyncOutcome
-    data object EmptyAcknowledgement : PendingSyncOutcome
+    data class IncompleteAcknowledgement(
+        val captureIds: Set<String> = emptySet(),
+        val sessionIds: Set<String> = emptySet()
+    ) : PendingSyncOutcome
     data class Failed(val cause: Throwable) : PendingSyncOutcome
 }
 
@@ -111,40 +114,125 @@ internal suspend fun syncPendingRecords(
     uploadSessions: suspend (List<SessionExport>) -> Result<SyncResponse>,
     onCaptureFailure: (Throwable) -> Unit = {}
 ): PendingSyncOutcome {
+    val captureOutcome = syncPendingCaptures(
+        captureStore = captureStore,
+        uploadCaptures = uploadCaptures,
+        onFailure = onCaptureFailure
+    )
+    // Captures are secondary, but not disposable. Always give sessions their attempt in this
+    // pass, then return the capture failure/incomplete acknowledgement so WorkManager retries it.
+    val sessionOutcome = syncPendingSessions(
+        sessionStore = sessionStore,
+        uploadSessions = uploadSessions
+    )
+    return combineSyncOutcomes(captureOutcome, sessionOutcome)
+}
+
+private suspend fun syncPendingCaptures(
+    captureStore: CaptureStore,
+    uploadCaptures: suspend (List<CaptureExport>) -> Result<SyncResponse>,
+    onFailure: (Throwable) -> Unit
+): PendingSyncOutcome {
     // Consent is immutable metadata on each capture. Enabling sharing today must never
     // retroactively send raw motion recorded under the local-only default.
-    val pendingCaptures = captureStore.unsynced()
-        .filter { it.export.isEligibleForModelTrainingUpload }
-    if (pendingCaptures.isNotEmpty()) {
-        uploadCaptures(pendingCaptures.map { it.export }).fold(
-            onSuccess = { response ->
-                try {
-                    captureStore.applySyncResponse(pendingCaptures, response)
-                } catch (cause: Throwable) {
-                    onCaptureFailure(cause)
-                }
-            },
-            onFailure = onCaptureFailure
-        )
+    val pending = try {
+        captureStore.unsynced().filter { it.export.isEligibleForModelTrainingUpload }
+    } catch (cause: Throwable) {
+        reportCaptureFailure(cause, onFailure)
+        return PendingSyncOutcome.Failed(cause)
+    }
+    if (pending.isEmpty()) return PendingSyncOutcome.Complete
+
+    val response = try {
+        uploadCaptures(pending.map { it.export }).getOrThrow()
+    } catch (cause: Throwable) {
+        reportCaptureFailure(cause, onFailure)
+        return PendingSyncOutcome.Failed(cause)
     }
 
-    val pendingSessions = sessionStore.unsynced()
-    if (pendingSessions.isEmpty()) return PendingSyncOutcome.Complete
+    try {
+        captureStore.applySyncResponse(pending, response)
+    } catch (cause: Throwable) {
+        reportCaptureFailure(cause, onFailure)
+        return PendingSyncOutcome.Failed(cause)
+    }
 
-    return uploadSessions(pendingSessions.map { it.export }).fold(
-        onSuccess = { response ->
-            runCatching { sessionStore.applySyncResponse(pendingSessions, response) }.fold(
-                onSuccess = {
-                    // Only a response which acknowledges no ID at all warrants a retry.
-                    if (response.accepted.isEmpty() && response.rejected.isEmpty()) {
-                        PendingSyncOutcome.EmptyAcknowledgement
-                    } else {
-                        PendingSyncOutcome.Complete
-                    }
-                },
-                onFailure = PendingSyncOutcome::Failed
-            )
-        },
-        onFailure = PendingSyncOutcome::Failed
+    val missingIds = unacknowledgedIds(
+        uploadedIds = pending.mapTo(linkedSetOf()) { it.export.capture.id },
+        response = response
     )
+    return if (missingIds.isEmpty()) {
+        PendingSyncOutcome.Complete
+    } else {
+        PendingSyncOutcome.IncompleteAcknowledgement(captureIds = missingIds)
+    }
+}
+
+private suspend fun syncPendingSessions(
+    sessionStore: SessionStore,
+    uploadSessions: suspend (List<SessionExport>) -> Result<SyncResponse>
+): PendingSyncOutcome {
+    val pending = try {
+        sessionStore.unsynced()
+    } catch (cause: Throwable) {
+        return PendingSyncOutcome.Failed(cause)
+    }
+    if (pending.isEmpty()) return PendingSyncOutcome.Complete
+
+    val response = try {
+        uploadSessions(pending.map { it.export }).getOrThrow()
+    } catch (cause: Throwable) {
+        return PendingSyncOutcome.Failed(cause)
+    }
+
+    try {
+        sessionStore.applySyncResponse(pending, response)
+    } catch (cause: Throwable) {
+        return PendingSyncOutcome.Failed(cause)
+    }
+
+    val missingIds = unacknowledgedIds(
+        uploadedIds = pending.mapTo(linkedSetOf()) { it.export.session.id },
+        response = response
+    )
+    return if (missingIds.isEmpty()) {
+        PendingSyncOutcome.Complete
+    } else {
+        PendingSyncOutcome.IncompleteAcknowledgement(sessionIds = missingIds)
+    }
+}
+
+private fun unacknowledgedIds(
+    uploadedIds: Set<String>,
+    response: SyncResponse
+): Set<String> = uploadedIds - response.accepted.toSet() - response.rejected.keys
+
+private fun combineSyncOutcomes(
+    captureOutcome: PendingSyncOutcome,
+    sessionOutcome: PendingSyncOutcome
+): PendingSyncOutcome {
+    // Prefer the primary session failure when both endpoints fail; either failure produces the
+    // same bounded WorkManager retry, while the capture failure has already been reported.
+    if (sessionOutcome is PendingSyncOutcome.Failed) return sessionOutcome
+    if (captureOutcome is PendingSyncOutcome.Failed) return captureOutcome
+
+    val captureIds = (captureOutcome as? PendingSyncOutcome.IncompleteAcknowledgement)
+        ?.captureIds
+        .orEmpty()
+    val sessionIds = (sessionOutcome as? PendingSyncOutcome.IncompleteAcknowledgement)
+        ?.sessionIds
+        .orEmpty()
+    return if (captureIds.isEmpty() && sessionIds.isEmpty()) {
+        PendingSyncOutcome.Complete
+    } else {
+        PendingSyncOutcome.IncompleteAcknowledgement(
+            captureIds = captureIds,
+            sessionIds = sessionIds
+        )
+    }
+}
+
+private fun reportCaptureFailure(cause: Throwable, callback: (Throwable) -> Unit) {
+    // Diagnostics are secondary too: a throwing logger must not prevent the session attempt.
+    runCatching { callback(cause) }
 }

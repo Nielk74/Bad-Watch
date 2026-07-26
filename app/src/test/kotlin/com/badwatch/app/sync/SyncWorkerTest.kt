@@ -2,6 +2,7 @@ package com.badwatch.app.sync
 
 import com.badwatch.app.data.CaptureStore
 import com.badwatch.app.data.SessionStore
+import com.badwatch.app.data.writeDurableAtomically
 import com.badwatch.core.model.CaptureSession
 import com.badwatch.core.model.PlayerProfile
 import com.badwatch.core.model.RallyProfile
@@ -84,7 +85,11 @@ class SyncWorkerTest {
             uploadSessions = { Result.success(SyncResponse()) }
         )
 
-        assertThat(outcome).isEqualTo(PendingSyncOutcome.EmptyAcknowledgement)
+        assertThat(outcome).isEqualTo(
+            PendingSyncOutcome.IncompleteAcknowledgement(
+                sessionIds = setOf("session-empty")
+            )
+        )
         assertThat(sessions.unsynced()).hasSize(1)
     }
 
@@ -106,10 +111,194 @@ class SyncWorkerTest {
             onCaptureFailure = { captureFailure = it }
         )
 
-        assertThat(outcome).isEqualTo(PendingSyncOutcome.Complete)
+        assertThat(outcome).isInstanceOf(PendingSyncOutcome.Failed::class.java)
+        assertThat((outcome as PendingSyncOutcome.Failed).cause.message)
+            .contains("offline capture endpoint")
         assertThat(captureFailure?.message).contains("offline capture endpoint")
         assertThat(sessions.refresh().single().synced).isTrue()
         assertThat(captures.unsynced()).hasSize(1)
+    }
+
+    @Test
+    fun captureOnlyTransportFailureProducesRetryingFailure() = runTest {
+        val sessions = SessionStore(temporaryFolder.newFolder("capture-only-sessions"))
+        val captures = CaptureStore(temporaryFolder.newFolder("capture-only-captures"))
+        captures.save(captureExport("capture-offline"))
+        val failure = IOException("capture transport unavailable")
+        var reported: Throwable? = null
+
+        val outcome = syncPendingRecords(
+            captureStore = captures,
+            sessionStore = sessions,
+            uploadCaptures = { Result.failure(failure) },
+            uploadSessions = { error("There is no session batch") },
+            onCaptureFailure = { reported = it }
+        )
+
+        assertThat(outcome).isEqualTo(PendingSyncOutcome.Failed(failure))
+        assertThat(reported).isSameInstanceAs(failure)
+        assertThat(captures.unsynced().map { it.export.capture.id })
+            .containsExactly("capture-offline")
+    }
+
+    @Test
+    fun emptyCaptureAcknowledgementRequestsRetry() = runTest {
+        val sessions = SessionStore(temporaryFolder.newFolder("empty-capture-ack-sessions"))
+        val captures = CaptureStore(temporaryFolder.newFolder("empty-capture-ack-captures"))
+        captures.save(captureExport("capture-empty"))
+
+        val outcome = syncPendingRecords(
+            captureStore = captures,
+            sessionStore = sessions,
+            uploadCaptures = { Result.success(SyncResponse()) },
+            uploadSessions = { error("There is no session batch") }
+        )
+
+        assertThat(outcome).isEqualTo(
+            PendingSyncOutcome.IncompleteAcknowledgement(
+                captureIds = setOf("capture-empty")
+            )
+        )
+        assertThat(captures.unsynced().map { it.export.capture.id })
+            .containsExactly("capture-empty")
+    }
+
+    @Test
+    fun partialCaptureAcknowledgementPersistsAcceptedAndRetriesOnlyMissing() = runTest {
+        val sessions = SessionStore(temporaryFolder.newFolder("partial-capture-sessions"))
+        val captures = CaptureStore(temporaryFolder.newFolder("partial-captures"))
+        captures.save(captureExport("capture-accepted"))
+        captures.save(captureExport("capture-missing"))
+
+        val outcome = syncPendingRecords(
+            captureStore = captures,
+            sessionStore = sessions,
+            uploadCaptures = {
+                Result.success(SyncResponse(accepted = listOf("capture-accepted")))
+            },
+            uploadSessions = { error("There is no session batch") }
+        )
+
+        assertThat(outcome).isEqualTo(
+            PendingSyncOutcome.IncompleteAcknowledgement(
+                captureIds = setOf("capture-missing")
+            )
+        )
+        val stored = captures.refresh().associateBy { it.export.capture.id }
+        assertThat(stored.getValue("capture-accepted").synced).isTrue()
+        assertThat(stored.getValue("capture-missing").synced).isFalse()
+        assertThat(captures.unsynced().map { it.export.capture.id })
+            .containsExactly("capture-missing")
+    }
+
+    @Test
+    fun partialSessionAcknowledgementPersistsAcceptedAndRetriesOnlyMissing() = runTest {
+        val sessions = SessionStore(temporaryFolder.newFolder("partial-sessions"))
+        val captures = CaptureStore(temporaryFolder.newFolder("partial-session-captures"))
+        sessions.save(sessionExport("session-accepted"))
+        sessions.save(sessionExport("session-missing"))
+
+        val outcome = syncPendingRecords(
+            captureStore = captures,
+            sessionStore = sessions,
+            uploadCaptures = { error("There is no capture batch") },
+            uploadSessions = {
+                Result.success(SyncResponse(accepted = listOf("session-accepted")))
+            }
+        )
+
+        assertThat(outcome).isEqualTo(
+            PendingSyncOutcome.IncompleteAcknowledgement(
+                sessionIds = setOf("session-missing")
+            )
+        )
+        val stored = sessions.refresh().associateBy { it.export.session.id }
+        assertThat(stored.getValue("session-accepted").synced).isTrue()
+        assertThat(stored.getValue("session-missing").synced).isFalse()
+        assertThat(sessions.unsynced().map { it.export.session.id })
+            .containsExactly("session-missing")
+    }
+
+    @Test
+    fun completeMixedAcceptanceAndRejectionFinishesWithoutRetry() = runTest {
+        val sessions = SessionStore(temporaryFolder.newFolder("mixed-sessions"))
+        val captures = CaptureStore(temporaryFolder.newFolder("mixed-captures"))
+        sessions.save(sessionExport("session-accepted"))
+        sessions.save(sessionExport("session-rejected"))
+        captures.save(captureExport("capture-accepted"))
+        captures.save(captureExport("capture-rejected"))
+
+        val outcome = syncPendingRecords(
+            captureStore = captures,
+            sessionStore = sessions,
+            uploadCaptures = {
+                Result.success(
+                    SyncResponse(
+                        accepted = listOf("capture-accepted"),
+                        rejected = mapOf("capture-rejected" to "Capture rejected")
+                    )
+                )
+            },
+            uploadSessions = {
+                Result.success(
+                    SyncResponse(
+                        accepted = listOf("session-accepted"),
+                        rejected = mapOf("session-rejected" to "Session rejected")
+                    )
+                )
+            }
+        )
+
+        assertThat(outcome).isEqualTo(PendingSyncOutcome.Complete)
+        assertThat(captures.unsynced()).isEmpty()
+        assertThat(sessions.unsynced()).isEmpty()
+        val storedCaptures = captures.refresh().associateBy { it.export.capture.id }
+        val storedSessions = sessions.refresh().associateBy { it.export.session.id }
+        assertThat(storedCaptures.getValue("capture-accepted").synced).isTrue()
+        assertThat(storedCaptures.getValue("capture-rejected").syncRejection?.reason)
+            .isEqualTo("Capture rejected")
+        assertThat(storedSessions.getValue("session-accepted").synced).isTrue()
+        assertThat(storedSessions.getValue("session-rejected").syncRejection?.reason)
+            .isEqualTo("Session rejected")
+    }
+
+    @Test
+    fun captureMarkerStorageFailureStillAcceptsSessionAndRequestsRetry() = runTest {
+        var failCaptureMarkers = false
+        val captures = CaptureStore(
+            directory = temporaryFolder.newFolder("failed-marker-captures"),
+            atomicWriter = { file, text ->
+                if (failCaptureMarkers && file.name.endsWith(".synced")) {
+                    throw IOException("capture marker write failed")
+                }
+                writeDurableAtomically(file, text)
+            }
+        )
+        val sessions = SessionStore(temporaryFolder.newFolder("failed-marker-sessions"))
+        captures.save(captureExport("capture-marker-failed"))
+        sessions.save(sessionExport("session-still-accepted"))
+        failCaptureMarkers = true
+        var reported: Throwable? = null
+
+        val outcome = syncPendingRecords(
+            captureStore = captures,
+            sessionStore = sessions,
+            uploadCaptures = {
+                Result.success(SyncResponse(accepted = listOf("capture-marker-failed")))
+            },
+            uploadSessions = {
+                Result.success(SyncResponse(accepted = listOf("session-still-accepted")))
+            },
+            onCaptureFailure = { reported = it }
+        )
+
+        assertThat(outcome).isInstanceOf(PendingSyncOutcome.Failed::class.java)
+        assertThat((outcome as PendingSyncOutcome.Failed).cause.message)
+            .contains("capture marker write failed")
+        assertThat(reported?.message).contains("capture marker write failed")
+        assertThat(captures.unsynced().map { it.export.capture.id })
+            .containsExactly("capture-marker-failed")
+        assertThat(sessions.refresh().single().synced).isTrue()
     }
 
     private fun sessionExport(id: String): SessionExport = SessionExport(
