@@ -102,6 +102,9 @@ jobs:
           for APK in dist/*.apk; do
             shasum -a 256 "$APK" > "$APK.sha256"
           done
+          for CHECKSUM in dist/*.apk.sha256; do
+            shasum -a 256 -c "$CHECKSUM"
+          done
 
       # Notes are the CHANGELOG section for this version; the tag_release.sh template
       # guarantees the section exists. Fall back to a one-liner if it is empty.

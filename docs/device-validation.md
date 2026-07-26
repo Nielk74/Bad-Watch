@@ -85,7 +85,8 @@ Use one retained artifact directory per release candidate. Do not replace **Pend
 | Start, live HUD, stop, save with HR granted and denied | Start/live/recap images plus session/report IDs | **Pending:** add final RC evidence path. |
 | Activity recreation during recording | Log and stable session ID/start-time comparison | **Pending:** add final RC evidence path. |
 | Process death and journal recovery | Before/after export, stable identity, `Partial` quality, missing-interval note | **Pending:** add final RC evidence path. |
-| Offline save then retry/sync | Session ID and before/after sync state against authenticated HTTPS server | **Pending:** add final RC evidence path. |
+| Detection Lab screen-off capture | Start/sleep/resume/save record with stable capture ID and advancing samples | **Pending:** add final RC evidence path. |
+| Offline save then retry/sync | Session ID and before/after state against an authenticated debug server over `adb reverse`; automated release cleartext-block assertion | **Pending:** add final RC evidence path. |
 | Home, live, recap, review/corrections, History, Progress, Training, Match, Settings, Tile, complication, ambient | Named 480×480 screenshot set | **Pending:** add final RC evidence path. |
 | Normal/enlarged text and English/French spot checks | Screenshot matrix plus clipping/accessibility notes | **Pending:** add final RC evidence path. |
 | 180-minute powered screen-off lifecycle | Probe `report.json`, `start.png`, `recap.png`, charger state and lifecycle result | **Pending:** no qualifying run is documented yet. |

@@ -234,8 +234,9 @@ Research shows why restraint matters. Rally duration, acceleration, and rest fea
 predicted coach-defined stages above chance in a study of 40 players, which supports further
 research but not a consumer level badge
 ([PubMed record](https://pubmed.ncbi.nlm.nih.gov/32546052/)). A newer novice-versus-experienced
-study found whole-body differences using **seven** inertial sensors, so its result cannot be
-transferred to one wrist ([study](https://doi.org/10.1186/s13102-025-01163-w)). Video-based
+study found whole-body differences using a **17-IMU system** and analysed seven body segments, so
+its result cannot be transferred to one wrist
+([study](https://doi.org/10.1186/s13102-025-01163-w)). Video-based
 footwork research likewise does not validate wrist-only court-position claims
 ([study](https://doi.org/10.3389/fspor.2026.1753118)).
 

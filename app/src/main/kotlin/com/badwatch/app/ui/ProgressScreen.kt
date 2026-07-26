@@ -67,8 +67,7 @@ private fun ProgressContent(
     val usable = history.filter {
         it.export.context.recordingQuality != RecordingQuality.Unusable
     }
-    val sevenDaysAgo = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(7)
-    val recent = usable.filter { it.export.session.startedAtMillis >= sevenDaysAgo }
+    val recent = selectProgressRollingWeek(history, System.currentTimeMillis())
     val recentMinutes = recent.sumOf { it.export.effectiveMetrics().window.durationMillis } / 60_000
     val playProfile = PlayProfileBuilder.build(usable.map { it.export })
 
@@ -266,6 +265,18 @@ private fun ProgressContent(
                 label = { Text(stringResource(R.string.action_back)) }
             )
         }
+    }
+}
+
+/** Sessions eligible for Progress goals, including both rolling-window time boundaries. */
+internal fun selectProgressRollingWeek(
+    history: List<StoredSession>,
+    nowMillis: Long
+): List<StoredSession> {
+    val sevenDaysAgo = nowMillis - TimeUnit.DAYS.toMillis(7)
+    return history.filter { stored ->
+        stored.export.context.recordingQuality != RecordingQuality.Unusable &&
+            stored.export.session.startedAtMillis in sevenDaysAgo..nowMillis
     }
 }
 

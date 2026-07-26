@@ -74,9 +74,10 @@ kept for audit and backup.
 ## History and Progress
 
 **History** shows each durable session, whether it is accepted by the dashboard, only on the watch,
-or explicitly rejected by the server. A rejection includes the server reason and stops retrying
-until the record is edited. Open a session to review/correct it. Deletion requires confirmation and
-removes the local record; it is not a remote-delete command.
+or explicitly rejected by the server. A rejection is mapped to a stable localized category; raw
+server diagnostics are not rendered as untranslated player copy. Permanent rejections stop
+retrying until the record is edited. Open a session to review/correct it. Deletion requires
+confirmation and removes the local record; it is not a remote-delete command.
 
 Mark a broken recording **Unusable** rather than deleting it when the audit trail matters. Unusable
 sessions remain in History but do not contribute to Home, Progress, personal baselines, Tile, or

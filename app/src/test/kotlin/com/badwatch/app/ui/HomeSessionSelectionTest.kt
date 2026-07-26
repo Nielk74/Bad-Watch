@@ -10,6 +10,7 @@ import com.badwatch.core.sync.SessionContext
 import com.badwatch.core.sync.SessionExport
 import com.google.common.truth.Truth.assertThat
 import java.io.File
+import java.util.concurrent.TimeUnit
 import org.junit.Test
 
 class HomeSessionSelectionTest {
@@ -30,6 +31,24 @@ class HomeSessionSelectionTest {
         assertThat(
             latestUsableSession(listOf(stored(1_000L, RecordingQuality.Unusable)))
         ).isNull()
+    }
+
+    @Test
+    fun rollingWeekIncludesBoundariesButExcludesFuturePastAndUnusableSessions() {
+        val now = 2_000_000_000_000L
+        val start = now - TimeUnit.DAYS.toMillis(7)
+        val atStart = stored(start, RecordingQuality.Unreviewed)
+        val beforeStart = stored(start - 1L, RecordingQuality.Unreviewed)
+        val atNow = stored(now, RecordingQuality.Partial)
+        val future = stored(now + 1L, RecordingQuality.Unreviewed)
+        val unusable = stored(now - 1_000L, RecordingQuality.Unusable)
+
+        val selected = selectHomeRollingWeek(
+            listOf(atStart, beforeStart, atNow, future, unusable),
+            nowMillis = now
+        )
+
+        assertThat(selected).containsExactly(atStart, atNow).inOrder()
     }
 
     private fun stored(startedAtMillis: Long, quality: RecordingQuality): StoredSession {

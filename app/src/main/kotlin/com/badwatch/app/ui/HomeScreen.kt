@@ -332,11 +332,12 @@ private fun QuickAction(
  */
 @Composable
 private fun ThisWeekCard(history: List<StoredSession>) {
-    val weekStart = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(7)
+    val nowMillis = System.currentTimeMillis()
+    val week = selectHomeRollingWeek(history, nowMillis)
     val usable = history.filter {
-        it.export.context.recordingQuality != RecordingQuality.Unusable
+        it.export.context.recordingQuality != RecordingQuality.Unusable &&
+            it.export.session.startedAtMillis <= nowMillis
     }
-    val week = usable.filter { it.export.session.startedAtMillis >= weekStart }
 
     InfoCard(title = stringResource(R.string.home_this_week)) {
         if (week.isEmpty()) {
@@ -384,6 +385,18 @@ private fun ThisWeekCard(history: List<StoredSession>) {
                 )
             }
         }
+    }
+}
+
+/** Sessions eligible for Home's rolling seven-day summary, including both time boundaries. */
+internal fun selectHomeRollingWeek(
+    history: List<StoredSession>,
+    nowMillis: Long
+): List<StoredSession> {
+    val weekStart = nowMillis - TimeUnit.DAYS.toMillis(7)
+    return history.filter { stored ->
+        stored.export.context.recordingQuality != RecordingQuality.Unusable &&
+            stored.export.session.startedAtMillis in weekStart..nowMillis
     }
 }
 

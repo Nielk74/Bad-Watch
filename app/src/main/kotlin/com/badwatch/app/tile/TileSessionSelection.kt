@@ -20,7 +20,7 @@ internal fun selectTileSessions(
         latest = latestUsableSession(sessions),
         rollingWeek = sessions.filter { stored ->
             stored.export.context.recordingQuality != RecordingQuality.Unusable &&
-                stored.export.session.startedAtMillis >= weekStart
+                stored.export.session.startedAtMillis in weekStart..nowMillis
         }
     )
 }

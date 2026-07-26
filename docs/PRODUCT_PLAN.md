@@ -243,7 +243,7 @@ Delivered rules:
   are used throughout;
 - haptics are opt-in for detected hits and purposeful for score/training confirmation;
 - destructive actions have confirmation; recoverable actions expose undo where appropriate;
-- all user-facing app flows are in English and French, use resource/plural formatting, and expose
+- all user-facing watch-app flows are in English and French, use resource/plural formatting, and expose
   merged semantics/content descriptions for screen readers;
 - target SDK 36 permission denial is a supported state, not an error screen.
 
