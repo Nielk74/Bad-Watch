@@ -476,9 +476,11 @@ The device's installed `base.apk` matched that hash byte-for-byte and verified w
 Signature Scheme v2 signer. The same build produced unsigned release APK
 `e23febe396dba1c3b8f34fcda4243ae5a598187ec4b9d8cb7d2b902243da5642` and unsigned AAB
 `f3335a55b28cddb4ed202fc3d929ef72524b44d3507d56f192836a3fb796557f`.
-The clean gate passed five Python unit tests, `py_compile`, `xmllint`, and Gradle clean/test/lint/
-debug/release APK/release bundle with all 132 Gradle tasks executed. Dense-metric, live-HUD,
-match, and shadow large-text thresholds have JVM layout regressions.
+The frozen app checkpoint's clean gate passed five Python unit tests, `py_compile`, `xmllint`, and
+Gradle clean/test/lint/debug/release APK/release bundle with all 132 Gradle tasks executed. Probe
+tooling revision `6a6c568` adds three selector regressions, bringing the current Python suite to
+eight passing tests. Dense-metric, live-HUD, match, and shadow large-text thresholds have JVM
+layout regressions.
 The 180-minute runner uses probe tooling checkpoint
 `6a6c568e0e156fd551ae1388b9502d261b61b796`. It locates the compact live Finish/Finir control
 through the full localized Stop-and-save accessibility name, with a regression for that contract.

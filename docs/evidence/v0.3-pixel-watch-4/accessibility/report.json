@@ -80,14 +80,22 @@
   },
   "localeEvidence": {
     "english": "Final app checkpoint navigation, permission, recording, review, recap, match and practice states",
-    "french": [
-      "../screenshots/09-live-fr-after-activity-recreation.png",
-      "../screenshots/10-review-fr.png",
-      "../screenshots/11-recap-fr-reviewed.png",
-      "../screenshots/57-final-shadow-fr-font-130.png",
-      "../screenshots/58-final-shadow-paused-fr-font-130.png",
-      "../screenshots/59-final-shadow-finish-fr-font-130.png"
-    ],
+    "earlierCandidateFrenchRecreation": {
+      "sourceRevision": "99b5f627917d27465dd6494ea0b329ecc670a596",
+      "screenshots": [
+        "../screenshots/09-live-fr-after-activity-recreation.png",
+        "../screenshots/10-review-fr.png",
+        "../screenshots/11-recap-fr-reviewed.png"
+      ]
+    },
+    "finalCandidateFrenchShadow": {
+      "sourceRevision": "6f6f6cd9531040072bc153b365c0c515b0a40781",
+      "screenshots": [
+        "../screenshots/57-final-shadow-fr-font-130.png",
+        "../screenshots/58-final-shadow-paused-fr-font-130.png",
+        "../screenshots/59-final-shadow-finish-fr-font-130.png"
+      ]
+    },
     "fluentHumanReviewClaimed": false
   },
   "assistiveTechnology": {

@@ -108,11 +108,12 @@ The frozen build also produced unsigned release APK
 `e23febe396dba1c3b8f34fcda4243ae5a598187ec4b9d8cb7d2b902243da5642` and unsigned AAB
 `f3335a55b28cddb4ed202fc3d929ef72524b44d3507d56f192836a3fb796557f`.
 Those are reproducible assembly artifacts, not installed/signed release-distribution evidence.
-The clean gate passed five Python tests, `py_compile`, `xmllint`, and Gradle clean/test/lint/
-debug/release APK/release bundle with all 132 Gradle tasks executed. JVM layout regressions lock
-in the `1.20` threshold for dense metrics, the 48 dp live-action lane, and compact match/shadow
-layouts; the live action keeps the full Stop-and-save semantic name behind visible
-**Finish** / **Finir** text.
+The frozen app checkpoint's clean gate passed five Python tests, `py_compile`, `xmllint`, and
+Gradle clean/test/lint/debug/release APK/release bundle with all 132 Gradle tasks executed. Probe
+tooling revision `6a6c568` adds three selector regressions, so the current Python suite passes all
+eight tests. JVM layout regressions lock in the `1.20` threshold for dense metrics, the 48 dp
+live-action lane, and compact match/shadow layouts; the live action keeps the full Stop-and-save
+semantic name behind visible **Finish** / **Finir** text.
 
 | Gate | Evidence to retain | v0.3 release-candidate status |
 | --- | --- | --- |

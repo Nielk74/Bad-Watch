@@ -28,7 +28,7 @@ from one APK.
 | Charger state | AC powered; no battery-drain claim |
 | Font / ambient matrix | Active/ambient plus final normal/`1.30` matrix retained and passed |
 
-Three traceable debug checkpoints contribute to this ledger:
+Nine traceable debug app checkpoints contribute to this ledger:
 
 | Scope | Source | APK SHA-256 |
 | --- | --- | --- |
@@ -57,16 +57,18 @@ visible **Finish** / **Finir** text, and retains the complete Stop-and-save acce
 checkpoint `6f6f6cd` gives match/interval and shadow the same `1.20` responsive threshold and JVM
 regressions.
 Earlier evidence remains representative for unchanged persistence, Tile, complication, ambient,
-and match/shadow reducer behavior. The match/shadow large-text layouts changed, so the broad
-normal/enlarged inventory and endurance gate must run on `6f6f6cd` before their final rows pass.
+and match/shadow reducer behavior. The final match/shadow layouts and broad normal/enlarged
+inventory were rerun on `6f6f6cd` and pass; only the endurance gate remains.
 
 The installed `base.apk` matched the final debug APK hash byte-for-byte and verified with APK
 Signature Scheme v2. The same source produced unsigned release APK SHA-256
 `e23febe396dba1c3b8f34fcda4243ae5a598187ec4b9d8cb7d2b902243da5642` and unsigned release
 AAB SHA-256 `f3335a55b28cddb4ed202fc3d929ef72524b44d3507d56f192836a3fb796557f`.
 Those release artifacts were assembled and hashed, not installed on this debug-evidence watch.
-The clean software gate passed five Python tests, `py_compile`, `xmllint`, and Gradle clean/test/
-lint/debug/release APK/release bundle with all 132 Gradle tasks executed.
+The frozen app checkpoint's clean software gate passed five Python tests, `py_compile`, `xmllint`,
+and Gradle clean/test/lint/debug/release APK/release bundle with all 132 Gradle tasks executed.
+Probe tooling revision `6a6c568` adds three selector regressions, bringing the current Python
+suite to eight passing tests.
 
 All retained PNGs in this directory are native 480 x 480 captures. The watch moved between
 English and French during the recreation check and used both normal and `1.30` font scale during
