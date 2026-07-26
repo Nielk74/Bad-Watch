@@ -279,7 +279,11 @@ fun BadWatchApp(
                     is ScreenFrame.SessionFailed -> {
                         ErrorScreen(
                             message = target.state.message,
-                            onDismiss = viewModel::acknowledge
+                            onDismiss = viewModel::acknowledge,
+                            // The failed collector may still own a durable journal. Route the
+                            // destructive choice through SessionService so recorder, optical HR,
+                            // foreground state, and the checkpoint are cleared as one command.
+                            onDiscardRecovery = onDiscardSession
                         )
                     }
 

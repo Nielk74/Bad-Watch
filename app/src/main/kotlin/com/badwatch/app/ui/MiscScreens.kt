@@ -11,6 +11,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -18,7 +22,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.material3.AlertDialog
+import androidx.wear.compose.material3.AlertDialogDefaults
+import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
+import androidx.wear.compose.material3.CompactButton
 import androidx.wear.compose.material3.EdgeButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
@@ -53,12 +61,19 @@ fun LoadingScreen() {
 }
 
 /**
- * The dead end when a session dies mid-record — sensor dropped, service killed. The player has
- * just lost their data, so the screen is deliberately quiet: what happened, why, and a single
- * way out. The edge button acknowledges and lands back on Home.
+ * Recovery UI when a session dies mid-record — sensor dropped, service killed. The player may
+ * still have a durable recovery checkpoint, so the screen is deliberately quiet: what
+ * happened, why, and two explicit choices. Dismiss keeps recovery data for a later retry;
+ * discard is destructive and therefore confirmed.
  */
 @Composable
-fun ErrorScreen(message: String, onDismiss: () -> Unit) {
+fun ErrorScreen(
+    message: String,
+    onDismiss: () -> Unit,
+    onDiscardRecovery: (() -> Unit)? = null
+) {
+    var confirmDiscard by remember { mutableStateOf(false) }
+
     WatchScreen(
         edgeButton = {
             EdgeButton(onClick = onDismiss) {
@@ -95,9 +110,48 @@ fun ErrorScreen(message: String, onDismiss: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
+                if (onDiscardRecovery != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.error_session_failure_options),
+                        modifier = Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.bodyExtraSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        if (onDiscardRecovery != null) {
+            item {
+                CompactButton(
+                    onClick = { confirmDiscard = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    ),
+                    label = { Text(stringResource(R.string.action_discard)) }
+                )
             }
         }
 
         item { Spacer(modifier = Modifier.height(48.dp)) }
     }
+
+    AlertDialog(
+        visible = confirmDiscard,
+        onDismissRequest = { confirmDiscard = false },
+        confirmButton = {
+            AlertDialogDefaults.ConfirmButton(
+                onClick = {
+                    confirmDiscard = false
+                    onDiscardRecovery?.invoke()
+                }
+            )
+        },
+        title = { Text(stringResource(R.string.error_session_discard_question)) },
+        text = { Text(stringResource(R.string.error_session_discard_body)) }
+    )
 }

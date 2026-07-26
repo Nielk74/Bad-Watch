@@ -145,6 +145,9 @@
     <string name="error_session_pending_save">La séance précédente doit encore être enregistrée.</string>
     <string name="error_session_checkpoint">Le point de récupération n’a pas pu être créé.</string>
     <string name="error_session_checkpoint_update">Le point de récupération n’a pas pu être mis à jour.</string>
+    <string name="error_session_failure_options">Fermez pour réessayer plus tard. Abandonner efface toute donnée de séance récupérable.</string>
+    <string name="error_session_discard_question">Effacer les données de la séance ?</string>
+    <string name="error_session_discard_body">Tout enregistrement conservé avant l’échec sera supprimé.</string>
     <string name="error_match_unreadable">Le match enregistré n’a pas pu être lu.</string>
     <string name="error_match_close">Le match enregistré n’a pas pu être fermé.</string>
     <string name="error_match_start_save">Le match n’a pas démarré, car il n’a pas pu être enregistré. Réessayez.</string>

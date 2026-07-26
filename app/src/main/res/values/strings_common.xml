@@ -139,6 +139,9 @@
     <string name="error_session_pending_save">The previous session still needs to be saved.</string>
     <string name="error_session_checkpoint">The recovery checkpoint could not be created.</string>
     <string name="error_session_checkpoint_update">The recovery checkpoint could not be updated.</string>
+    <string name="error_session_failure_options">Dismiss to try again later. Discard clears any recoverable session data.</string>
+    <string name="error_session_discard_question">Discard session data?</string>
+    <string name="error_session_discard_body">Any recording kept before the failure will be deleted.</string>
     <string name="error_match_unreadable">The saved match could not be read.</string>
     <string name="error_match_close">The saved match could not be closed.</string>
     <string name="error_match_start_save">The match was not started because it could not be saved. Try again.</string>

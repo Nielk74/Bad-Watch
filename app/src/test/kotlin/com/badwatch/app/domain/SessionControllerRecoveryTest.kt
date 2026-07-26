@@ -22,6 +22,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -162,6 +163,64 @@ class SessionControllerRecoveryTest {
     }
 
     @Test
+    fun failedSensorStreamKeepsJournalUntilDiscardThenNextStartIsFresh() = runTest {
+        val root = temporaryFolder.newFolder("failed-stream-discard")
+        val journalFile = File(root, "active/session.json")
+        val journal = ActiveSessionJournal(journalFile)
+        val store = SessionStore(File(root, "sessions"))
+        val stream = ThrowOnceSensorStream(sample(2_000L, heartRate = 147f))
+        val controllerJob = SupervisorJob()
+        val controllerScope = CoroutineScope(
+            controllerJob + StandardTestDispatcher(testScheduler)
+        )
+        var clock = 1_000L
+        val controller = SessionController(
+            sensorStream = stream,
+            sessionStore = store,
+            runtimeSettings = FakeRuntimeSettings,
+            activeSessionJournal = journal,
+            appVersion = "test-version",
+            scope = controllerScope,
+            now = { clock }
+        )
+
+        assertThat(controller.start())
+            .isEqualTo(SessionStartResult.Started(recovered = false, startedAtMillis = 1_000L))
+        clock = 2_000L
+        val failedCollection = controllerJob.children.single()
+        runCurrent()
+        failedCollection.join()
+
+        assertThat(controller.state.value).isInstanceOf(SessionState.Failed::class.java)
+        assertThat(controller.isRecording).isFalse()
+        val failedCheckpoint = journal.load()!!
+        val failedSessionId = failedCheckpoint.checkpoint.sessionId
+        assertThat(failedCheckpoint.checkpoint.samplesProcessed).isEqualTo(1L)
+        assertThat(store.refresh()).isEmpty()
+
+        // Dismiss is deliberately non-destructive: the player can still retry this checkpoint.
+        controller.acknowledge()
+        assertThat(controller.state.value).isEqualTo(SessionState.Idle)
+        assertThat(journal.load()!!.checkpoint.sessionId).isEqualTo(failedSessionId)
+
+        // The confirmed failed-screen action reuses the normal durable discard transition.
+        assertThat(controller.discard()).isTrue()
+        assertThat(journal.load()).isNull()
+        assertThat(store.refresh()).isEmpty()
+
+        clock = 3_000L
+        assertThat(controller.start())
+            .isEqualTo(SessionStartResult.Started(recovered = false, startedAtMillis = 3_000L))
+        runCurrent()
+        val freshCheckpoint = journal.load()!!
+        assertThat(freshCheckpoint.checkpoint.sessionId).isNotEqualTo(failedSessionId)
+        assertThat(controller.state.value).isInstanceOf(SessionState.Recording::class.java)
+
+        controller.discard()
+        controllerScope.cancel()
+    }
+
+    @Test
     fun crashAfterDurableSaveReconcilesWithoutOpeningOrDuplicating() = runTest {
         val root = temporaryFolder.newFolder("saved-before-clear")
         val journalFile = File(root, "active/session.json")
@@ -287,6 +346,26 @@ class SessionControllerRecoveryTest {
 
         suspend fun emit(sample: SensorSample) {
             mutableSamples.emit(sample)
+        }
+    }
+
+    /** First subscription fails after one real sample; later subscriptions remain healthy. */
+    private class ThrowOnceSensorStream(
+        private val firstSample: SensorSample
+    ) : SensorStream {
+        private var subscriptions = 0
+        private val healthySamples = MutableSharedFlow<SensorSample>(extraBufferCapacity = 16)
+
+        override fun samples(): Flow<SensorSample> {
+            subscriptions++
+            return if (subscriptions == 1) {
+                flow {
+                    emit(firstSample)
+                    throw IllegalStateException("Sensor stream stopped unexpectedly")
+                }
+            } else {
+                healthySamples
+            }
         }
     }
 }
