@@ -182,9 +182,9 @@ automatically or discards either edit silently.
 
 ## Browser regression gate
 
-At test-only repository checkpoint `836f116`, `:server:test` depends on
-`:server:dashboardBrowserTest` and requires Node 22. It executes six journeys against JavaScript
-extracted from shipped `index.html`: stale-token prompt/retry; URL-filter
+At browser/server repository checkpoint `836f116`, with the Wear APK unchanged, `:server:test`
+depends on `:server:dashboardBrowserTest` and requires Node 22. It executes six journeys against
+JavaScript extracted from shipped `index.html`: stale-token prompt/retry; URL-filter
 hydrate/apply/error/reset; deep-linked reviewed detail; successful revisioned diary save and
 aggregate refresh; HTTP 409 reload/conflict replacement; and archive-restore success/error. This
 proves client state/request contracts, not responsive layout or real-browser rendering.

@@ -15,7 +15,7 @@
     <string name="summary_average_burst">Hits / exchange</string>
     <string name="summary_active_quiet">Est. active : quiet</string>
     <string name="summary_detected">Detected</string>
-    <string name="summary_quiet">No play</string>
+    <string name="summary_quiet">No detected play</string>
     <string name="summary_activity_distribution" tools:ignore="PluralsCandidate">Estimated detected activity %1$d percent, no detected play %2$d percent</string>
     <string name="summary_activity_distribution_with_unobserved" tools:ignore="PluralsCandidate">Estimated detected activity %1$d percent, no detected play %2$d percent, known unobserved time %3$d percent</string>
     <string name="summary_unobserved">Unobserved</string>

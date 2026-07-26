@@ -14,7 +14,7 @@ from one APK.
 | Evidence date | 2026-07-26 UTC |
 | Final app/APK source revision | `0bdbe985756d962e73b47dfc5ca098a709a9a86f` |
 | Final recovery/screenshot retention checkpoint | `909bef8` (documentation/endurance follow) |
-| Browser journey gate checkpoint | `836f116` (test/workflow only; APK unchanged) |
+| Browser/server checkpoint | `836f116` (dashboard client, tests, and workflows; Wear APK unchanged) |
 | Session probe implementation | `e9719a57d6a44463ff554e596de55ee95de41ef6` |
 | Recovery probe implementation | `5318deb910ea3aae0f77d41e8c5e227ae77f39f8` |
 | Tested artifact | `app-debug.apk` |
@@ -65,7 +65,7 @@ Checkpoint `0bdbe98` incorporates the subsequent hour-plus responsive review, bo
 cleanup and settled-recap verification, retry-safe incomplete sync acknowledgements, immutable
 process-absence provenance, inference gating, exact Home/History/Tile recovery markers,
 observed-minute Progress records, dashboard filters and gap audit, CSV recovery columns, and the
-three-way Detected/No play/Unobserved activity composition. Earlier evidence remains representative
+three-way Detected/No detected play/Unobserved activity composition. Earlier evidence remains representative
 only for the explicitly scoped behavior named in its section. Final-APK device retests cover
 start/recover/save, hour-plus Summary and History at normal/`1.30` text, and the recovered Summary
 notice/composition. Final-build Home, Progress, Tile rendering/gap marker, recovered-History
@@ -82,9 +82,9 @@ tests, `py_compile`, resource XML and browser JavaScript syntax validation, and 
 clean/test/lint/debug/release-APK/release-bundle. Its historical result was 132 tasks: 129 executed
 and three up-to-date; no later aggregate task total is inferred from it.
 
-At test-only repository checkpoint `836f116`, `:server:test` depends on
-`:server:dashboardBrowserTest` and requires Node 22. It executes six journeys against JavaScript
-extracted from shipped `index.html`: stale-token prompt/retry; URL-filter
+At browser/server repository checkpoint `836f116`, with the Wear APK unchanged, `:server:test`
+depends on `:server:dashboardBrowserTest` and requires Node 22. It executes six journeys against
+JavaScript extracted from shipped `index.html`: stale-token prompt/retry; URL-filter
 hydrate/apply/error/reset; deep-linked reviewed detail; successful revisioned diary save and
 aggregate refresh; HTTP 409 reload/conflict replacement; and archive-restore success/error. This
 proves client state/request contracts, not responsive layout or real-browser rendering.
@@ -170,7 +170,7 @@ detected exchanges cannot bridge it, and it is neither detected activity nor inf
 - [after final recovery](recovery-final/20260726T121444Z/after-recovery.png)
 - [immediate optional diary after stop](recovery-final/20260726T121444Z/recap.png)
 - [settled Summary with exact known-unobserved notice](screenshots/65-final-recovery-gap-recap.png)
-- [three-way activity/quiet/unobserved composition](screenshots/66-final-recovery-gap-composition.png)
+- [three-way detected/no-detected-play/unobserved composition](screenshots/66-final-recovery-gap-composition.png)
 
 The earlier [schema-1 recovery report](recovery/20260726T020131Z/report.json) remains historical
 evidence for stable identity, a frozen checkpoint, and resumed sampling. It did not persist or
@@ -376,8 +376,10 @@ stack. History retains the same complete value and remains readable/reachable at
 
 The final recovered-session Summary shows `0:11` of known unobserved time, explains that elapsed
 time includes it, and explicitly says it is excluded from inferred quiet time and personal
-comparisons. The composition card uses three distinct states—Detected, No play, and Unobserved—so
-its active share uses reviewed wall time without relabelling the gap as activity or rest.
+comparisons. The composition card uses three distinct states—Detected, No detected play, and
+Unobserved; the French labels are Détecté, Aucun jeu détecté, and Non observé. “No detected play”
+describes observed time outside detected active spans; it does not claim that no badminton
+occurred. Its active share uses reviewed wall time without relabelling the gap as activity or rest.
 
 - [final known-unobserved Summary notice](screenshots/65-final-recovery-gap-recap.png)
 - [final three-way session composition](screenshots/66-final-recovery-gap-composition.png)

@@ -157,7 +157,8 @@ Sources: [controlled wrist study](https://doi.org/10.1177/17543371211048328),
 2. **Start session** launches a health foreground service. A gyroscope is required;
    accelerometer and Health Services heart rate degrade independently.
 3. Recording continues with the display off. The live face leads with detected hits and elapsed
-   time; estimated exchanges and optical HR remain secondary and disappear when unavailable.
+   time; estimated exchanges remain secondary, and unavailable optical HR stays visible as the
+   truthful `--` placeholder.
 4. If Wear OS recreates the process, the durable journal restores the same session ID and start
    time, marks recording quality partial, and appends an immutable process-absence interval from
    the last durable checkpoint through restore. Whole-session elapsed time and heart-rate coverage
@@ -194,6 +195,9 @@ record motion.
    Immutable process-absence intervals remain in the raw audit record. Only their overlap with the
    reviewed window is unobserved time; trimming one outside that window can make the remaining
    evidence eligible again when diary quality is also eligible.
+   The Summary composition legend says **Detected**, **No detected play**, and **Unobserved**
+   (**Détecté**, **Aucun jeu détecté**, and **Non observé** in French). “No detected play” means
+   observed time outside detected active spans, not proof that no badminton occurred.
 5. Heart-rate zones appear only with a configured/age-estimated maximum. HRR-minutes require an
    explicitly configured resting rate as well. Age estimation uses `208 − 0.7 × age` for adults
    and an exact maximum overrides it.
@@ -262,9 +266,9 @@ archive. Players who want movement/HR evidence run the ordinary session recorder
   `observed_seconds`. Raw motion enters an archive only when recording-time model-training consent,
   participant ID, and protocol are all present.
 
-At test-only repository checkpoint `836f116`, `:server:test` depends on
-`:server:dashboardBrowserTest` and requires Node 22. It executes six journeys against JavaScript
-extracted from shipped `index.html`: stale-token prompt/retry; URL-filter
+At browser/server repository checkpoint `836f116`, with the Wear APK unchanged, `:server:test`
+depends on `:server:dashboardBrowserTest` and requires Node 22. It executes six journeys against
+JavaScript extracted from shipped `index.html`: stale-token prompt/retry; URL-filter
 hydrate/apply/error/reset; deep-linked reviewed detail; successful revisioned diary save and
 aggregate refresh; HTTP 409 reload/conflict replacement; and archive-restore success/error. This
 proves client state/request contracts, not responsive layout or real-browser rendering. See the
@@ -441,8 +445,7 @@ tooling/ Release and real-device endurance probes.
 
 Files remain the right persistence shape for this standalone watch: listing, reading, replacing,
 syncing, and deleting whole session envelopes are its operations. Server-side analytics own the
-cross-session query workload. Room and a multi-module architecture would add migration/build cost
-without making those operations safer.
+cross-session query workload. Room would add migration cost without making those operations safer.
 
 The shared `:core` schema is the wire and archive contract. Raw events and original summaries are
 immutable; reviewed views are deterministic projections. Compatibility-only schema-1
@@ -496,9 +499,9 @@ At the pre-`836f116` frozen APK checkpoint `0bdbe98`, that gate passed all 31 Py
 the broader local command produces the release AAB, while CI deliberately retains its existing
 APK-focused command.
 
-At test-only repository checkpoint `836f116`, `:server:test` depends on
-`:server:dashboardBrowserTest` and requires Node 22. It executes six journeys against JavaScript
-extracted from shipped `index.html`: stale-token prompt/retry; URL-filter
+At browser/server repository checkpoint `836f116`, with the Wear APK unchanged, `:server:test`
+depends on `:server:dashboardBrowserTest` and requires Node 22. It executes six journeys against
+JavaScript extracted from shipped `index.html`: stale-token prompt/retry; URL-filter
 hydrate/apply/error/reset; deep-linked reviewed detail; successful revisioned diary save and
 aggregate refresh; HTTP 409 reload/conflict replacement; and archive-restore success/error. This
 proves client state/request contracts, not responsive layout or real-browser rendering. No current

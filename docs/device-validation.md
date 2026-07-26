@@ -11,7 +11,7 @@ mode, and charger state with every release-candidate run.
 
 ## Software gate
 
-Node 22 is required locally as of test-only repository checkpoint `836f116`, because
+Node 22 is required locally as of browser/server repository checkpoint `836f116`, because
 `:server:test` depends on `:server:dashboardBrowserTest`. Run from the repository root:
 
 ```bash
@@ -30,11 +30,11 @@ artifact gate as well:
 At the pre-`836f116` frozen APK checkpoint `0bdbe98`, all 31 Python unit tests, `py_compile`,
 resource XML validation, browser JavaScript syntax validation, and that Gradle artifact gate
 passed. Gradle reported 132 tasks: 129 executed and three up-to-date. This is a historical count
-for that frozen artifact run, not a task total for the later test-only checkpoint.
+for that frozen artifact run, not a task total for the later browser/server checkpoint.
 
-At test-only repository checkpoint `836f116`, `:server:test` depends on
-`:server:dashboardBrowserTest` and requires Node 22. It executes six journeys against JavaScript
-extracted from shipped `index.html`: stale-token prompt/retry; URL-filter
+At browser/server repository checkpoint `836f116`, with the Wear APK unchanged, `:server:test`
+depends on `:server:dashboardBrowserTest` and requires Node 22. It executes six journeys against
+JavaScript extracted from shipped `index.html`: stale-token prompt/retry; URL-filter
 hydrate/apply/error/reset; deep-linked reviewed detail; successful revisioned diary save and
 aggregate refresh; HTTP 409 reload/conflict replacement; and archive-restore success/error. This
 proves client state/request contracts, not responsive layout or real-browser rendering. No current
@@ -152,8 +152,8 @@ Those are reproducible assembly artifacts, not installed/signed release-distribu
 The pre-`836f116` frozen app checkpoint's clean gate passed all 31 Python tests, `py_compile`,
 resource XML and browser JavaScript syntax validation, and Gradle
 clean/test/lint/debug/release-APK/release-bundle. Its historical result was 132 tasks: 129 executed
-and three up-to-date. The later `836f116` Node 22 browser checkpoint is recorded separately above;
-no replacement aggregate task count is asserted. JVM layout regressions lock in the `1.20`
+and three up-to-date. The later `836f116` Node 22 browser/server checkpoint is recorded separately
+above; no replacement aggregate task count is asserted. JVM layout regressions lock in the `1.20`
 threshold for dense metrics, the 48 dp live-action lane, compact match/shadow layouts, and the
 hour-plus full-width duration row; the live action keeps the full Stop-and-save semantic name
 behind visible **Finish** / **Finir** text.
@@ -194,7 +194,7 @@ older source checkpoint that supplies their physical evidence.
 | Core normal-size screens | Named 480×480 Home, live, recap/review, History, Progress, Training, Match/interval, Detection Lab, Settings, and permission images | **Passed only as a source-scoped combined inventory (2026-07-26 UTC):** the [earlier broad inventory and exact frozen-APK subset](evidence/v0.3-pixel-watch-4/README.md#final-visual-inventory-and-enlarged-text) are retained. Final `0bdbe98` captures cover Summary, hour-plus History, and recovered Summary/composition; final Home, Progress, Tile, recovered History, and Live were not captured. |
 | English/French spot checks | Screenshot matrix plus recreation/semantics notes | **Passed on earlier scoped candidates (2026-07-26 UTC):** English navigation/active states, French live/review/recap recreation, and French longest-cue/paused/finish-dialog shadow states are retained. They were not repeated on final `0bdbe98`; no fluent-review claim is made. |
 | Enlarged text | `1.30` Home, History, Progress, Settings, live, review/recap, safe failure, match/interval, practice/shadow, and permission matrix with reflow, scroll reachability, and no collision/clipping defects | **Passed as combined scoped evidence (2026-07-26 UTC):** the historical [26-image matrix](evidence/v0.3-pixel-watch-4/accessibility/report.json) covers the broader destinations; final `0bdbe98` physically retests hour-plus Summary/History at `1.30`. The recovered Summary/composition captures are separate final evidence, not part of the enlarged matrix. Final Home, Progress, Tile, recovered History, and Live have automated coverage only. |
-| Hour-plus duration and recovery-coverage UI | Frozen-APK normal/`1.30` Summary and History plus exact gap notice/composition images | **Passed (2026-07-26 UTC):** [current 480×480 captures](evidence/v0.3-pixel-watch-4/README.md#final-frozen-apk-long-session-and-recovery-coverage) show `3:00:12`, the 11-second known-unobserved notice, and the three-way Detected/No play/Unobserved composition. |
+| Hour-plus duration and recovery-coverage UI | Frozen-APK normal/`1.30` Summary and History plus exact gap notice/composition images | **Passed (2026-07-26 UTC):** [current 480×480 captures](evidence/v0.3-pixel-watch-4/README.md#final-frozen-apk-long-session-and-recovery-coverage) show `3:00:12`, the 11-second known-unobserved notice, and the three-way Detected/No detected play/Unobserved composition (`Détecté`/`Aucun jeu détecté`/`Non observé` in French). |
 | 180-minute powered screen-off lifecycle | Probe `report.json`, `start.png`, optional post-stop diary, verified `recap.png`, charger state, and lifecycle result | **Pending active final gate:** `FINAL_ENDURANCE_PENDING`; the retained `6f6f6cd` run is pre-final and is not counted for this row. |
 | 180-minute unpowered battery measurement | Probe report with every reading unpowered and measured battery delta | **Not claimed:** no qualifying run is documented. |
 

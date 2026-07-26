@@ -73,6 +73,14 @@ estimate remains an estimate.
   A displayed active:quiet ratio must therefore say **estimated** and expose manual session
   trimming or corrections before it is treated as a training target.
 
+**Summary activity composition**
+: The three visible legend labels are **Detected**, **No detected play**, and **Unobserved**
+  (**Détecté**, **Aucun jeu détecté**, and **Non observé** in French). “No detected play” is
+  observed reviewed time outside detected active spans; it does not prove that no badminton
+  occurred. Do not shorten either localized composition label. Known unobserved process time
+  remains a separate evidence state and is never counted as detected activity or inferred quiet
+  time.
+
 **Heart-rate coverage**
 : The approximate share of elapsed seconds for which the optical sensor supplied a distinct
   reading. Recorded average and peak BPM may still be shown with their sample count and
