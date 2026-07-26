@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "capturedAtUtc": "2026-07-26T02:49:44Z",
+  "outcome": "pass",
+  "sourceRevision": "c5a1a67aa8b1b85a665b74ddf735ee9138308e0c",
+  "debugApkSha256": "d5daeaf26d3e9b93b4b88d307b845f0ce049fd7248eadc324eb26b54e96dc39a",
+  "device": {
+    "model": "Pixel Watch 4",
+    "apiLevel": 37,
+    "fingerprint": "google/kenari_btwifi/kenari_btwifi:17/CP2A.260603.001.S1/15396605:user/release-keys"
+  },
+  "scenario": {
+    "targetRepetitions": 18,
+    "seedBefore": -5674233167501734591,
+    "nextCueIndexBefore": 2,
+    "confirmedRepetitionsBefore": 1,
+    "statusBefore": "Active",
+    "activeFileSha256Before": "92e7b5e1560671c82be3e4ed82ae1fe7965b7f9e082ca04bf8ae6ee10780f2c3",
+    "processDeathAction": "am force-stop com.badwatch.badwatch",
+    "restoredAutomatically": true,
+    "seedAfter": -5674233167501734591,
+    "sameSeed": true,
+    "nextCueIndexAfter": 2,
+    "confirmedRepetitionsAfter": 1,
+    "sameConfirmedRepetition": true,
+    "statusAfter": "Paused",
+    "restoredSafetyMessage": "Restored safely. Unobserved restart time will not count.",
+    "currentCueTimestampShiftedFromMillis": 1785034077513,
+    "currentCueTimestampShiftedToMillis": 1785034102387,
+    "activeFileSha256After": "90fcc7d7442290b4f8096e135d76e233d530628a811e2c784e78fc8da9027c0f",
+    "cleanup": "Finish early and Done confirmed through the visible UI",
+    "activeFileRemovedAfterCleanup": true
+  },
+  "evidence": {
+    "beforeScreenshot": "../screenshots/29-final-shadow-before-restart.png",
+    "afterScreenshot": "../screenshots/30-final-shadow-after-restart.png",
+    "completedScreenshot": "../screenshots/31-final-shadow-complete.png"
+  }
+}
