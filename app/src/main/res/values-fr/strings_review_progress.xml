@@ -15,8 +15,10 @@
     <string name="summary_average_burst">Frappes / échange</string>
     <string name="summary_active_quiet">Activité est. : calme</string>
     <string name="summary_detected">Détecté</string>
-    <string name="summary_quiet">Calme</string>
-    <string name="summary_activity_distribution">Activité détectée estimée %1$d pour cent, temps calme %2$d pour cent</string>
+    <string name="summary_quiet">Sans jeu</string>
+    <string name="summary_activity_distribution">Activité détectée estimée %1$d pour cent, aucun jeu détecté %2$d pour cent</string>
+    <string name="summary_activity_distribution_with_unobserved">Activité détectée estimée %1$d pour cent, aucun jeu détecté %2$d pour cent, temps non observé connu %3$d pour cent</string>
+    <string name="summary_unobserved">Non observé</string>
     <string name="summary_peak_zone">Zone maximale</string>
     <string name="summary_cardio_response">Réponse cardio</string>
     <string name="format_hrr_minutes">%1$.1f min-RFC</string>

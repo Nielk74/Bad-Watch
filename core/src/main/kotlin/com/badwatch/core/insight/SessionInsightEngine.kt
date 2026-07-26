@@ -198,7 +198,8 @@ class SessionInsightEngine(
      * Reported only when it is low, because a healthy number here is not news.
      */
     private fun intensityInsight(session: TrainingSession, profile: RallyProfile): Insight? {
-        if (profile.workDensity >= 0.2f) return null
+        val wholeSessionDensity = profile.workDensityOver(session.summary.durationMillis)
+        if (wholeSessionDensity >= 0.2f) return null
         val minutes = (profile.totalWorkMillis / 60_000.0).roundToInt()
         val total = (session.summary.durationMillis / 60_000.0).roundToInt()
         if (total < 15) return null
@@ -209,11 +210,11 @@ class SessionInsightEngine(
             detail = "$minutes of $total minutes sat inside detected exchange windows. " +
                 "Warm-up, drills without hits and missed detections can lower this estimate.",
             severity = InsightSeverity.Notable,
-            evidence = "${percent(profile.workDensity)}% estimated active time",
+            evidence = "${percent(wholeSessionDensity)}% estimated active time",
             localizationArgs = mapOf(
                 "activeMinutes" to minutes.toString(),
                 "totalMinutes" to total.toString(),
-                "activePercent" to percent(profile.workDensity).toString()
+                "activePercent" to percent(wholeSessionDensity).toString()
             )
         )
     }

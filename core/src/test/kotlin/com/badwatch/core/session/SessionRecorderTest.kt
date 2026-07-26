@@ -157,9 +157,11 @@ class SessionRecorderTest {
         val secondCheckpoint = roundTrip(restored.checkpoint()!!)
         val twiceRestored = SessionRecorder.restore(secondCheckpoint)
         val snapshot = twiceRestored.snapshot(START + 25_000L)
+        val knownAbsence = twiceRestored.knownProcessAbsenceMillis(START + 25_000L)
         val recorded = twiceRestored.finish(START + 30_000L)!!
 
         assertThat(snapshot.durationMillis).isEqualTo(25_000L)
+        assertThat(knownAbsence).isEqualTo(16_000L)
         assertThat(recorded.session.id).isEqualTo("recovered-session")
         assertThat(recorded.session.startedAtMillis).isEqualTo(START)
         assertThat(recorded.session.endedAtMillis).isEqualTo(START + 30_000L)

@@ -105,6 +105,21 @@ class SessionInsightEngineTest {
     }
 
     @Test
+    fun lowActivityDensityUsesWholeSessionWallTimeRatherThanOnlyAnalyzedPlay() {
+        val profile = profile(
+            rallies = rallies(count = 20, shotsEach = 10),
+            restMillis = 0L
+        )
+
+        val insight = engine.generate(session(), profile)
+            .single { it.id == "low-work-density" }
+
+        assertThat(profile.workDensity).isEqualTo(1f)
+        assertThat(insight.localizationArgs["activePercent"]).isEqualTo("4")
+        assertThat(insight.evidence).isEqualTo("4% estimated active time")
+    }
+
+    @Test
     fun comparesRestAgainstThePlayersOwnNormWhenHistoryExists() {
         val profile = profile(rallies = rallies(count = 20, shotsEach = 5), restMillis = 20_000L)
         val baseline = InsightBaseline(

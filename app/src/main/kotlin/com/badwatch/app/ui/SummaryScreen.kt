@@ -73,6 +73,12 @@ fun SummaryScreen(
     val rallies = reviewed.rallyProfile
     val effective = reviewed.metrics
     val postBurstHeartRate = PostBurstHeartRateBuilder.build(stored)
+    val effectiveGapMillis = processAbsenceNoticeMillis(stored)
+    val activityComposition = sessionActivityComposition(
+        durationMillis = effective.window.durationMillis,
+        detectedActiveMillis = rallies.totalWorkMillis,
+        knownUnobservedMillis = effectiveGapMillis
+    )
 
     WatchScreen(
         edgeButton = {
@@ -119,7 +125,6 @@ fun SummaryScreen(
 
         if (shouldShowProcessAbsenceNotice(stored)) {
             item {
-                val effectiveGapMillis = processAbsenceNoticeMillis(stored)
                 InfoCard(title = stringResource(R.string.summary_process_gap_title)) {
                     Text(
                         text = if (effectiveGapMillis > 0L) {
@@ -204,25 +209,38 @@ fun SummaryScreen(
                     pluralStringResource(R.plurals.common_hits_count, longestHits, longestHits)
                 )
                 DetailRow(stringResource(R.string.summary_active_quiet), formatRestRatio(rallies.restRatio))
-                val total = rallies.totalWorkMillis + rallies.totalRestMillis
-                if (total > 0) {
-                    val activePercent = (rallies.workDensity * 100).toInt()
+                if (activityComposition.durationMillis > 0L) {
                     DistributionBar(
-                        segments = listOf(
-                            DistributionSegment(
+                        segments = buildList {
+                            add(DistributionSegment(
                                 color = MaterialTheme.colorScheme.primary,
-                                fraction = rallies.totalWorkMillis.toFloat() / total
-                            ),
-                            DistributionSegment(
+                                fraction = activityComposition.activeFraction
+                            ))
+                            add(DistributionSegment(
                                 color = MaterialTheme.colorScheme.secondary,
-                                fraction = rallies.totalRestMillis.toFloat() / total
+                                fraction = activityComposition.quietFraction
+                            ))
+                            if (activityComposition.unobservedMillis > 0L) {
+                                add(DistributionSegment(
+                                    color = MaterialTheme.colorScheme.outline,
+                                    fraction = activityComposition.unobservedFraction
+                                ))
+                            }
+                        },
+                        contentDescription = if (activityComposition.unobservedMillis > 0L) {
+                            stringResource(
+                                R.string.summary_activity_distribution_with_unobserved,
+                                activityComposition.activePercent,
+                                activityComposition.quietPercent,
+                                activityComposition.unobservedPercent
                             )
-                        ),
-                        contentDescription = stringResource(
-                            R.string.summary_activity_distribution,
-                            activePercent,
-                            100 - activePercent
-                        )
+                        } else {
+                            stringResource(
+                                R.string.summary_activity_distribution,
+                                activityComposition.activePercent,
+                                activityComposition.quietPercent
+                            )
+                        }
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         LegendDot(
@@ -234,10 +252,16 @@ fun SummaryScreen(
                             label = stringResource(R.string.summary_quiet)
                         )
                     }
+                    if (activityComposition.unobservedMillis > 0L) {
+                        LegendDot(
+                            color = MaterialTheme.colorScheme.outline,
+                            label = stringResource(R.string.summary_unobserved)
+                        )
+                    }
                 }
                 DetailRow(
                     stringResource(R.string.label_estimated_active),
-                    "${(rallies.workDensity * 100).toInt()}%"
+                    "${activityComposition.activePercent}%"
                 )
             }
         }

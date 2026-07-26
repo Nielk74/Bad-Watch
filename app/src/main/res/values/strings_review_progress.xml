@@ -15,8 +15,10 @@
     <string name="summary_average_burst">Hits / exchange</string>
     <string name="summary_active_quiet">Est. active : quiet</string>
     <string name="summary_detected">Detected</string>
-    <string name="summary_quiet">Quiet</string>
-    <string name="summary_activity_distribution" tools:ignore="PluralsCandidate">Estimated detected activity %1$d percent, quiet time %2$d percent</string>
+    <string name="summary_quiet">No play</string>
+    <string name="summary_activity_distribution" tools:ignore="PluralsCandidate">Estimated detected activity %1$d percent, no detected play %2$d percent</string>
+    <string name="summary_activity_distribution_with_unobserved" tools:ignore="PluralsCandidate">Estimated detected activity %1$d percent, no detected play %2$d percent, known unobserved time %3$d percent</string>
+    <string name="summary_unobserved">Unobserved</string>
     <string name="summary_peak_zone">Peak zone</string>
     <string name="summary_cardio_response">Cardio response</string>
     <string name="format_hrr_minutes">%1$.1f HRR-min</string>

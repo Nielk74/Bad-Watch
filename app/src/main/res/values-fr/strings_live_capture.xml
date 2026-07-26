@@ -12,7 +12,9 @@
     <string name="live_rally_bursts">Échanges détectés</string>
     <string name="live_average_hits">Frappes moy.</string>
     <string name="live_active_quiet">Activité est. : calme</string>
-    <string name="live_activity_distribution">Temps d’activité estimé %1$d pour cent, temps calme %2$d pour cent</string>
+    <string name="live_activity_distribution">Temps d’activité estimé %1$d pour cent, aucun jeu détecté %2$d pour cent</string>
+    <string name="live_activity_distribution_with_unobserved">Temps d’activité estimé %1$d pour cent, aucun jeu détecté %2$d pour cent, temps non observé connu %3$d pour cent</string>
+    <string name="live_unobserved">Non observé</string>
     <string name="live_heart_rate_reserve">Réserve cardiaque</string>
     <string name="live_last_hit">Dernière frappe détectée</string>
     <string name="live_waiting_swing">En attente de votre premier geste</string>

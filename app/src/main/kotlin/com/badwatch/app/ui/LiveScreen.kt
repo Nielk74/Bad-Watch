@@ -384,6 +384,11 @@ private fun HudDetailsPage(
 ) {
     val snapshot = state.snapshot
     val rallies = state.rallyProfile
+    val activityComposition = sessionActivityComposition(
+        durationMillis = snapshot.durationMillis,
+        detectedActiveMillis = rallies.totalWorkMillis,
+        knownUnobservedMillis = state.knownProcessAbsenceMillis
+    )
 
     WatchScreen {
         item {
@@ -399,29 +404,48 @@ private fun HudDetailsPage(
                     pluralStringResource(R.plurals.common_hits_count, longestHits, longestHits)
                 )
                 DetailRow(stringResource(R.string.live_active_quiet), formatRestRatio(rallies.restRatio))
-                val total = rallies.totalWorkMillis + rallies.totalRestMillis
-                if (total > 0) {
-                    val activePercent = (rallies.workDensity * 100).toInt()
+                if (activityComposition.unobservedMillis > 0L) {
+                    DetailRow(
+                        stringResource(R.string.live_unobserved),
+                        formatDuration(activityComposition.unobservedMillis)
+                    )
+                }
+                if (activityComposition.durationMillis > 0L) {
                     DistributionBar(
-                        segments = listOf(
-                            DistributionSegment(
+                        segments = buildList {
+                            add(DistributionSegment(
                                 color = MaterialTheme.colorScheme.primary,
-                                fraction = rallies.totalWorkMillis.toFloat() / total
-                            ),
-                            DistributionSegment(
+                                fraction = activityComposition.activeFraction
+                            ))
+                            add(DistributionSegment(
                                 color = MaterialTheme.colorScheme.secondary,
-                                fraction = rallies.totalRestMillis.toFloat() / total
+                                fraction = activityComposition.quietFraction
+                            ))
+                            if (activityComposition.unobservedMillis > 0L) {
+                                add(DistributionSegment(
+                                    color = MaterialTheme.colorScheme.outline,
+                                    fraction = activityComposition.unobservedFraction
+                                ))
+                            }
+                        },
+                        contentDescription = if (activityComposition.unobservedMillis > 0L) {
+                            stringResource(
+                                R.string.live_activity_distribution_with_unobserved,
+                                activityComposition.activePercent,
+                                activityComposition.quietPercent,
+                                activityComposition.unobservedPercent
                             )
-                        ),
-                        contentDescription = stringResource(
-                            R.string.live_activity_distribution,
-                            activePercent,
-                            100 - activePercent
-                        )
+                        } else {
+                            stringResource(
+                                R.string.live_activity_distribution,
+                                activityComposition.activePercent,
+                                activityComposition.quietPercent
+                            )
+                        }
                     )
                     DetailRow(
                         stringResource(R.string.label_estimated_active),
-                        "$activePercent%"
+                        "${activityComposition.activePercent}%"
                     )
                 }
             }

@@ -323,7 +323,8 @@ class SessionController(
         _state.value = SessionState.Recording(
             snapshot = session.snapshot(timestampMillis),
             rallyProfile = session.rallyProfile(timestampMillis),
-            profile = session.playerProfile
+            profile = session.playerProfile,
+            knownProcessAbsenceMillis = session.knownProcessAbsenceMillis(timestampMillis)
         )
     }
 
@@ -381,7 +382,9 @@ sealed interface SessionState {
     data class Recording(
         val snapshot: TrainingSessionSnapshot,
         val rallyProfile: RallyProfile,
-        val profile: PlayerProfile
+        val profile: PlayerProfile,
+        /** Immutable recovery provenance inside the live wall window. */
+        val knownProcessAbsenceMillis: Long = 0L
     ) : SessionState
 
     data class Completed(

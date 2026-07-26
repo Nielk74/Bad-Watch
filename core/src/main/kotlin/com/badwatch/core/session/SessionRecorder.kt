@@ -7,6 +7,7 @@ import com.badwatch.core.model.SensorSample
 import com.badwatch.core.model.ShotEvent
 import com.badwatch.core.model.TrainingSession
 import com.badwatch.core.model.TrainingSessionSnapshot
+import com.badwatch.core.model.overlapDurationMillis
 import com.badwatch.core.pipeline.ShotDetectionPipeline
 import java.util.UUID
 
@@ -75,6 +76,13 @@ class SessionRecorder(
             shots = shots,
             sessionEndMillis = nowMillis,
             processAbsenceGaps = aggregator.processAbsenceGaps()
+        )
+
+    /** Known process-absence time inside the live wall window, with overlapping gaps unioned. */
+    fun knownProcessAbsenceMillis(nowMillis: Long): Long =
+        aggregator.processAbsenceGaps().overlapDurationMillis(
+            startMillis = startMillis,
+            endMillis = maxOf(startMillis, nowMillis)
         )
 
     /** Adds durable provenance for one process absence while retaining the original wall bounds. */

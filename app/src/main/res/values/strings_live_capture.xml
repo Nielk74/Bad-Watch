@@ -12,7 +12,9 @@
     <string name="live_rally_bursts">Detected exchanges</string>
     <string name="live_average_hits">Avg hits</string>
     <string name="live_active_quiet">Est. active : quiet</string>
-    <string name="live_activity_distribution" tools:ignore="PluralsCandidate">Estimated active time %1$d percent, quiet time %2$d percent</string>
+    <string name="live_activity_distribution" tools:ignore="PluralsCandidate">Estimated active time %1$d percent, no detected play %2$d percent</string>
+    <string name="live_activity_distribution_with_unobserved" tools:ignore="PluralsCandidate">Estimated active time %1$d percent, no detected play %2$d percent, known unobserved time %3$d percent</string>
+    <string name="live_unobserved">Unobserved</string>
     <string name="live_heart_rate_reserve">HR reserve</string>
     <string name="live_last_hit">Last detected hit</string>
     <string name="live_waiting_swing">Waiting for your first swing</string>

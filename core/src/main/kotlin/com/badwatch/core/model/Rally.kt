@@ -58,11 +58,25 @@ data class RallyProfile(
     val restRatio: Float
         get() = if (totalWorkMillis <= 0L) 0f else totalRestMillis.toFloat() / totalWorkMillis
 
-    /** Fraction of the session spent actually playing, 0..1. */
+    /**
+     * Fraction of the analyzed detected-play span spent inside exchange windows, 0..1.
+     *
+     * This intentionally describes only [totalWorkMillis] + [totalRestMillis]. Callers that
+     * present a whole-session share must use [workDensityOver] with the reviewed wall duration,
+     * because leading time and known process absence are not part of detected rest.
+     */
     val workDensity: Float
         get() {
             val total = totalWorkMillis + totalRestMillis
             return if (total <= 0L) 0f else totalWorkMillis.toFloat() / total
+        }
+
+    /** Fraction of a caller-supplied wall window spent inside detected exchange windows. */
+    fun workDensityOver(durationMillis: Long): Float =
+        if (durationMillis <= 0L) {
+            0f
+        } else {
+            (totalWorkMillis.toFloat() / durationMillis).coerceIn(0f, 1f)
         }
 
     companion object {

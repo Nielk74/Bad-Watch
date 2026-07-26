@@ -85,6 +85,7 @@ class SessionControllerRecoveryTest {
         val recording = recoveredController.state.value as SessionState.Recording
         assertThat(recording.snapshot.startedAtMillis).isEqualTo(1_000L)
         assertThat(recording.snapshot.durationMillis).isEqualTo(24_000L)
+        assertThat(recording.knownProcessAbsenceMillis).isEqualTo(11_500L)
         assertThat(ActiveSessionJournal(journalFile).load()!!.checkpoint.aggregator.processAbsenceGaps)
             .containsExactly(ProcessAbsenceGap(13_500L, 25_000L))
 
