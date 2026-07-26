@@ -27,10 +27,35 @@ PACKAGE = "com.badwatch.badwatch"
 ACTIVITY = f"{PACKAGE}/com.badwatch.app.MainActivity"
 SERVICE_NAME = "com.badwatch.app.service.SessionService"
 SESSION_FILE = re.compile(r"^[0-9]+-[A-Za-z0-9-]+\.json$")
+STOP_ACTION_DESCRIPTIONS = {"Stop & save", "Arrêter et enregistrer"}
 
 
 class ProbeError(RuntimeError):
     pass
+
+
+def find_stop_action(root: ET.Element) -> ET.Element | None:
+    """Find the localized live stop action by its accessibility contract.
+
+    The round-screen button intentionally renders the compact verbs ``Finish``/``Finir`` while
+    exposing the complete localized action through ``content-desc``. Retain the former visible
+    English label as a compatibility fallback for older APKs used by recovery probes.
+    """
+    nodes = list(root.iter("node"))
+    semantic_target = next(
+        (
+            node
+            for node in nodes
+            if node.attrib.get("content-desc") in STOP_ACTION_DESCRIPTIONS
+        ),
+        None,
+    )
+    if semantic_target is not None:
+        return semantic_target
+    return next(
+        (node for node in nodes if node.attrib.get("text") == "Stop & save"),
+        None,
+    )
 
 
 @dataclass(frozen=True)
@@ -215,22 +240,19 @@ class Device:
                 for node in root.iter("node")
                 if (text := node.attrib.get("text"))
             ]
-            target = next(
-                (node for node in root.iter("node") if node.attrib.get("text") == "Stop & save"),
-                None,
-            )
+            target = find_stop_action(root)
             if target is not None:
                 break
         if target is None:
             preview = ", ".join(repr(text) for text in last_visible_text[:8]) or "no text"
             raise ProbeError(
-                "live UI did not expose the expected 'Stop & save' action after 15 seconds; "
+                "live UI did not expose the localized stop-and-save action after 15 seconds; "
                 f"last hierarchy showed {preview}"
             )
         bounds = target.attrib.get("bounds", "")
         match = re.fullmatch(r"\[([0-9]+),([0-9]+)]\[([0-9]+),([0-9]+)]", bounds)
         if match is None:
-            raise ProbeError(f"unexpected Stop bounds: {bounds!r}")
+            raise ProbeError(f"unexpected stop-action bounds: {bounds!r}")
         left, top, right, bottom = map(int, match.groups())
         self.shell("input", "tap", str((left + right) // 2), str((top + bottom) // 2))
 
