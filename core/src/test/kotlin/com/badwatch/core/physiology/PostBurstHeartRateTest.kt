@@ -2,6 +2,7 @@ package com.badwatch.core.physiology
 
 import com.badwatch.core.model.HeartRatePoint
 import com.badwatch.core.model.PlayerProfile
+import com.badwatch.core.model.ProcessAbsenceGap
 import com.badwatch.core.model.Rally
 import com.badwatch.core.model.RallyProfile
 import com.badwatch.core.model.ShotEvent
@@ -12,7 +13,10 @@ import com.badwatch.core.sync.SessionExport
 import com.badwatch.core.sync.CorrectionActor
 import com.badwatch.core.sync.CorrectionProvenance
 import com.badwatch.core.sync.HitCorrectionRevision
+import com.badwatch.core.sync.RecordingQuality
+import com.badwatch.core.sync.SessionContext
 import com.badwatch.core.sync.SessionCorrections
+import com.badwatch.core.sync.TrimCorrectionRevision
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
@@ -94,6 +98,47 @@ class PostBurstHeartRateTest {
 
         assertThat(PostBurstHeartRateBuilder.build(original)).isNotNull()
         assertThat(PostBurstHeartRateBuilder.build(reviewed)).isNull()
+    }
+
+    @Test
+    fun completeDiaryCannotHideAGapButTrimmingItOutRestoresTheHrObservation() {
+        val points = listOf(
+            92_000L to 164f,
+            100_000L to 170f,
+            112_000L to 168f,
+            151_000L to 145f,
+            155_000L to 143f,
+            160_000L to 141f,
+            165_000L to 140f,
+            169_000L to 139f
+        )
+        val complete = export(points).copy(
+            context = SessionContext(recordingQuality = RecordingQuality.Complete)
+        )
+        val gap = ProcessAbsenceGap(0L, 10_000L)
+        val gapBearing = complete.copy(
+            session = complete.session.copy(processAbsenceGaps = listOf(gap))
+        )
+
+        assertThat(PostBurstHeartRateBuilder.build(gapBearing)).isNull()
+
+        val trimmed = gapBearing.copy(
+            corrections = SessionCorrections(
+                trimRevisions = listOf(
+                    TrimCorrectionRevision(
+                        trimFromStartMillis = 10_000L,
+                        provenance = CorrectionProvenance(
+                            revisionId = "exclude-gap",
+                            actor = CorrectionActor.Player,
+                            recordedAtMillis = 200_000L
+                        )
+                    )
+                )
+            )
+        )
+
+        assertThat(PostBurstHeartRateBuilder.build(trimmed)).isNotNull()
+        assertThat(trimmed.session.processAbsenceGaps).containsExactly(gap)
     }
 
     private fun export(points: List<Pair<Long, Float>>): SessionExport {

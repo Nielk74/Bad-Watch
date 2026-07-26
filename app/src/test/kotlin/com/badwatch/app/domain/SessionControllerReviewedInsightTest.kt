@@ -6,6 +6,7 @@ import com.badwatch.app.data.SessionStore
 import com.badwatch.app.sensors.SensorStream
 import com.badwatch.core.model.HeartRateZone
 import com.badwatch.core.model.PlayerProfile
+import com.badwatch.core.model.ProcessAbsenceGap
 import com.badwatch.core.model.SensorSample
 import com.badwatch.core.model.ShotEvent
 import com.badwatch.core.model.ShotType
@@ -18,6 +19,7 @@ import com.badwatch.core.sync.ActivityMode
 import com.badwatch.core.sync.CorrectionActor
 import com.badwatch.core.sync.CorrectionProvenance
 import com.badwatch.core.sync.HitCorrectionRevision
+import com.badwatch.core.sync.RecordingQuality
 import com.badwatch.core.sync.SessionContext
 import com.badwatch.core.sync.SessionCorrections
 import com.badwatch.core.sync.SessionExport
@@ -109,6 +111,62 @@ class SessionControllerReviewedInsightTest {
         assertThat(revised.session).isEqualTo(raw.session)
         assertThat(revised.rallyProfile).isEqualTo(raw.rallyProfile)
         assertThat(store.refresh().single().export.session).isEqualTo(raw.session)
+        controllerScope.cancel()
+    }
+
+    @Test
+    fun completeDiaryEditCannotReenableImmediateInsightsForRecoveredEvidence() = runTest {
+        val root = temporaryFolder.newFolder("recovered-insight")
+        val store = SessionStore(File(root, "sessions"))
+        val base = exchangeExport()
+        val gap = ProcessAbsenceGap(2_500L, 8_500L)
+        val recovered = base.copy(
+            session = base.session.copy(processAbsenceGaps = listOf(gap)),
+            context = base.context.copy(recordingQuality = RecordingQuality.Partial)
+        )
+        store.save(recovered)
+
+        val checkpointRecorder = SessionRecorder(sessionId = recovered.session.id)
+        checkpointRecorder.start(recovered.session.startedAtMillis)
+        checkpointRecorder.onSample(
+            SensorSample(
+                timestampMillis = recovered.session.startedAtMillis + 1L,
+                gyro = Vector3(0f, 0f, 0f),
+                heartRateBpm = null
+            )
+        )
+        val journal = ActiveSessionJournal(File(root, "active/session.json"))
+        journal.save(
+            ActiveSessionJournalEntry(
+                checkpoint = checkpointRecorder.checkpoint()!!,
+                deviceId = recovered.deviceId,
+                appVersion = recovered.appVersion,
+                updatedAtMillis = recovered.session.endedAtMillis
+            )
+        )
+        val controllerScope = CoroutineScope(
+            SupervisorJob() + StandardTestDispatcher(testScheduler)
+        )
+        val controller = SessionController(
+            sensorStream = EmptySensorStream,
+            sessionStore = store,
+            runtimeSettings = FakeRuntimeSettings,
+            activeSessionJournal = journal,
+            appVersion = "test",
+            scope = controllerScope
+        )
+
+        assertThat(controller.start()).isEqualTo(SessionStartResult.AlreadySaved(recovered))
+        assertThat((controller.state.value as SessionState.Completed).insights).isEmpty()
+
+        val relabelled = controller.updateCompletedSession(
+            context = recovered.context.copy(recordingQuality = RecordingQuality.Complete),
+            report = recovered.report
+        )!!
+
+        assertThat(relabelled.context.recordingQuality).isEqualTo(RecordingQuality.Complete)
+        assertThat(relabelled.session.processAbsenceGaps).containsExactly(gap)
+        assertThat((controller.state.value as SessionState.Completed).insights).isEmpty()
         controllerScope.cancel()
     }
 

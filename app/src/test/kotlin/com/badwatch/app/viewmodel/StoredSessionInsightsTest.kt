@@ -2,6 +2,7 @@ package com.badwatch.app.viewmodel
 
 import com.badwatch.core.model.HeartRateZone
 import com.badwatch.core.model.PlayerProfile
+import com.badwatch.core.model.ProcessAbsenceGap
 import com.badwatch.core.model.ShotEvent
 import com.badwatch.core.model.ShotType
 import com.badwatch.core.model.TrainingSession
@@ -15,6 +16,7 @@ import com.badwatch.core.sync.RecordingQuality
 import com.badwatch.core.sync.SessionContext
 import com.badwatch.core.sync.SessionCorrections
 import com.badwatch.core.sync.SessionExport
+import com.badwatch.core.sync.TrimCorrectionRevision
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
@@ -79,6 +81,36 @@ class StoredSessionInsightsTest {
 
             assertThat(buildStoredSessionInsights(selected, emptyList())).isEmpty()
         }
+    }
+
+    @Test
+    fun completeDiaryCannotReenableInsightsUntilReviewTrimExcludesTheImmutableGap() {
+        val complete = export("gap", start = 10_000L, quietMillis = 10_000L)
+        val gap = ProcessAbsenceGap(complete.session.startedAtMillis, complete.session.startedAtMillis + 500L)
+        val gapBearing = complete.copy(
+            session = complete.session.copy(processAbsenceGaps = listOf(gap))
+        )
+
+        assertThat(gapBearing.context.recordingQuality).isEqualTo(RecordingQuality.Complete)
+        assertThat(buildStoredSessionInsights(gapBearing, emptyList())).isEmpty()
+
+        val trimmed = gapBearing.copy(
+            corrections = SessionCorrections(
+                trimRevisions = listOf(
+                    TrimCorrectionRevision(
+                        trimFromStartMillis = 500L,
+                        provenance = CorrectionProvenance(
+                            revisionId = "exclude-gap",
+                            actor = CorrectionActor.Player,
+                            recordedAtMillis = complete.session.endedAtMillis + 1L
+                        )
+                    )
+                )
+            )
+        )
+
+        assertThat(buildStoredSessionInsights(trimmed, emptyList())).isNotEmpty()
+        assertThat(trimmed.session.processAbsenceGaps).containsExactly(gap)
     }
 
     private fun export(

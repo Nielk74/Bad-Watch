@@ -2,6 +2,7 @@ package com.badwatch.server
 
 import com.badwatch.core.model.PlayerProfile
 import com.badwatch.core.model.HeartRateZone
+import com.badwatch.core.model.ProcessAbsenceGap
 import com.badwatch.core.model.ShotEvent
 import com.badwatch.core.model.ShotType
 import com.badwatch.core.model.TrainingSession
@@ -268,6 +269,49 @@ class AnalyticsTest {
             assertThat(dashboard.sessions.single().insights).isEmpty()
             assertThat(Analytics.detail(recording, listOf(recording)).reviewed.insights).isEmpty()
         }
+    }
+
+    @Test
+    fun completeGapRecordingStaysInAggregatesButCannotTeachServerInferences() {
+        val complete = reviewableSession().copy(
+            context = SessionContext(
+                activityMode = ActivityMode.SinglesMatch,
+                recordingQuality = RecordingQuality.Complete
+            )
+        )
+        val gap = ProcessAbsenceGap(59_000L, 60_000L)
+        val gapBearing = complete.copy(
+            session = complete.session.copy(processAbsenceGaps = listOf(gap))
+        )
+
+        val dashboard = Analytics.build(listOf(gapBearing))
+
+        assertThat(dashboard.sessionCount).isEqualTo(1)
+        assertThat(dashboard.totalElapsedMillis).isEqualTo(60_000L)
+        assertThat(dashboard.totalShots).isEqualTo(complete.session.shots.size)
+        assertThat(dashboard.sessions.single().insights).isEmpty()
+        assertThat(dashboard.comparisonGroups).isEmpty()
+        assertThat(Analytics.detail(gapBearing, listOf(gapBearing)).reviewed.insights).isEmpty()
+
+        val trimmed = gapBearing.copy(
+            corrections = SessionCorrections(
+                trimRevisions = listOf(
+                    TrimCorrectionRevision(
+                        trimFromEndMillis = 1_000L,
+                        provenance = CorrectionProvenance(
+                            revisionId = "exclude-gap",
+                            actor = CorrectionActor.Player,
+                            recordedAtMillis = complete.session.endedAtMillis + 1L
+                        )
+                    )
+                )
+            )
+        )
+        val reviewedDashboard = Analytics.build(listOf(trimmed))
+
+        assertThat(reviewedDashboard.comparisonGroups).hasSize(1)
+        assertThat(Analytics.detail(trimmed, listOf(trimmed)).reviewed.insights).isNotEmpty()
+        assertThat(trimmed.session.processAbsenceGaps).containsExactly(gap)
     }
 
     @Test

@@ -16,6 +16,7 @@ import com.badwatch.core.sync.RecordingQuality
 import com.badwatch.core.sync.SessionContext
 import com.badwatch.core.sync.SessionCorrections
 import com.badwatch.core.sync.SessionExport
+import com.badwatch.core.sync.isPlayerInferenceEligible
 import com.badwatch.core.sync.reviewedAnalysis
 import com.badwatch.core.sync.reviewedInsightBaseline
 import kotlinx.coroutines.CancellationException
@@ -328,17 +329,15 @@ class SessionController(
 
     private fun publishCompleted(export: SessionExport) {
         val history = sessionStore.sessions.value.map { it.export }
-        val analysis = export.reviewedAnalysis()
-        val baseline = export.reviewedInsightBaseline(history)
-        val insights = when (export.context.recordingQuality) {
-            RecordingQuality.Partial,
-            RecordingQuality.Unusable -> emptyList()
-            RecordingQuality.Unreviewed,
-            RecordingQuality.Complete -> insightEngine.generate(
+        val insights = if (export.isPlayerInferenceEligible) {
+            val analysis = export.reviewedAnalysis()
+            insightEngine.generate(
                 session = analysis.session,
                 rallyProfile = analysis.rallyProfile,
-                baseline = baseline
+                baseline = export.reviewedInsightBaseline(history)
             )
+        } else {
+            emptyList()
         }
         _state.value = SessionState.Completed(
             export = export,

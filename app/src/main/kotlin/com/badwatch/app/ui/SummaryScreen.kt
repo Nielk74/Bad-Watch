@@ -34,6 +34,7 @@ import com.badwatch.app.ui.components.ScreenHeader
 import com.badwatch.app.ui.components.Stat
 import com.badwatch.app.ui.components.WatchScreen
 import com.badwatch.app.ui.components.color
+import com.badwatch.app.ui.components.formatDuration
 import com.badwatch.app.ui.components.formatHeartRate
 import com.badwatch.app.ui.components.formatRestRatio
 import com.badwatch.app.ui.components.hrZoneLabel
@@ -47,6 +48,8 @@ import com.badwatch.core.sync.DiaryReviewStatus
 import com.badwatch.core.sync.RecordingQuality
 import com.badwatch.core.sync.SessionCompletion
 import com.badwatch.core.sync.effectiveMetrics
+import com.badwatch.core.sync.hasKnownProcessAbsence
+import com.badwatch.core.sync.knownProcessAbsenceMillisInEffectiveWindow
 import com.badwatch.core.sync.reviewedAnalysis
 
 /**
@@ -112,6 +115,26 @@ fun SummaryScreen(
                 // Short `m:ss` values still need enough width at the round edge.
                 durationWeight = 0.85f
             )
+        }
+
+        if (shouldShowProcessAbsenceNotice(stored)) {
+            item {
+                val effectiveGapMillis = processAbsenceNoticeMillis(stored)
+                InfoCard(title = stringResource(R.string.summary_process_gap_title)) {
+                    Text(
+                        text = if (effectiveGapMillis > 0L) {
+                            stringResource(
+                                R.string.summary_process_gap_body,
+                                formatDuration(effectiveGapMillis)
+                            )
+                        } else {
+                            stringResource(R.string.summary_process_gap_outside_review_body)
+                        },
+                        style = MaterialTheme.typography.bodyExtraSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
 
         if (stored.context.diaryReviewStatus != DiaryReviewStatus.Unreviewed ||
@@ -387,6 +410,13 @@ fun SummaryScreen(
         }
     }
 }
+
+/** Diary edits cannot hide immutable process-recovery provenance from the recap. */
+internal fun shouldShowProcessAbsenceNotice(stored: SessionExport): Boolean =
+    stored.hasKnownProcessAbsence
+
+internal fun processAbsenceNoticeMillis(stored: SessionExport): Long =
+    stored.knownProcessAbsenceMillisInEffectiveWindow
 
 @Composable
 private fun HeartRateZone.color(): androidx.compose.ui.graphics.Color = when (this) {

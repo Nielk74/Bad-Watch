@@ -1,9 +1,9 @@
 package com.badwatch.core.progress
 
-import com.badwatch.core.sync.RecordingQuality
 import com.badwatch.core.sync.SessionComparisonKey
 import com.badwatch.core.sync.SessionExport
 import com.badwatch.core.sync.comparisonKey
+import com.badwatch.core.sync.isPlayerInferenceEligible
 import com.badwatch.core.sync.reviewedAnalysis
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
@@ -59,10 +59,7 @@ object PlayProfileBuilder {
     private const val MINIMUM_HR_COVERAGE = 0.6f
 
     fun build(exports: List<SessionExport>): PlayProfile {
-        val eligible = exports.filterNot {
-            it.context.recordingQuality == RecordingQuality.Unusable ||
-                it.context.recordingQuality == RecordingQuality.Partial
-        }
+        val eligible = exports.filter { it.isPlayerInferenceEligible }
         val groups = eligible
             .groupBy { it.context.comparisonKey() }
             .filterKeys { it.baselineEligible }

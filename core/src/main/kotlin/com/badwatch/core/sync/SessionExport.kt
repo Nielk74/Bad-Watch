@@ -3,6 +3,7 @@ package com.badwatch.core.sync
 import com.badwatch.core.model.PlayerProfile
 import com.badwatch.core.model.RallyProfile
 import com.badwatch.core.model.TrainingSession
+import com.badwatch.core.model.overlapDurationMillis
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -64,6 +65,36 @@ data class SessionExport(
         const val SCHEMA_VERSION: Int = 1
     }
 }
+
+/** Immutable process-recovery provenance, independent of the editable diary quality. */
+val SessionExport.hasKnownProcessAbsence: Boolean
+    get() = session.processAbsenceGaps.isNotEmpty()
+
+/**
+ * Union overlap between immutable process-absence provenance and the player-reviewed time window.
+ * Gaps outside a later edge trim do not contaminate the evidence that remains in that projection.
+ */
+val SessionExport.knownProcessAbsenceMillisInEffectiveWindow: Long
+    get() {
+        val window = effectiveWindow()
+        return session.processAbsenceGaps.overlapDurationMillis(
+            startMillis = window.startedAtMillis,
+            endMillis = window.endedAtMillis
+        )
+    }
+
+/**
+ * Whether this recording is safe to teach player-facing comparisons or observations.
+ *
+ * [RecordingQuality] is an editable diary answer, so it cannot erase process-absence provenance.
+ * A recovered recording remains useful evidence and stays in honest aggregates, but unobserved
+ * time inside the reviewed window makes it unsuitable for inferred insights, personal baselines,
+ * and play profiles even if the player later labels it [RecordingQuality.Complete].
+ */
+val SessionExport.isPlayerInferenceEligible: Boolean
+    get() = knownProcessAbsenceMillisInEffectiveWindow == 0L &&
+        context.recordingQuality != RecordingQuality.Partial &&
+        context.recordingQuality != RecordingQuality.Unusable
 
 /**
  * A batch upload. The watch may have accumulated several sessions while offline.

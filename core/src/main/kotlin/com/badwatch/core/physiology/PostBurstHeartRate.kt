@@ -2,6 +2,7 @@ package com.badwatch.core.physiology
 
 import com.badwatch.core.model.HeartRatePoint
 import com.badwatch.core.sync.SessionExport
+import com.badwatch.core.sync.isPlayerInferenceEligible
 import com.badwatch.core.sync.reviewedAnalysis
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
@@ -34,6 +35,7 @@ object PostBurstHeartRateBuilder {
     private const val MIN_FOLLOW_UP_SAMPLES = 5
 
     fun build(export: SessionExport): PostBurstHeartRateChange? {
+        if (!export.isPlayerInferenceEligible) return null
         val reviewed = export.reviewedAnalysis()
         val burstEnd = reviewed.rallyProfile.rallies.maxOfOrNull { it.endMillis } ?: return null
         val trace = reviewed.session.heartRateTrace

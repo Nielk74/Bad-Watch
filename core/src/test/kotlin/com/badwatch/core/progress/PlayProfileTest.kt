@@ -2,6 +2,7 @@ package com.badwatch.core.progress
 
 import com.badwatch.core.model.HeartRateValueSource
 import com.badwatch.core.model.PlayerProfile
+import com.badwatch.core.model.ProcessAbsenceGap
 import com.badwatch.core.model.ShotEvent
 import com.badwatch.core.model.ShotType
 import com.badwatch.core.model.TrainingSession
@@ -81,6 +82,29 @@ class PlayProfileTest {
 
         val profile = PlayProfileBuilder.build(exports) as PlayProfile.Ready
 
+        assertThat(profile.sessionCount).isEqualTo(5)
+        assertThat(profile.medianDetectedHitsPerMinute).isWithin(0.01f).of(3f)
+    }
+
+    @Test
+    fun completeRecordingWithAnEffectiveProcessGapCannotTeachThePlayProfile() {
+        val clean = (0 until 5).map { index -> export("clean-$index", day = index) }
+        val gapBearing = export("gap", day = 6, shots = 500).let { export ->
+            export.copy(
+                session = export.session.copy(
+                    processAbsenceGaps = listOf(
+                        ProcessAbsenceGap(
+                            export.session.startedAtMillis + 1_000L,
+                            export.session.startedAtMillis + 2_000L
+                        )
+                    )
+                )
+            )
+        }
+
+        val profile = PlayProfileBuilder.build(clean + gapBearing) as PlayProfile.Ready
+
+        assertThat(gapBearing.context.recordingQuality).isEqualTo(RecordingQuality.Complete)
         assertThat(profile.sessionCount).isEqualTo(5)
         assertThat(profile.medianDetectedHitsPerMinute).isWithin(0.01f).of(3f)
     }

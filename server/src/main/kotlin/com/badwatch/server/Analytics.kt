@@ -17,6 +17,7 @@ import com.badwatch.core.sync.SessionCompletion
 import com.badwatch.core.sync.SessionContext
 import com.badwatch.core.sync.SessionExport
 import com.badwatch.core.sync.comparisonKey
+import com.badwatch.core.sync.isPlayerInferenceEligible
 import com.badwatch.core.sync.reviewedAnalysis
 import com.badwatch.core.sync.reviewedInsightBaseline
 import kotlinx.serialization.Serializable
@@ -165,10 +166,7 @@ object Analytics {
     ): DashboardData {
         val appliedFilter = canonicalize(filter)
         val comparisonGroups = buildComparisonGroups(
-            sessions.filter {
-                it.context.recordingQuality != RecordingQuality.Partial &&
-                    it.context.recordingQuality != RecordingQuality.Unusable
-            }
+            sessions.filter { it.isPlayerInferenceEligible }
         )
         val selectedSessions = sessions.filter { matchesFilter(it, appliedFilter) }
         if (selectedSessions.isEmpty()) {
@@ -308,23 +306,21 @@ object Analytics {
         .sortedWith(compareBy({ it.key.activityMode.ordinal }, { it.key.comparisonTag.orEmpty() }))
 
     /**
-     * Partial recordings can contain an unobserved process gap, and unusable recordings are kept
-     * only for audit. Their reviewed detector values remain visible, but neither can safely turn
-     * inferred quiet/rest into a player-facing observation.
+     * Reviewed detector values remain visible for audit and aggregates, but editable diary quality
+     * can never erase immutable process-absence provenance and re-enable an inferred observation.
      */
     private fun insightsFor(
         export: SessionExport,
         analysis: ReviewedSessionAnalysis,
         baseline: InsightBaseline
-    ): List<Insight> = when (export.context.recordingQuality) {
-        RecordingQuality.Partial,
-        RecordingQuality.Unusable -> emptyList()
-        RecordingQuality.Unreviewed,
-        RecordingQuality.Complete -> insightEngine.generate(
+    ): List<Insight> = if (export.isPlayerInferenceEligible) {
+        insightEngine.generate(
             session = analysis.session,
             rallyProfile = analysis.rallyProfile,
             baseline = baseline
         )
+    } else {
+        emptyList()
     }
 
     private fun matchesFilter(

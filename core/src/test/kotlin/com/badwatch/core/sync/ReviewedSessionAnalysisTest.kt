@@ -138,11 +138,25 @@ class ReviewedSessionAnalysisTest {
             exchangeExport(1_100_000L).withContext(ActivityMode.SinglesMatch),
             exchangeExport(600_000L).withContext(ActivityMode.Drill, tag = "rear court")
         )
+        val completeWithGap = exchangeExport(700_000L)
+            .withContext(ActivityMode.SinglesMatch)
+            .let { export ->
+                export.copy(
+                    session = export.session.copy(
+                        processAbsenceGaps = listOf(ProcessAbsenceGap(710_000L, 711_000L))
+                    )
+                )
+            }
 
-        val baseline = current.reviewedInsightBaseline(eligible + excluded + current)
+        val baseline = current.reviewedInsightBaseline(
+            eligible + excluded + completeWithGap + current
+        )
 
         assertThat(baseline.sessionCount).isEqualTo(2)
         assertThat(baseline.hasEnoughHistory).isFalse()
+        assertThat(completeWithGap.reviewedInsightBaseline(eligible)).isEqualTo(
+            com.badwatch.core.insight.InsightBaseline.NONE
+        )
     }
 
     @Test

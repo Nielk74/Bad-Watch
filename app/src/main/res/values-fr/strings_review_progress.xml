@@ -2,6 +2,9 @@
 <resources>
     <string name="summary_saved">Séance enregistrée</string>
     <string name="summary_reviewed_time">Durée vérifiée</string>
+    <string name="summary_process_gap_title">Temps non observé connu</string>
+    <string name="summary_process_gap_body">Wear OS a redémarré pendant cette séance. %1$s de la durée vérifiée n’a pas été observée. Le temps écoulé l’inclut. L’interruption n’est pas comptée comme du temps calme estimé et cet enregistrement est exclu des comparaisons personnelles.</string>
+    <string name="summary_process_gap_outside_review_body">Wear OS a redémarré pendant cette séance. Le temps non observé connu est hors de la durée vérifiée et n’affecte pas les comparaisons personnelles.</string>
     <string name="summary_your_report">Votre compte-rendu</string>
     <string name="summary_perceived_effort">Effort perçu</string>
     <string name="summary_session_rpe_load">Charge séance-RPE</string>

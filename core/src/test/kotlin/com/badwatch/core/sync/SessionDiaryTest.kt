@@ -2,6 +2,7 @@ package com.badwatch.core.sync
 
 import com.badwatch.core.model.HeartRateZone
 import com.badwatch.core.model.PlayerProfile
+import com.badwatch.core.model.ProcessAbsenceGap
 import com.badwatch.core.model.RallyProfile
 import com.badwatch.core.model.ShotEvent
 import com.badwatch.core.model.ShotType
@@ -208,6 +209,56 @@ class SessionDiaryTest {
         assertThat(untyped.isComparableWith(sessionExport())).isFalse()
         assertThat(untaggedDrill.isComparableWith(untaggedDrill)).isFalse()
         assertThat(taggedDrill.isComparableWith(sameTaggedDrill)).isTrue()
+    }
+
+    @Test
+    fun immutableGapOverlapOverridesEditableCompleteQualityForInferenceAndComparison() {
+        val clean = sessionExport().copy(
+            context = SessionContext(
+                activityMode = ActivityMode.SinglesMatch,
+                recordingQuality = RecordingQuality.Complete
+            )
+        )
+        val gap = clean.copy(
+            session = clean.session.copy(
+                processAbsenceGaps = listOf(ProcessAbsenceGap(2_000L, 3_000L))
+            )
+        )
+
+        assertThat(clean.isPlayerInferenceEligible).isTrue()
+        assertThat(gap.hasKnownProcessAbsence).isTrue()
+        assertThat(gap.knownProcessAbsenceMillisInEffectiveWindow).isEqualTo(1_000L)
+        assertThat(gap.isPlayerInferenceEligible).isFalse()
+        assertThat(gap.isComparableWith(clean)).isFalse()
+        assertThat(clean.isComparableWith(gap)).isFalse()
+    }
+
+    @Test
+    fun edgeTrimOutsideTheGapRestoresInferenceEligibilityWithoutDeletingProvenance() {
+        val clean = sessionExport().copy(
+            context = SessionContext(
+                activityMode = ActivityMode.SinglesMatch,
+                recordingQuality = RecordingQuality.Complete
+            )
+        )
+        val trimmed = clean.copy(
+            session = clean.session.copy(
+                processAbsenceGaps = listOf(ProcessAbsenceGap(1_000L, 2_000L))
+            ),
+            corrections = SessionCorrections(
+                trimRevisions = listOf(
+                    TrimCorrectionRevision(
+                        trimFromStartMillis = 1_000L,
+                        provenance = provenance("trim-gap", 7_000L)
+                    )
+                )
+            )
+        )
+
+        assertThat(trimmed.hasKnownProcessAbsence).isTrue()
+        assertThat(trimmed.knownProcessAbsenceMillisInEffectiveWindow).isEqualTo(0L)
+        assertThat(trimmed.isPlayerInferenceEligible).isTrue()
+        assertThat(trimmed.isComparableWith(clean)).isTrue()
     }
 
     @Test

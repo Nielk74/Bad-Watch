@@ -453,5 +453,8 @@ fun SessionContext.comparisonKey(): SessionComparisonKey = SessionComparisonKey(
 
 fun SessionExport.isComparableWith(other: SessionExport): Boolean {
     val key = context.comparisonKey()
-    return key.baselineEligible && key == other.context.comparisonKey()
+    return isPlayerInferenceEligible &&
+        other.isPlayerInferenceEligible &&
+        key.baselineEligible &&
+        key == other.context.comparisonKey()
 }

@@ -2,6 +2,9 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="summary_saved">Session saved</string>
     <string name="summary_reviewed_time">Reviewed time</string>
+    <string name="summary_process_gap_title">Known unobserved time</string>
+    <string name="summary_process_gap_body">Wear OS restarted during this session. %1$s of the reviewed time was not observed. Elapsed time includes it. The gap is not counted as inferred quiet time, and this recording is excluded from personal comparisons.</string>
+    <string name="summary_process_gap_outside_review_body">Wear OS restarted during this session. Its known unobserved time is outside the reviewed window and does not affect personal comparisons.</string>
     <string name="summary_your_report">Your report</string>
     <string name="summary_perceived_effort">Perceived effort</string>
     <string name="summary_session_rpe_load">Session-RPE load</string>
