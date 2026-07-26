@@ -511,6 +511,67 @@ def require_system_wake_controls(
         )
 
 
+def activate_system_wake_suppression(
+    device: Device,
+    max_attempts: int = 6,
+    settle_seconds: float = 0.5,
+) -> SystemWakeControls:
+    """Apply and verify wake suppression until Pixel System UI converges.
+
+    Wear System UI observes ``theater_mode_on`` asynchronously, so an immediate snapshot can
+    still expose or reassert its prior value just after a shell update. The observed failure was
+    stay-awake and DND applied while Theater had returned to zero. Re-applying the complete,
+    idempotent control set is bounded, and two matching reads separated by a settle interval
+    prevent a transient ``1`` from being accepted as release evidence.
+    """
+    if max_attempts <= 0:
+        raise ValueError("max_attempts must be positive")
+    if settle_seconds < 0:
+        raise ValueError("settle_seconds must not be negative")
+
+    expected = SystemWakeControls(
+        stay_on_while_plugged_in="0",
+        theater_mode_on="1",
+        zen_mode=2,
+    )
+    last_actual: SystemWakeControls | None = None
+    for _ in range(max_attempts):
+        # Theater remains last: DND's System UI observer must settle before Theater is latched.
+        device.apply_system_wake_suppression()
+        time.sleep(settle_seconds)
+        last_actual = device.system_wake_controls()
+        if last_actual != expected:
+            continue
+        time.sleep(settle_seconds)
+        last_actual = device.system_wake_controls()
+        if last_actual == expected:
+            return last_actual
+
+    raise ProbeError(
+        "active system-wake controls did not stabilize after "
+        f"{max_attempts} attempts: expected {expected.as_report()}, "
+        f"last found {last_actual.as_report() if last_actual else None}"
+    )
+
+
+def note_secondary_failure(
+    primary_error: BaseException,
+    operation: str,
+    secondary_error: BaseException,
+) -> None:
+    """Attach a cleanup failure without replacing the error that triggered cleanup."""
+    note = (
+        f"{operation} also failed with {type(secondary_error).__name__}: "
+        f"{secondary_error}"
+    )
+    # BaseException.add_note arrived in Python 3.11. The probe otherwise supports the 3.10
+    # syntax/type floor used by this repository, so diagnostics must remain best-effort there.
+    add_note = getattr(primary_error, "add_note", None)
+    if callable(add_note):
+        add_note(note)
+    print(f"wear-session-probe: {note}", file=sys.stderr)
+
+
 @contextmanager
 def system_wake_suppression(
     device: Device,
@@ -523,26 +584,80 @@ def system_wake_suppression(
         return
 
     evidence.original = device.system_wake_controls()
+    primary_error: BaseException | None = None
     try:
-        device.apply_system_wake_suppression()
-        evidence.active = device.system_wake_controls()
-        require_system_wake_controls(
-            evidence.active,
-            SystemWakeControls(
-                stay_on_while_plugged_in="0",
-                theater_mode_on="1",
-                zen_mode=2,
-            ),
-            "active",
-        )
+        evidence.active = activate_system_wake_suppression(device)
         yield evidence
+    except BaseException as error:
+        primary_error = error
+        raise
     finally:
         # This deliberately catches normal completion, ProbeError, KeyboardInterrupt, and even
         # a partially-applied setup. On the normal path it runs before the visible stop flow,
         # which itself wakes the display.
-        device.restore_system_wake_controls(evidence.original)
-        evidence.restored = device.system_wake_controls()
-        require_system_wake_controls(evidence.restored, evidence.original, "restored")
+        try:
+            device.restore_system_wake_controls(evidence.original)
+            evidence.restored = device.system_wake_controls()
+            require_system_wake_controls(evidence.restored, evidence.original, "restored")
+        except BaseException as restoration_error:
+            if primary_error is None:
+                raise
+            note_secondary_failure(
+                primary_error,
+                "restoring the original system-wake controls",
+                restoration_error,
+            )
+
+
+@contextmanager
+def stop_started_session_on_failure(device: Device) -> Iterator[None]:
+    """Stop/save an active probe session through the visible UI when its body fails.
+
+    This is deliberately not a general shutdown helper: on normal completion the ordinary probe
+    flow owns its stop, screenshots, and report. On an exception or Ctrl-C, settings contexts
+    unwind first, then the exact same visible stop-and-save action is used so no journal is left
+    active and no collected session is deleted. A cleanup error is attached to, but never
+    replaces, the triggering exception.
+    """
+    try:
+        yield
+    except BaseException as primary_error:
+        try:
+            service_running = device.is_session_service_running()
+            journal_active = device.read_active_journal() is not None
+            if journal_active and not service_running:
+                # A dead service can leave the fsynced recorder as the only ownership signal.
+                # Re-enter through the same exact Activity/autostart path as a normal probe so
+                # SessionController restores that journal into a live, visibly stoppable session.
+                device.start_session()
+                wait_until(
+                    lambda: (
+                        device.is_session_service_running()
+                        or device.read_active_journal() is None
+                    ),
+                    15,
+                    "the journaled failed probe session to recover",
+                )
+                service_running = device.is_session_service_running()
+
+            if service_running:
+                device.stop_session_through_ui()
+                wait_until(
+                    lambda: not device.is_session_service_running(),
+                    20,
+                    "the failed probe session service to stop",
+                )
+            if device.read_active_journal() is not None:
+                raise ProbeError(
+                    "the active-session journal remained after visible stop/save cleanup"
+                )
+        except BaseException as cleanup_error:
+            note_secondary_failure(
+                primary_error,
+                "visibly stopping and saving the failed probe session",
+                cleanup_error,
+            )
+        raise
 
 
 def device_metadata(device: Device) -> dict[str, str]:
@@ -582,62 +697,71 @@ def main() -> int:
     metadata = device_metadata(device)
     start_wall_millis = int(time.time() * 1000)
 
-    device.start_session()
-    wait_until(device.is_session_service_running, 15, "the foreground session service")
-    time.sleep(2)
-    device.screenshot(output / "start.png")
-
     duration_seconds = args.duration_minutes * 60.0
-    with system_wake_suppression(device, args.suppress_system_wakes) as wake_controls:
-        device.sleep_display()
-        wait_until(
-            lambda: device.wakefulness() in {"Asleep", "Dozing"},
-            15,
-            "the display to enter sleep or doze",
-        )
+    with stop_started_session_on_failure(device):
+        device.start_session()
+        wait_until(device.is_session_service_running, 15, "the foreground session service")
+        time.sleep(2)
+        device.screenshot(output / "start.png")
 
-        readings = [device.battery()]
-        print(
-            "probe 0m: "
-            f"service={readings[0].service_running}/{readings[0].service_foreground} "
-            f"wake={readings[0].wakefulness} samples={readings[0].journal_samples_processed}",
-            flush=True,
-        )
-        deadline = time.monotonic() + duration_seconds
-        while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                break
-            # Do not turn the short remainder at the end of a run into another reading. A probe
-            # sample is a continuity interval: taking two readings a second apart can truthfully
-            # see the same durable checkpoint even though sensors are still streaming. That made
-            # the strict per-interval progress gate depend on scheduling jitter. Wait out the tail
-            # without inventing an undersized interval; every retained reading remains at least
-            # sample_seconds after the previous one.
-            if remaining < args.sample_seconds:
-                time.sleep(remaining)
-                break
-            time.sleep(args.sample_seconds)
-            reading = device.battery()
-            readings.append(reading)
-            elapsed_minutes = (reading.captured_at_epoch_millis - start_wall_millis) / 60_000
+        with system_wake_suppression(device, args.suppress_system_wakes) as wake_controls:
+            device.sleep_display()
+            wait_until(
+                lambda: device.wakefulness() in {"Asleep", "Dozing"},
+                15,
+                "the display to enter sleep or doze",
+            )
+
+            readings = [device.battery()]
             print(
-                f"probe {elapsed_minutes:.1f}m: "
-                f"service={reading.service_running}/{reading.service_foreground} "
-                f"wake={reading.wakefulness} samples={reading.journal_samples_processed}",
+                "probe 0m: "
+                f"service={readings[0].service_running}/{readings[0].service_foreground} "
+                f"wake={readings[0].wakefulness} "
+                f"samples={readings[0].journal_samples_processed}",
                 flush=True,
             )
-            if not reading.service_running:
-                raise ProbeError(
-                    "foreground service disappeared before the requested duration elapsed"
+            deadline = time.monotonic() + duration_seconds
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                # Do not turn the short remainder at the end of a run into another reading. A
+                # sample is a continuity interval: taking two readings a second apart can
+                # truthfully see the same durable checkpoint even while sensors are streaming.
+                # Wait out the tail without inventing an undersized interval; every retained
+                # reading remains at least sample_seconds after the previous one.
+                if remaining < args.sample_seconds:
+                    time.sleep(remaining)
+                    break
+                time.sleep(args.sample_seconds)
+                reading = device.battery()
+                readings.append(reading)
+                elapsed_minutes = (
+                    reading.captured_at_epoch_millis - start_wall_millis
+                ) / 60_000
+                print(
+                    f"probe {elapsed_minutes:.1f}m: "
+                    f"service={reading.service_running}/{reading.service_foreground} "
+                    f"wake={reading.wakefulness} "
+                    f"samples={reading.journal_samples_processed}",
+                    flush=True,
                 )
-            if reading.service_foreground is not True:
-                raise ProbeError("session service remained present but was not foreground")
+                if not reading.service_running:
+                    raise ProbeError(
+                        "foreground service disappeared before the requested duration elapsed"
+                    )
+                if reading.service_foreground is not True:
+                    raise ProbeError("session service remained present but was not foreground")
 
-    # The suppression context restores the user's exact settings before this visible wake/stop.
-    device.stop_session_through_ui()
-    wait_until(lambda: not device.is_session_service_running(), 20, "the session service to stop")
-    end_wall_millis = int(time.time() * 1000)
+        # The suppression context restores exact settings before this visible wake/stop.
+        device.stop_session_through_ui()
+        wait_until(
+            lambda: not device.is_session_service_running(),
+            20,
+            "the session service to stop",
+        )
+        end_wall_millis = int(time.time() * 1000)
+
     post_stop_review_captured = device.capture_saved_session_recap(output)
 
     after_files = device.session_files()

@@ -15,9 +15,11 @@ from wear_session_probe import (  # noqa: E402
     ProbeError,
     SAVED_RECAP,
     SystemWakeControls,
+    activate_system_wake_suppression,
     classify_post_stop_screen,
     dnd_filter_for_zen_mode,
     find_stop_action,
+    stop_started_session_on_failure,
     system_wake_suppression,
     visible_hierarchy_labels,
 )
@@ -134,7 +136,8 @@ class WearSessionProbeWakeSuppressionTest(unittest.TestCase):
         with self.assertRaises(ProbeError):
             dnd_filter_for_zen_mode(4)
 
-    def test_restores_exact_controls_after_probe_error(self) -> None:
+    @patch("wear_session_probe.time.sleep", return_value=None)
+    def test_restores_exact_controls_after_probe_error(self, _: object) -> None:
         device = FakeWakeControlDevice()
         original = device.controls
         evidence = None
@@ -150,7 +153,8 @@ class WearSessionProbeWakeSuppressionTest(unittest.TestCase):
         self.assertIsNotNone(evidence)
         self.assertEqual(evidence.restored, original)
 
-    def test_restores_exact_controls_after_keyboard_interrupt(self) -> None:
+    @patch("wear_session_probe.time.sleep", return_value=None)
+    def test_restores_exact_controls_after_keyboard_interrupt(self, _: object) -> None:
         device = FakeWakeControlDevice()
         original = device.controls
 
@@ -173,6 +177,209 @@ class WearSessionProbeWakeSuppressionTest(unittest.TestCase):
             evidence.as_report(),
             {"enabled": False, "original": None, "active": None, "restored": None},
         )
+
+
+class SequencedWakeControlDevice:
+    def __init__(self, controls: list[SystemWakeControls]) -> None:
+        self.controls = iter(controls)
+        self.apply_calls = 0
+
+    def apply_system_wake_suppression(self) -> None:
+        self.apply_calls += 1
+
+    def system_wake_controls(self) -> SystemWakeControls:
+        return next(self.controls)
+
+
+class WearSessionProbeWakeConvergenceTest(unittest.TestCase):
+    @patch("wear_session_probe.time.sleep", return_value=None)
+    def test_retries_when_theater_does_not_latch_then_requires_stable_reads(
+        self,
+        _: object,
+    ) -> None:
+        expected = SystemWakeControls("0", "1", 2)
+        theater_fell_back = SystemWakeControls("0", "0", 2)
+        device = SequencedWakeControlDevice(
+            [
+                theater_fell_back,
+                expected,
+                theater_fell_back,
+                expected,
+                expected,
+            ]
+        )
+
+        active = activate_system_wake_suppression(  # type: ignore[arg-type]
+            device,
+            max_attempts=3,
+            settle_seconds=0,
+        )
+
+        self.assertEqual(active, expected)
+        self.assertEqual(device.apply_calls, 3)
+
+    @patch("wear_session_probe.time.sleep", return_value=None)
+    def test_fails_after_bounded_attempts_with_last_observed_controls(self, _: object) -> None:
+        theater_fell_back = SystemWakeControls("0", "0", 2)
+        device = SequencedWakeControlDevice([theater_fell_back, theater_fell_back])
+
+        with self.assertRaisesRegex(
+            ProbeError,
+            "did not stabilize after 2 attempts.*theaterModeOn.*'0'",
+        ):
+            activate_system_wake_suppression(  # type: ignore[arg-type]
+                device,
+                max_attempts=2,
+                settle_seconds=0,
+            )
+
+        self.assertEqual(device.apply_calls, 2)
+
+
+class FakeFailureCleanupDevice:
+    def __init__(
+        self,
+        *,
+        running: bool = True,
+        journal: dict[str, object] | None = None,
+        stop_error: BaseException | None = None,
+    ) -> None:
+        self.running = running
+        self.journal = journal
+        self.stop_error = stop_error
+        self.start_calls = 0
+        self.stop_calls = 0
+
+    def is_session_service_running(self) -> bool:
+        return self.running
+
+    def read_active_journal(self) -> dict[str, object] | None:
+        return self.journal
+
+    def start_session(self) -> None:
+        self.start_calls += 1
+        self.running = True
+
+    def stop_session_through_ui(self) -> None:
+        self.stop_calls += 1
+        if self.stop_error is not None:
+            raise self.stop_error
+        self.running = False
+        self.journal = None
+
+
+class OrderedFailureDevice(FakeWakeControlDevice):
+    def __init__(self) -> None:
+        super().__init__()
+        self.running = True
+        self.events: list[str] = []
+
+    def apply_system_wake_suppression(self) -> None:
+        self.events.append("apply")
+        super().apply_system_wake_suppression()
+
+    def restore_system_wake_controls(self, original: SystemWakeControls) -> None:
+        self.events.append("restore")
+        super().restore_system_wake_controls(original)
+
+    def is_session_service_running(self) -> bool:
+        return self.running
+
+    def read_active_journal(self) -> dict[str, object] | None:
+        return None
+
+    def stop_session_through_ui(self) -> None:
+        self.events.append("visible-stop")
+        self.running = False
+
+
+class Python310StyleProbeError(ProbeError):
+    # Simulate the absence of BaseException.add_note while this suite runs on Python 3.11+.
+    add_note = None
+
+
+class WearSessionProbeFailureCleanupTest(unittest.TestCase):
+    def test_probe_error_is_rethrown_after_visible_stop_save(self) -> None:
+        device = FakeFailureCleanupDevice()
+        original = ProbeError("original monitoring failure")
+
+        with self.assertRaises(ProbeError) as raised:
+            with stop_started_session_on_failure(device):  # type: ignore[arg-type]
+                raise original
+
+        self.assertIs(raised.exception, original)
+        self.assertEqual(device.stop_calls, 1)
+        self.assertFalse(device.running)
+
+    def test_journal_only_failure_recovers_exact_session_before_visible_stop_save(self) -> None:
+        device = FakeFailureCleanupDevice(
+            running=False,
+            journal={"checkpoint": {"sessionId": "recover-me"}},
+        )
+        original = ProbeError("service disappeared")
+
+        with self.assertRaises(ProbeError) as raised:
+            with stop_started_session_on_failure(device):  # type: ignore[arg-type]
+                raise original
+
+        self.assertIs(raised.exception, original)
+        self.assertEqual(device.start_calls, 1)
+        self.assertEqual(device.stop_calls, 1)
+        self.assertFalse(device.running)
+        self.assertIsNone(device.journal)
+
+    @patch("wear_session_probe.time.sleep", return_value=None)
+    def test_wake_controls_restore_before_failure_cleanup_wakes_and_stops(self, _: object) -> None:
+        device = OrderedFailureDevice()
+
+        with self.assertRaisesRegex(ProbeError, "monitoring failed"):
+            with stop_started_session_on_failure(device):  # type: ignore[arg-type]
+                with system_wake_suppression(device, enabled=True):
+                    raise ProbeError("monitoring failed")
+
+        self.assertEqual(device.events, ["apply", "restore", "visible-stop"])
+        self.assertFalse(device.running)
+
+    def test_keyboard_interrupt_is_rethrown_after_visible_stop_save(self) -> None:
+        device = FakeFailureCleanupDevice()
+        original = KeyboardInterrupt()
+
+        with self.assertRaises(KeyboardInterrupt) as raised:
+            with stop_started_session_on_failure(device):  # type: ignore[arg-type]
+                raise original
+
+        self.assertIs(raised.exception, original)
+        self.assertEqual(device.stop_calls, 1)
+        self.assertFalse(device.running)
+
+    @patch("wear_session_probe.print")
+    def test_cleanup_failure_is_not_allowed_to_replace_original_error(self, _: object) -> None:
+        device = FakeFailureCleanupDevice(stop_error=ProbeError("stop UI unavailable"))
+        original = ProbeError("original suppression failure")
+
+        with self.assertRaises(ProbeError) as raised:
+            with stop_started_session_on_failure(device):  # type: ignore[arg-type]
+                raise original
+
+        self.assertIs(raised.exception, original)
+        self.assertEqual(device.stop_calls, 1)
+        self.assertIn("stop UI unavailable", "\n".join(original.__notes__))
+
+    @patch("wear_session_probe.print")
+    def test_python_310_without_add_note_still_preserves_and_reports_primary_error(
+        self,
+        print_mock: object,
+    ) -> None:
+        device = FakeFailureCleanupDevice(stop_error=ProbeError("stop UI unavailable"))
+        original = Python310StyleProbeError("original suppression failure")
+
+        with self.assertRaises(Python310StyleProbeError) as raised:
+            with stop_started_session_on_failure(device):  # type: ignore[arg-type]
+                raise original
+
+        self.assertIs(raised.exception, original)
+        self.assertEqual(device.stop_calls, 1)
+        self.assertTrue(getattr(print_mock, "called"))
 
 
 class FakeStopDevice(Device):
