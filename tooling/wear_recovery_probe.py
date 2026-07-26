@@ -8,6 +8,7 @@ import hashlib
 import json
 import sys
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,166 @@ def checkpoint(journal: dict[str, Any], key: str) -> Any:
         return journal["checkpoint"][key]
     except (KeyError, TypeError) as error:
         raise ProbeError(f"active journal has no checkpoint.{key}") from error
+
+
+@dataclass(frozen=True)
+class ProcessAbsenceInterval:
+    started_at_millis: int
+    ended_at_millis: int
+
+    def as_report(self) -> dict[str, int]:
+        return {
+            "startedAtMillis": self.started_at_millis,
+            "endedAtMillis": self.ended_at_millis,
+        }
+
+
+@dataclass(frozen=True)
+class ProcessAbsenceEvidence:
+    session_intervals: tuple[ProcessAbsenceInterval, ...]
+    checkpoint_intervals: tuple[ProcessAbsenceInterval, ...]
+    validation_errors: tuple[str, ...]
+    checkpoint_exact_match: bool
+    covers_journal_to_restart: bool
+    overlaps_forced_stop: bool
+    matched_interval: ProcessAbsenceInterval | None
+
+    @property
+    def passed(self) -> bool:
+        return (
+            not self.validation_errors
+            and bool(self.session_intervals)
+            and self.checkpoint_exact_match
+            and self.covers_journal_to_restart
+            and self.overlaps_forced_stop
+        )
+
+    def as_report(self) -> dict[str, Any]:
+        return {
+            "processAbsenceGaps": [gap.as_report() for gap in self.session_intervals],
+            "afterRecoveryCheckpointProcessAbsenceGaps": [
+                gap.as_report() for gap in self.checkpoint_intervals
+            ],
+            "processAbsenceGapCount": len(self.session_intervals),
+            "processAbsenceGapTotalMillis": sum(
+                gap.ended_at_millis - gap.started_at_millis
+                for gap in self.session_intervals
+            ),
+            "processAbsenceIntervalsValid": not self.validation_errors,
+            "processAbsenceCheckpointExactMatch": self.checkpoint_exact_match,
+            "processAbsenceCoversJournalToRestart": self.covers_journal_to_restart,
+            "processAbsenceOverlapsForcedStop": self.overlaps_forced_stop,
+            "matchedProcessAbsenceGap": (
+                self.matched_interval.as_report() if self.matched_interval else None
+            ),
+            "processAbsenceValidationErrors": list(self.validation_errors),
+            "processAbsenceEvidenceValid": self.passed,
+        }
+
+
+def _parse_process_absence_intervals(
+    raw: Any,
+    source: str,
+) -> tuple[tuple[ProcessAbsenceInterval, ...], list[str]]:
+    errors: list[str] = []
+    if raw is None:
+        return (), [f"{source} is missing"]
+    if not isinstance(raw, list):
+        return (), [f"{source} must be a list"]
+    if not raw:
+        return (), [f"{source} must contain at least one interval"]
+
+    intervals: list[ProcessAbsenceInterval] = []
+    for index, item in enumerate(raw):
+        location = f"{source}[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{location} must be an object")
+            continue
+        started_at = item.get("startedAtMillis")
+        ended_at = item.get("endedAtMillis")
+        if not isinstance(started_at, int) or isinstance(started_at, bool):
+            errors.append(f"{location}.startedAtMillis must be an integer")
+            continue
+        if not isinstance(ended_at, int) or isinstance(ended_at, bool):
+            errors.append(f"{location}.endedAtMillis must be an integer")
+            continue
+        if started_at < 0:
+            errors.append(f"{location}.startedAtMillis must not be negative")
+            continue
+        if ended_at <= started_at:
+            errors.append(f"{location}.endedAtMillis must be after its start")
+            continue
+        intervals.append(ProcessAbsenceInterval(started_at, ended_at))
+
+    for previous, current in zip(intervals, intervals[1:]):
+        if current.started_at_millis < previous.ended_at_millis:
+            errors.append(f"{source} must be ordered and non-overlapping")
+            break
+    return tuple(intervals), errors
+
+
+def evaluate_process_absence_evidence(
+    session_gaps: Any,
+    checkpoint_gaps: Any,
+    journal_updated_at_millis: Any,
+    forced_stop_at_millis: int,
+    restart_requested_at_millis: int,
+) -> ProcessAbsenceEvidence:
+    """Validate durable gap provenance without requiring an Android device.
+
+    The journal timestamp is the last durable observation before recovery. The controller records
+    from that conservative boundary until its restart timestamp, which occurs no earlier than the
+    host's restart request. The same interval sequence must then survive both the recovered
+    checkpoint and final session export.
+    """
+    session_intervals, session_errors = _parse_process_absence_intervals(
+        session_gaps,
+        "session.processAbsenceGaps",
+    )
+    checkpoint_intervals, checkpoint_errors = _parse_process_absence_intervals(
+        checkpoint_gaps,
+        "after checkpoint aggregator.processAbsenceGaps",
+    )
+    errors = session_errors + checkpoint_errors
+    if not isinstance(journal_updated_at_millis, int) or isinstance(
+        journal_updated_at_millis,
+        bool,
+    ):
+        errors.append("stopped journal updatedAtMillis must be an integer")
+        journal_updated_at_millis = -1
+    if forced_stop_at_millis > restart_requested_at_millis:
+        errors.append("forced-stop timestamp must not follow the restart request")
+    if journal_updated_at_millis > restart_requested_at_millis:
+        errors.append("journal timestamp must not follow the restart request")
+
+    matched = next(
+        (
+            gap
+            for gap in session_intervals
+            if gap.started_at_millis <= journal_updated_at_millis
+            and gap.ended_at_millis >= restart_requested_at_millis
+        ),
+        None,
+    )
+    overlaps_forced_stop = any(
+        gap.started_at_millis < restart_requested_at_millis
+        and gap.ended_at_millis > forced_stop_at_millis
+        for gap in session_intervals
+    )
+    return ProcessAbsenceEvidence(
+        session_intervals=session_intervals,
+        checkpoint_intervals=checkpoint_intervals,
+        validation_errors=tuple(errors),
+        checkpoint_exact_match=(
+            not session_errors
+            and not checkpoint_errors
+            and bool(session_intervals)
+            and session_intervals == checkpoint_intervals
+        ),
+        covers_journal_to_restart=matched is not None,
+        overlaps_forced_stop=overlaps_forced_stop,
+        matched_interval=matched,
+    )
 
 
 def main() -> int:
@@ -116,6 +277,19 @@ def main() -> int:
         and int(session.get("startedAtMillis", -1)) < killed_at
         and int(session.get("endedAtMillis", -1)) > restart_requested_at
     )
+    after_aggregator = checkpoint(after, "aggregator")
+    checkpoint_gaps = (
+        after_aggregator.get("processAbsenceGaps")
+        if isinstance(after_aggregator, dict)
+        else None
+    )
+    gap_evidence = evaluate_process_absence_evidence(
+        session_gaps=session.get("processAbsenceGaps"),
+        checkpoint_gaps=checkpoint_gaps,
+        journal_updated_at_millis=stopped.get("updatedAtMillis"),
+        forced_stop_at_millis=killed_at,
+        restart_requested_at_millis=restart_requested_at,
+    )
     passed = (
         same_id
         and same_start
@@ -124,10 +298,11 @@ def main() -> int:
         and recovery_count >= 1
         and partial
         and elapsed_span_includes_gap
+        and gap_evidence.passed
     )
 
     report = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "result": "pass" if passed else "fail",
         "deviceTransportHash": hashlib.sha256(serial.encode()).hexdigest()[:12],
         "device": metadata,
@@ -145,20 +320,22 @@ def main() -> int:
         "forcedStopAtEpochMillis": killed_at,
         "restartRequestedAtEpochMillis": restart_requested_at,
         "observedForcedStopGapMillis": restart_requested_at - killed_at,
+        "stoppedJournalUpdatedAtEpochMillis": stopped.get("updatedAtMillis"),
         "savedDurationMillis": saved_duration,
         "savedElapsedSpanMillis": elapsed_span,
         "savedElapsedSpanIncludesForcedStopGap": elapsed_span_includes_gap,
         "gapSemantics": (
-            "Elapsed session duration spans the interruption; the frozen sample checkpoint proves "
-            "that no sensor samples were invented while the process was stopped."
+            "Elapsed session duration spans the interruption; immutable process-absence intervals "
+            "mark the unobserved boundary and exactly match the recovered checkpoint."
         ),
+        **gap_evidence.as_report(),
     }
     (output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2))
     if not passed:
         raise ProbeError(
             "stable identity, frozen stopped checkpoint, resumed samples, elapsed-span semantics, "
-            "recovery count, or Partial gate failed"
+            "immutable process-absence provenance, recovery count, or Partial gate failed"
         )
     print(f"Evidence written to {output}")
     return 0
