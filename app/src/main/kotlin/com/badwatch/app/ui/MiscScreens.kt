@@ -28,7 +28,6 @@ import androidx.wear.compose.material3.AlertDialogDefaults
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.CompactButton
-import androidx.wear.compose.material3.EdgeButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
@@ -80,17 +79,7 @@ fun ErrorScreen(
 ) {
     var confirmDiscard by remember { mutableStateOf(false) }
 
-    WatchScreen(
-        edgeButton = {
-            EdgeButton(
-                onClick = {
-                    if (confirmPrimaryAction) confirmDiscard = true else onDismiss()
-                }
-            ) {
-                Text(stringResource(primaryActionResource))
-            }
-        }
-    ) {
+    WatchScreen {
         item {
             Column(
                 modifier = Modifier
@@ -133,6 +122,19 @@ fun ErrorScreen(
             }
         }
 
+        // Keep the safe/recoverable action before the destructive alternative. Edge actions
+        // only appear at the end of a Wear list; at enlarged text that made Discard look like
+        // the primary choice while Dismiss was still below the fold.
+        item {
+            CompactButton(
+                onClick = {
+                    if (confirmPrimaryAction) confirmDiscard = true else onDismiss()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(primaryActionResource)) }
+            )
+        }
+
         if (onDiscardRecovery != null) {
             item {
                 CompactButton(
@@ -147,7 +149,7 @@ fun ErrorScreen(
             }
         }
 
-        item { Spacer(modifier = Modifier.height(48.dp)) }
+        item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 
     AlertDialog(
