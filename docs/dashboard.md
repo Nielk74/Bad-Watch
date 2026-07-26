@@ -182,20 +182,20 @@ automatically or discards either edit silently.
 
 ## Browser regression gate
 
-The dependency-free browser-client suite executes the JavaScript extracted from the shipped
-`index.html` in Node's VM with a deterministic fake DOM, storage, navigation, dialogs, and HTTP
-responses:
+At test-only repository checkpoint `836f116`, `:server:test` depends on
+`:server:dashboardBrowserTest` and requires Node 22. It executes six journeys against JavaScript
+extracted from shipped `index.html`: stale-token prompt/retry; URL-filter
+hydrate/apply/error/reset; deep-linked reviewed detail; successful revisioned diary save and
+aggregate refresh; HTTP 409 reload/conflict replacement; and archive-restore success/error. This
+proves client state/request contracts, not responsive layout or real-browser rendering.
+
+The dependency-free suite runs in Node's VM with a deterministic fake DOM, storage, navigation,
+dialogs, and HTTP responses. CI/release install Node 22 before invoking the shared Gradle gate:
 
 ```bash
 ./gradlew :server:dashboardBrowserTest
 # Direct equivalent: TZ=UTC node --test server/src/test/js/dashboard-client.test.mjs
 ```
-
-It behaviorally covers bearer-token rejection/retry, URL filter hydration/apply/reset/error,
-deep-linked reviewed detail rendering, successful diary save, HTTP 409 reload, and archive restore
-success/error. `:server:test` depends on this task, and CI/release install Node 22 before running the
-shared Gradle test gate. This is a client-state and request-contract regression suite; responsive
-layout and browser-engine rendering still require visual browser review.
 
 ## Demo data
 

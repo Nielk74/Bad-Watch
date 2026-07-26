@@ -12,10 +12,13 @@ from one APK.
 | Field | Recorded value |
 | --- | --- |
 | Evidence date | 2026-07-26 UTC |
-| Final app source revision | `6f6f6cd9531040072bc153b365c0c515b0a40781` |
-| Probe tooling revision | `6a6c568e0e156fd551ae1388b9502d261b61b796` |
+| Final app/APK source revision | `0bdbe985756d962e73b47dfc5ca098a709a9a86f` |
+| Final recovery/screenshot retention checkpoint | `909bef8` (documentation/endurance follow) |
+| Browser journey gate checkpoint | `836f116` (test/workflow only; APK unchanged) |
+| Session probe implementation | `e9719a57d6a44463ff554e596de55ee95de41ef6` |
+| Recovery probe implementation | `5318deb910ea3aae0f77d41e8c5e227ae77f39f8` |
 | Tested artifact | `app-debug.apk` |
-| Final debug APK SHA-256 | `28076fc03319ca15df92760a8d20b993af2f8ae8e129ffe61e021876eed0169d` |
+| Final debug APK SHA-256 | `5d637e2d0c7fad57f15503c140d9cb11e25f4b94df1732256e88f2ca2a0046fb` |
 | Package | `com.badwatch.badwatch` |
 | Version | `0.3.0` (`versionCode=300`) |
 | SDKs | minimum 30, target 36, compile 36 |
@@ -23,12 +26,12 @@ from one APK.
 | Watch | Google Pixel Watch 4, `kenari_btwifi`, 480 x 480 |
 | OS | Android 17 / API 37 |
 | Build fingerprint | `google/kenari_btwifi/kenari_btwifi:17/CP2A.260603.001.S1/15396605:user/release-keys` |
-| App last update reported by device | `2026-07-26 06:57:56` |
+| App last update reported by device | `2026-07-26 14:08:34` |
 | Device connection | Wireless ADB TLS transport |
 | Charger state | AC powered; no battery-drain claim |
-| Font / ambient matrix | Active/ambient plus final normal/`1.30` matrix retained and passed |
+| Font / ambient matrix | Scoped active/ambient and broad normal/`1.30` evidence plus final-APK Summary/History/recovered-Summary retests |
 
-Nine traceable debug app checkpoints contribute to this ledger:
+Ten traceable debug app checkpoints contribute to this ledger:
 
 | Scope | Source | APK SHA-256 |
 | --- | --- | --- |
@@ -40,7 +43,8 @@ Nine traceable debug app checkpoints contribute to this ledger:
 | Service-owned terminal cleanup | `8c8520a2fdea19f09e9ca1b35bb25d5649086a5a` | `bc97ab8c79d02ff8240fb00e6782d0a6c86165490914c522d6f1b4064df7d85e` |
 | Large-text dense-metric stacking | `402000cc870bff8b1922dff423bbb1b835cb3201` | `a22d24f46054c439f8abb6cfe1b92afc3a0e890e4849e80d3db28085f4ef0ec0` |
 | Large-text live action lane | `ea08bf21b79f73b16285378f310784f5af01abd4` | `a429ec043bf1d8ec033ac1e3415eaf4958ad4dbab99b98f816b1f2635f15c4e2` |
-| Safe-first recovery plus compact match/shadow and frozen final gate | `6f6f6cd9531040072bc153b365c0c515b0a40781` | `28076fc03319ca15df92760a8d20b993af2f8ae8e129ffe61e021876eed0169d` |
+| Safe-first recovery plus compact match/shadow and the pre-final endurance run | `6f6f6cd9531040072bc153b365c0c515b0a40781` | `28076fc03319ca15df92760a8d20b993af2f8ae8e129ffe61e021876eed0169d` |
+| Long-duration review, retry-safe sync, immutable recovery coverage, and frozen final APK | `0bdbe985756d962e73b47dfc5ca098a709a9a86f` | `5d637e2d0c7fad57f15503c140d9cb11e25f4b94df1732256e88f2ca2a0046fb` |
 
 The `008a4f4` app change is deliberately narrow: it makes `MainActivity` `singleTop`, consumes the
 Tile's one-shot start command through `onNewIntent`, and adds stable ambient lifecycle diagnostics.
@@ -53,27 +57,49 @@ Frozen checkpoint `402000c` stacks dense groups of three or more metrics at font
 above and adds a JVM threshold regression.
 Frozen checkpoint `ea08bf2` reserves a 48 dp live-action lane at the same threshold, uses compact
 visible **Finish** / **Finir** text, and retains the complete Stop-and-save accessibility name.
-`e6fea0a` then places the safe/recoverable failure action before destructive Discard. Frozen
-checkpoint `6f6f6cd` gives match/interval and shadow the same `1.20` responsive threshold and JVM
-regressions.
-Earlier evidence remains representative for unchanged persistence, Tile, complication, ambient,
-and match/shadow reducer behavior. The final match/shadow layouts and broad normal/enlarged
-inventory were rerun on `6f6f6cd` and pass; only the endurance gate remains.
+`e6fea0a` then places the safe/recoverable failure action before destructive Discard. Checkpoint
+`6f6f6cd` gives match/interval and shadow the same `1.20` responsive threshold and JVM regressions.
+It is the source of the retained pre-final endurance run, not the final APK.
+
+Checkpoint `0bdbe98` incorporates the subsequent hour-plus responsive review, bounded probe
+cleanup and settled-recap verification, retry-safe incomplete sync acknowledgements, immutable
+process-absence provenance, inference gating, exact Home/History/Tile recovery markers,
+observed-minute Progress records, dashboard filters and gap audit, CSV recovery columns, and the
+three-way Detected/No play/Unobserved activity composition. Earlier evidence remains representative
+only for the explicitly scoped behavior named in its section. Final-APK device retests cover
+start/recover/save, hour-plus Summary and History at normal/`1.30` text, and the recovered Summary
+notice/composition. Final-build Home, Progress, Tile rendering/gap marker, recovered-History
+marker, and Live details were not physically recaptured; those paths have automated regression
+coverage only. The definitive endurance retest is `FINAL_ENDURANCE_PENDING`.
 
 The installed `base.apk` matched the final debug APK hash byte-for-byte and verified with APK
 Signature Scheme v2. The same source produced unsigned release APK SHA-256
-`e23febe396dba1c3b8f34fcda4243ae5a598187ec4b9d8cb7d2b902243da5642` and unsigned release
-AAB SHA-256 `f3335a55b28cddb4ed202fc3d929ef72524b44d3507d56f192836a3fb796557f`.
+`f46405c1a9ee9d420d61b8e997da27ca75090665801279549eb734c4777fa6d8` and unsigned release
+AAB SHA-256 `70d3c1816612565187d27f299ff69ca7060e978f717fd5698bcb5ae812fe58dc`.
 Those release artifacts were assembled and hashed, not installed on this debug-evidence watch.
-The frozen app checkpoint's clean software gate passed five Python tests, `py_compile`, `xmllint`,
-and Gradle clean/test/lint/debug/release APK/release bundle with all 132 Gradle tasks executed.
-Probe tooling revision `6a6c568` adds three selector regressions, bringing the current Python
-suite to eight passing tests.
+At the pre-`836f116` frozen app checkpoint `0bdbe98`, the clean software gate passed all 31 Python
+tests, `py_compile`, resource XML and browser JavaScript syntax validation, and Gradle
+clean/test/lint/debug/release-APK/release-bundle. Its historical result was 132 tasks: 129 executed
+and three up-to-date; no later aggregate task total is inferred from it.
+
+At test-only repository checkpoint `836f116`, `:server:test` depends on
+`:server:dashboardBrowserTest` and requires Node 22. It executes six journeys against JavaScript
+extracted from shipped `index.html`: stale-token prompt/retry; URL-filter
+hydrate/apply/error/reset; deep-linked reviewed detail; successful revisioned diary save and
+aggregate refresh; HTTP 409 reload/conflict replacement; and archive-restore success/error. This
+proves client state/request contracts, not responsive layout or real-browser rendering.
+
+For a powered endurance run, current probe tooling snapshots, suppresses, reports, and restores
+plugged-in stay-awake, Theater Mode, and DND so charging UI/notifications cannot create a false
+awake interval. It also separately classifies the optional post-stop diary and a settled saved
+Summary. Those controls do not change battery telemetry, and powered evidence remains ineligible
+for a drain claim.
 
 All retained PNGs in this directory are native 480 x 480 captures. The watch moved between
 English and French during the recreation check and used both normal and `1.30` font scale during
-the final visual pass. Screen-off acquisition was observed with the system in `Dozing`; the
-180-minute gate is powered, and no battery-drain conclusion is drawn from this evidence.
+the visual passes. Screen-off acquisition was observed with the system in `Dozing`; the retained
+pre-final 180-minute run was powered, the frozen-final-APK run is `FINAL_ENDURANCE_PENDING`, and no
+battery-drain conclusion is drawn from either lifecycle gate.
 
 ## Passed observations
 
@@ -126,19 +152,29 @@ after the check.
 
 ### Process death and journal recovery
 
-The automated physical recovery run passed. Session
-`9ecee2f3-a6fa-4c13-abb6-28d6b9e9e568` kept one ID and start time across a forced process stop.
-Its checkpoint stayed frozen at 1,189 samples while the process was absent, advanced to 2,369
-after restoration, incremented `recoveryCount` to 1, and saved exactly one `Partial` session.
+The final schema-2 physical recovery run passed on checkpoint `0bdbe98`. Session
+`5fde6181-2421-4919-ac3b-6a16d0360b59` kept one ID and start time across a forced process stop. Its
+checkpoint stayed frozen at 1,185 samples, advanced to 2,375 after restoration, incremented
+`recoveryCount` to 1, and saved exactly one `Partial` session whose duration and elapsed span are
+both 42,607 ms.
 
-The forced-stop gap was 3,644 ms. The saved duration and elapsed span were both 44,087 ms and
-intentionally include that interruption; the frozen sample count proves the app did not invent
-sensor coverage during it.
+The host observed 3,626 ms between force-stop and restart request. The app conservatively retained
+the larger immutable interval `1785068100751..1785068112485` (11,734 ms), from its last durable
+journal boundary through controller restoration. It is valid and ordered, exactly matches the
+recovered checkpoint and final session, covers journal-to-restart, overlaps the forced stop, and
+passes `processAbsenceEvidenceValid`. Elapsed time includes it, but no sensor evidence is invented,
+detected exchanges cannot bridge it, and it is neither detected activity nor inferred quiet time.
 
-- [machine-readable passing report](recovery/20260726T020131Z/report.json)
-- [before process death](recovery/20260726T020131Z/before-process-death.png)
-- [after recovery](recovery/20260726T020131Z/after-recovery.png)
-- [saved recap](recovery/20260726T020131Z/recap.png)
+- [final machine-readable passing report](recovery-final/20260726T121444Z/report.json)
+- [before final process death](recovery-final/20260726T121444Z/before-process-death.png)
+- [after final recovery](recovery-final/20260726T121444Z/after-recovery.png)
+- [immediate optional diary after stop](recovery-final/20260726T121444Z/recap.png)
+- [settled Summary with exact known-unobserved notice](screenshots/65-final-recovery-gap-recap.png)
+- [three-way activity/quiet/unobserved composition](screenshots/66-final-recovery-gap-composition.png)
+
+The earlier [schema-1 recovery report](recovery/20260726T020131Z/report.json) remains historical
+evidence for stable identity, a frozen checkpoint, and resumed sampling. It did not persist or
+validate `processAbsenceGaps` and is not used to prove the final provenance contract.
 
 ### Detection Lab through screen-off
 
@@ -277,10 +313,14 @@ probe and from any battery measurement.
 
 ### Final visual inventory and enlarged text
 
-The final normal-size English pass retained the Tile, Home, History, Progress, an empty Detection
-Lab, Settings, match interval, and the existing-task Tile-to-live transition. The zero-swing lab
-keeps destructive/disabled actions visually distinct and does not allow an empty drill to be
-saved.
+“Final visual inventory” is the retained release-ledger grouping, not a claim that every image was
+captured from final APK checkpoint `0bdbe98`. The broad navigation and language matrix below is
+source-scoped to the earlier checkpoints named in this ledger.
+
+The broad normal-size English pass on the scoped pre-final checkpoints retained the Tile, Home,
+History, Progress, an empty Detection Lab, Settings, match interval, and the existing-task
+Tile-to-live transition. The zero-swing lab keeps destructive/disabled actions visually distinct
+and does not allow an empty drill to be saved.
 
 - [Home at normal font scale](screenshots/36-final-home-current.png)
 - [History at normal font scale](screenshots/37-final-history-normal.png)
@@ -289,7 +329,7 @@ saved.
 - [Settings at normal font scale](screenshots/40-final-settings-normal.png)
 - [match interval at normal font scale](screenshots/56-final-match-interval-normal.png)
 
-A `1.30` pass covers navigation, permissions, recording/review/recap, safe failure recovery,
+A scoped `1.30` pass covers navigation, permissions, recording/review/recap, safe failure recovery,
 match/interval, practice, and shadow. The first sweep exposed tight Progress metrics, a clipped
 live action, destructive-first failure order, and overfull match/shadow states. Those findings
 drove revisions `402000c`, `ea08bf2`, `e6fea0a`, and `6f6f6cd`; the images below are the corrected
@@ -316,30 +356,79 @@ safe Dismiss precedes Discard, and match/shadow use compact large-text layouts.
 - [French paused shadow at 1.30 font scale](screenshots/58-final-shadow-paused-fr-font-130.png)
 - [French finish dialog at 1.30 font scale](screenshots/59-final-shadow-finish-fr-font-130.png)
 
-The report validates all 26 referenced PNGs as native 480 x 480 captures, records no critical
-truncation or overlap, and confirms cleanup: font scale `1.0`, system English locale, granted HR,
-no active checkpoint, and no foreground service. It explicitly does not claim a fluent French
-review or a physical TalkBack traversal.
+The accessibility report validates its 26 referenced PNGs as native 480 x 480 captures, records no
+critical truncation or overlap, and confirms cleanup: font scale `1.0`, system English locale,
+granted HR, no active checkpoint, and no foreground service. It explicitly does not claim a
+fluent French review or a physical TalkBack traversal.
 
-## Explicitly pending or not claimed
+### Final frozen-APK long session and recovery coverage
+
+Checkpoint `0bdbe98` was then installed and byte-matched for a focused final subset: saved Summary,
+hour-plus History, and recovered Summary/composition. At normal font scale and `1.30`, the saved
+Summary renders the exact three-hour value `3:00:12` without clipping: normal text gives the
+hour-plus duration its own full-width row, while enlarged text uses the established accessibility
+stack. History retains the same complete value and remains readable/reachable at both scales.
+
+- [three-hour Summary at normal font scale](screenshots/61-final-long-duration-recap.png)
+- [three-hour Summary at 1.30](screenshots/62-final-long-duration-recap-font-130.png)
+- [three-hour History row at normal font scale](screenshots/63-final-long-duration-history.png)
+- [three-hour History row at 1.30](screenshots/64-final-long-duration-history-font-130.png)
+
+The final recovered-session Summary shows `0:11` of known unobserved time, explains that elapsed
+time includes it, and explicitly says it is excluded from inferred quiet time and personal
+comparisons. The composition card uses three distinct states—Detected, No play, and Unobserved—so
+its active share uses reviewed wall time without relabelling the gap as activity or rest.
+
+- [final known-unobserved Summary notice](screenshots/65-final-recovery-gap-recap.png)
+- [final three-way session composition](screenshots/66-final-recovery-gap-composition.png)
+
+All six frozen-APK captures are native 480 x 480 images. They complement rather than relabel the
+earlier full navigation/language matrix. Final-build Home, Progress, Tile rendering/gap marker,
+recovered-History marker, and Live details were not physically recaptured; those paths have
+automated regression coverage only.
+
+## Final release-gate status
 
 | Gate | Status at this ledger revision |
 | --- | --- |
 | Physical match and shadow process-restoration checks | **Passed:** retained reports prove state identity, safe timing, and visible cleanup. |
-| Ongoing Activity, Tile rendering/cold start, complication, and ambient surfaces | **Passed:** system-rendered/tapped surfaces and a real ambient lifecycle are retained above. |
-| Existing-task Tile Start | **Passed:** the frozen-APK report proves same-task/same-Activity/same-process delivery, one session, advancing samples, health FGS, and complete visible cleanup. |
-| Normal-size screen inventory and English/French spot checks | **Passed:** normal English core/destination screens and the French live/review/recap recreation flow are retained. |
-| Enlarged-text inspection | **Passed:** the frozen-APK report covers navigation, permission, recording/review/recap, safe failure, match/interval, and EN/FR practice/shadow states with no critical truncation or overlap. |
-| 180-minute powered screen-off lifecycle probe | **Actively pending:** only a completed final-candidate report, start image, and recap can pass this row. |
+| Ongoing Activity, Tile rendering/cold start, complication, and ambient surfaces | **Passed on explicitly scoped earlier candidates:** system-rendered/tapped surfaces and a real ambient lifecycle are retained above; they were not repeated on final `0bdbe98`. |
+| Existing-task Tile Start | **Passed:** the scoped `6f6f6cd` report proves same-task/same-Activity/same-process delivery, one session, advancing samples, health FGS, and complete visible cleanup; final-source regressions retain the launch contract. |
+| Session process-restoration provenance | **Passed:** the frozen-APK schema-2 report proves stable identity, frozen/resumed samples, exact checkpoint/session intervals, `Partial` quality, and visible gap semantics. |
+| Normal-size screen inventory and English/French spot checks | **Passed as combined scoped evidence:** the broad navigation/language matrix is from earlier candidates; final `0bdbe98` adds only saved Summary, hour-plus History, and recovered Summary/composition. Final Home, Progress, Tile, recovered History, and Live were not recaptured. |
+| Enlarged-text inspection | **Passed as combined scoped evidence:** the earlier 26-image matrix covers the broad responsive inventory; final `0bdbe98` physically retests hour-plus Summary/History at `1.30`. Its recovered Summary/composition captures are separate final evidence, not part of the enlarged matrix. Other final-build visual paths have automated coverage only. |
+| 180-minute powered screen-off lifecycle probe | **Pending active final gate:** `FINAL_ENDURANCE_PENDING`; the older passing run below is pre-final. |
 | 180-minute unpowered battery measurement | **Not claimed** |
 
 <!-- ENDURANCE_RESULT_START -->
-The powered 180-minute gate has not passed at this ledger revision. The earlier run was stopped
-and its partial artifact removed so the enlarged-text defect could be corrected before producing
-final-candidate lifecycle evidence. The replacement run must retain `report.json`, `start.png`,
-and `recap.png`; until then, no duration or lifecycle result is claimed. Because this is a powered
-run, it can never substantiate battery drain even when it passes.
+The historical powered 180-minute run passed on 2026-07-26 UTC against pre-final app checkpoint
+`6f6f6cd` using probe tooling checkpoint `3f28ec3`. Its retained
+[report](endurance/20260726T071128Z/report.json),
+[start image](endurance/20260726T071128Z/start.png), and
+[Summary image](endurance/20260726T071128Z/recap.png) remain useful regression evidence. The probe
+requested 10,800,000 ms, observed 10,814,298 ms wall time, and saved exactly one 10,812,561 ms session
+(`6210124d-db32-4ccf-bfe3-28752bf21b58`) to
+`1785049889518-6210124d-db32-4ccf-bfe3-28752bf21b58.json`, a 1,737 ms saved-vs-wall error.
+
+All 178 retained readings reported `Dozing`, a running foreground service, health foreground type
+`0x100`, the same journal ID, and a strictly advancing processed-sample checkpoint from 0 to
+1,075,257. The report's four lifecycle booleans all pass. Temperatures remained between 30.3 C
+and 33.3 C. System-wake suppression records plugged-in stay-awake, Theater Mode, and zen/DND as
+original `7/0/0`, active `0/1/2`, and restored `7/0/0`; both images are native 480 x 480.
+
+Every reading was powered. Accordingly, `batteryMeasurementValid` is false,
+`batteryDeltaPercent` is null, and this passing lifecycle result does not substantiate battery
+drain. Because production and probe behavior changed afterward, this result does not close the
+frozen-final-APK release gate.
+
+Definitive frozen-final-APK endurance result: `FINAL_ENDURANCE_PENDING`.
+
+The final retained report must supply its exact path/source/tooling identity, duration figures,
+one-session identity, all-Dozing/health-FGS/sample-progress booleans, wake-control
+original/active/restored values, and `postStopReviewCaptured` / `savedSessionRecapVerified` before
+the pending row is marked Passed. The unpowered battery-measurement row remains deliberately
+unclaimed and is not a v0.3 release blocker.
 <!-- ENDURANCE_RESULT_END -->
 
-Later artifacts must be added rather than overwriting this record, and the release matrix in
-[`docs/device-validation.md`](../../device-validation.md) must link them before those rows pass.
+Later artifacts are added rather than overwriting this record. The definitive matching result must
+also be linked from the release matrix in [`docs/device-validation.md`](../../device-validation.md).

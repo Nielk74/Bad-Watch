@@ -1,9 +1,13 @@
 # Bad Watch product plan — v0.3 completion record
 
-**Status:** implementation complete for the v0.3 product contract. Platform surfaces, recovery
-flows, exact existing-task Tile launch, and the expanded normal/enlarged design matrix are
-physically verified; only the powered 180-minute lifecycle gate remains before this record can be
-marked final.
+**Status:** implementation complete for the v0.3 product contract. Platform surfaces and exact
+existing-task Tile launch have scoped retained hardware evidence. Final-APK device retests cover
+start/recover/save, hour-plus Summary and History at normal/`1.30` text, and the recovered Summary
+notice/composition. Final-build Home, Progress, Tile rendering/gap marker, recovered-History
+marker, and Live details were not physically recaptured; those paths have automated regression
+coverage only. The definitive powered 180-minute screen-off lifecycle rerun is still in progress:
+`FINAL_ENDURANCE_PENDING`. Battery drain remains deliberately unclaimed because this lifecycle
+gate is powered.
 
 **Updated:** 2026-07-26
 
@@ -94,8 +98,8 @@ None validates a global level badge from this product's single racket-wrist stre
 **Decision:** keep two truths separate:
 
 - an editable **self-reported experience** field; and
-- a multidimensional **play pattern** after at least five usable, like-for-like sessions across
-  at least three days.
+- a multidimensional **play pattern** after at least five inference-eligible, like-for-like
+  sessions across at least three days.
 
 The play pattern reports medians such as corrected detected hits per minute, estimated active
 share, detected hits per burst, and heart-rate reserve only when authorized. It never converts
@@ -114,7 +118,8 @@ work, internal response, context, and player report to be considered together. I
 is too heterogeneous for a personal risk predictor, and acute:chronic workload ratios do not
 justify universal danger bands.
 
-**Decision:** compare a player primarily with their own earlier, usable, like-for-like sessions.
+**Decision:** compare a player primarily with their own earlier, inference-eligible, like-for-like
+sessions.
 Keep recorded duration, detected volume, estimated exchange structure, measured optical HR,
 reported RPE, soreness, completion, and context as separate evidence. Display transparent
 session-RPE (`reviewed minutes × reported RPE`) and HRR-minutes only when their inputs exist. Do
@@ -154,7 +159,11 @@ Sources: [controlled wrist study](https://doi.org/10.1177/17543371211048328),
 3. Recording continues with the display off. The live face leads with detected hits and elapsed
    time; estimated exchanges and optical HR remain secondary and disappear when unavailable.
 4. If Wear OS recreates the process, the durable journal restores the same session ID and start
-   time, marks recording quality partial, and resumes without inventing the missing interval.
+   time, marks recording quality partial, and appends an immutable process-absence interval from
+   the last durable checkpoint through restore. Whole-session elapsed time and heart-rate coverage
+   retain their wall-clock bounds, but the app never invents sensor coverage, connects detections
+   across that evidence boundary, or calls the interval estimated quiet play. Repeated recoveries
+   accumulate distinct intervals.
 5. **Stop & save** persists one atomic JSON record. Discard is explicit and confirmed.
 
 If the sensor flow itself fails after recording has begun, Bad Watch does not strand the player
@@ -182,6 +191,9 @@ record motion.
    because they have no timestamp or stroke type.
 4. Detected exchanges, active span, summary, baselines, personal records, insights, exports, and
    server analytics are rebuilt from the reviewed window and surviving timestamped events.
+   Immutable process-absence intervals remain in the raw audit record. Only their overlap with the
+   reviewed window is unobserved time; trimming one outside that window can make the remaining
+   evidence eligible again when diary quality is also eligible.
 5. Heart-rate zones appear only with a configured/age-estimated maximum. HRR-minutes require an
    explicitly configured resting rate as well. Age estimation uses `208 − 0.7 × age` for adults
    and an exact maximum overrides it.
@@ -190,12 +202,18 @@ record motion.
 
 - Home shows the latest usable recap and a literal seven-day activity card.
 - History provides status, review/edit, correction, and confirmed deletion.
-- Progress supports player-chosen seven-day session and recorded-minute goals, personal archive
-  records, self-reported experience, and the like-for-like play pattern.
+- Progress supports player-chosen seven-day session and observed reviewed-minute goals, personal
+  archive records, self-reported experience, and the like-for-like play pattern. Known unobserved
+  process time is subtracted from minute goals and the longest-recording record without deleting
+  the recovered session or its detected-hit evidence.
 - Sessions marked **Unusable** stay in the audit trail but do not teach baselines, goals,
   progress, Tile, or complication aggregates.
+- Sessions marked **Partial**, **Unusable**, or containing a process-absence interval inside the
+  reviewed window never produce player-facing insights or teach personal baselines/play patterns.
+  Editing diary quality to Complete cannot erase immutable recovery provenance.
 - The Tile starts a session and summarizes the last session/week. The watch-face complication is
-  explicitly “7-day corrected detected hits,” not load or readiness.
+  explicitly “7-day corrected detected hits,” not load or readiness. Home, History, and the Tile
+  show the exact known-unobserved duration when it overlaps the current reviewed window.
 
 ### Keep score manually
 
@@ -229,13 +247,28 @@ archive. Players who want movement/HR evidence run the ordinary session recorder
   acceptance/rejection, exponential retry, and payload fingerprints. An unchanged server-rejected
   record stops retrying and shows a localized action category; editing it creates a new upload
   candidate. A changed diary is accepted only when its acknowledged base matches the current
-  server revision, so an offline branch cannot leapfrog an intervening browser edit.
+  server revision, so an offline branch cannot leapfrog an intervening browser edit. An incomplete
+  or malformed acknowledgement is retryable and no local success marker is written until every
+  submitted record has an explicit accepted/rejected result.
 - The dashboard binds to loopback by default. A non-loopback bind requires a token. Data API
   responses are `Cache-Control: no-store`; TLS is delegated to a reverse proxy.
-- The authenticated browser supports reviewed analytics, filters, a raw-vs-reviewed detail audit,
-  diary editing, deterministic lossless JSON backup, reviewed CSV, and validate-before-write
-  restore. Raw motion enters an archive only when recording-time model-training consent,
+- The authenticated browser supports reviewed analytics; activity, completion, recording-quality,
+  and comparison-tag filters with URL state/reset/error handling; a raw-vs-reviewed detail audit;
+  diary editing; deterministic lossless JSON backup; reviewed CSV; and validate-before-write
+  restore. Its default aggregate excludes **Unusable** recordings, while an explicit audit filter
+  can include them. Recovery coverage is visible in list/detail cards and as shaded raw timeline
+  intervals; reviewed wall time is the shared active-share denominator, so known unobserved time is
+  neither active nor quiet. CSV adds `process_absence_count`, `unobserved_seconds`, and
+  `observed_seconds`. Raw motion enters an archive only when recording-time model-training consent,
   participant ID, and protocol are all present.
+
+At test-only repository checkpoint `836f116`, `:server:test` depends on
+`:server:dashboardBrowserTest` and requires Node 22. It executes six journeys against JavaScript
+extracted from shipped `index.html`: stale-token prompt/retry; URL-filter
+hydrate/apply/error/reset; deep-linked reviewed detail; successful revisioned diary save and
+aggregate refresh; HTTP 409 reload/conflict replacement; and archive-restore success/error. This
+proves client state/request contracts, not responsive layout or real-browser rendering. See the
+[dashboard browser regression gate](dashboard.md#browser-regression-gate).
 
 ---
 
@@ -254,6 +287,9 @@ Delivered rules:
   controls disappear there;
 - dense groups of three or more metrics stack vertically when font scale reaches `1.20`, keeping
   labels and values separated instead of squeezing a phone-like row into the round viewport;
+- hour-plus reviewed durations use `h:mm:ss` and receive a full-width row at normal text size;
+  enlarged text uses the same accessibility stack. Summary, Home, History, and weekly cards share
+  this rule, so a three-hour recording is never clipped into a narrow three-up metric cell;
 - at the same large-text threshold, live recording reserves a 48 dp action lane and uses the
   compact visible label **Finish** / **Finir** while retaining the full **Stop & save** accessible
   name;
@@ -281,32 +317,33 @@ The delivered design and screen inventory are recorded in
 | Racket-hand onboarding and handedness | Delivered | `OnboardingScreen`, `SettingsStore` |
 | Required gyro, optional accelerometer | Delivered | `FusedSensorCollector` capability/failure paths |
 | Health Services optical HR | Delivered | `ExerciseHeartRateSession`, coverage and timestamp tests |
-| Screen-off recording | Delivered | health FGS `SessionService`, active journal, Detection Lab doze proof, ambient callback proof, and passing two-minute session smoke; 180-minute gate pending |
-| Process-death session recovery | Delivered | `ActiveSessionJournal`, controller recovery tests |
+| Screen-off recording | Delivered; final lifecycle rerun pending | health FGS `SessionService`, active journal, Detection Lab doze proof, ambient callback proof, scoped short smokes, and a [passing pre-final 180-minute run](evidence/v0.3-pixel-watch-4/endurance/20260726T071128Z/report.json); definitive final report: `FINAL_ENDURANCE_PENDING` |
+| Process-death session recovery | Delivered | `ActiveSessionJournal`, immutable `ProcessAbsenceGap` provenance, repeated-recovery/controller regressions, and the [passing final schema-2 watch probe](evidence/v0.3-pixel-watch-4/recovery-final/20260726T121444Z/report.json) |
 | Failed-session recovery decision | Delivered | explicit preserve/discard UI, EN/FR copy, and throwing-flow regression |
 | Detection Lab terminal recovery | Delivered | serialized cancel/retry-save commands, stable capture ID, cleanup-order regressions |
 | Zero-copy detector window | Delivered | `SampleWindow` and pipeline tests |
 | Atomic session/capture persistence | Delivered | shared `AtomicFileWriter`, recovery/quarantine tests |
-| Detected exchange estimates | Delivered | `RallySegmenter`, measurement vocabulary |
+| Detected exchange estimates | Delivered | gap-aware `RallySegmenter`, hard observed-segment boundaries, measurement vocabulary |
 | Optional post-session diary | Delivered | typed `SessionContext`/`PostSessionReport`, EN/FR watch flow |
 | Append-only detection correction | Delivered | `SessionCorrections`, `ReviewedSessionAnalysis` |
-| Evidence-backed insights | Delivered | prior-only like-for-like baseline and silence tests |
+| Evidence-backed insights | Delivered | prior-only like-for-like baseline, historical-recap recomputation, and Partial/Unusable/process-gap silence tests |
 | Adult HR profile provenance | Delivered | exact/estimated/placeholder sources and gating tests |
 | Transparent HRR-min and session-RPE | Delivered | coverage-gated physiology and explicit formulas |
-| History, goals, records, play pattern | Delivered | usable-session filters and `PlayProfileBuilder` |
+| History, goals, records, play pattern | Delivered | observed-minute records/goals, exact recovery markers, inference-eligible filters, and `PlayProfileBuilder` |
 | Manual BWF scoreboard | Delivered | scoring reducer, durable controller, ambient UI |
 | Six-corner shadow routine | Delivered | balanced reducer, durable controller, haptic grammar |
 | Sourced practice library | Delivered | BWF cards with non-measurement notes |
-| Tile and watch-face complication | Delivered | corrected detected-hit semantics and refresh tests |
+| Tile and watch-face complication | Delivered | corrected detected-hit semantics, exact latest-session unobserved marker, and refresh tests |
 | Self-hosted dashboard configuration | Delivered | release UI with connection test and HTTP warning |
-| Dashboard review/editor/filtering | Delivered | authenticated APIs and responsive browser UI |
-| Backup, reviewed CSV, restore | Delivered | deterministic archive and validation tests |
+| Dashboard review/editor/filtering | Delivered | authenticated APIs, activity/completion/quality/tag URL filters, default Unusable exclusion, gap-aware list/detail/timeline, responsive browser UI, and six executable Node 22 client journeys |
+| Backup, reviewed CSV, restore | Delivered | deterministic archive, recovery coverage columns, validation tests, and the browser archive-restore success/error journey |
+| Payload-specific sync completion | Delivered | incomplete acknowledgements retry; accepted/rejected fingerprints alone create terminal markers |
 | Consent-bound Detection Lab | Delivered | immutable consent/protocol/participant metadata |
 | Player-independent ML tooling | Delivered as research infrastructure | grouped ingestion/training/evaluation and acceptance gate |
 | Automatic learned classifier | Research-gated | no model is accepted without section 7 evidence |
-| English/French resources and accessibility semantics | Delivered | resource checks, semantics, final normal/1.30 EN matrix, French recording/review and longest-shadow-state spot checks |
+| English/French resources and accessibility semantics | Delivered | resource checks and semantics; a source-scoped earlier normal/`1.30` matrix and French spot checks; final-APK Summary/History/recovery checks, with final Home, Progress, Tile, recovered-History, and Live visuals covered only by regressions |
 | Android platform / target SDK 36 | Delivered | granular HR permission and denied-path proof on Android 17 / API 37 hardware |
-| CI and release-tag automation | Delivered | Python, JVM, lint, debug and release assemblies |
+| CI and release-tag automation | Delivered | Python, JVM, lint, debug and release assemblies plus the Node 22 six-journey browser gate |
 
 ---
 
@@ -420,22 +457,23 @@ v0.3 is done only when all of these are true:
 | Acceptance condition | Result |
 | --- | --- |
 | The full app can be used offline with no account/dashboard | Complete |
-| Session and Detection Lab capture survive screen-off under the health FGS | Device-verified for Detection Lab and a passing powered two-minute session smoke; 180-minute session gate pending |
+| Session and Detection Lab capture survive screen-off under the health FGS | Scoped Detection Lab/short-smoke checks and a pre-final powered 180-minute run pass; definitive frozen-final-APK run is `FINAL_ENDURANCE_PENDING` |
 | Optional HR failure/denial leaves a truthful motion-only session | Device-verified |
-| Process death restores a stable session without fabricating downtime | Device-verified |
+| Process death restores stable identity and preserves a durable unobserved evidence boundary without fabricating sensor samples or inferred quiet time | Device-verified by the final schema-2 recovery report |
 | A failed sensor flow can be preserved or deliberately discarded without trapping the next start | Complete; confirmed-discard UI and a real throwing-flow regression prove journal removal and a fresh next ID |
 | Player review changes every derived primary metric and preserves raw evidence | Complete |
 | Match and shadow utilities checkpoint every command and restore safely | Complete; physical reports retain match identity/action log and shadow seed/cue timing across process death |
 | Sync acceptance/rejection is durable, visible, and payload-specific | Complete; physical offline-retry and authenticated acceptance verified |
-| Browser backup/CSV/restore is authenticated and loss-safe | Complete |
-| English/French, accessibility, lint, JVM tests, debug and release builds pass | Complete; the final 1.30 matrix covers navigation, permission, live/review/recap, safe failure, match/interval, and EN/FR practice/shadow states |
-| A target-36 Pixel Watch run proves the final APK's core flow | Complete; frozen-APK identity, exact existing-task Tile delivery, visual matrix, and cleanup are retained |
-| A three-hour screen-off probe produces exactly one duration-correct session | Pending active release gate |
-| Documentation describes shipped behavior and rejected claims without stale roadmap text | Complete except for inserting the final endurance outcome in this evidence record |
+| Browser backup/CSV/restore is authenticated and loss-safe | Complete; six Node 22 journeys include revisioned save/conflict behavior and archive-restore success/error |
+| English/French, accessibility, lint, JVM tests, debug and release builds pass | Complete; a source-scoped earlier `1.30` matrix covers navigation, permission, live/review/recap, safe failure, match/interval, and EN/FR practice/shadow. Final-APK physical retests cover only Summary/History/recovered-Summary paths; final Home, Progress, Tile, recovered History, and Live visuals have automated regression coverage only |
+| A target-36 Pixel Watch run proves the final APK's core flow | Complete for the physically exercised final subset: final APK identity/byte match, start/recover/save, hour-plus Summary/History, recovered Summary notice/composition, and cleanup. Home, Progress, Tile rendering/gap marker, recovered-History marker, and Live details were not recaptured on the final build; older platform evidence is source-scoped and final-source coverage for those paths is automated |
+| A three-hour screen-off probe produces exactly one duration-correct session | `FINAL_ENDURANCE_PENDING`; the older passing run is retained as pre-final evidence and does not close this final-APK gate |
+| Documentation describes shipped behavior and rejected claims without stale roadmap text | Complete except for replacing `FINAL_ENDURANCE_PENDING` with the definitive retained endurance result |
 
 ### Validation and evidence
 
-The reproducible software gate is:
+Node 22 is required because `:server:test` now depends on the browser-client journey task. The CI
+and release workflows install it before running this reproducible software gate:
 
 ```bash
 python3 -m unittest discover -s tools -p 'test_*.py' -v
@@ -444,6 +482,27 @@ python3 -m py_compile tools/ingest.py tools/train.py \
 ./gradlew test :app:lintDebug :app:assembleDebug :app:assembleRelease \
   --stacktrace --no-daemon
 ```
+
+The frozen local APK candidate additionally ran the broader artifact gate:
+
+```bash
+./gradlew clean test lint assembleDebug assembleRelease bundleRelease \
+  --stacktrace --no-daemon
+```
+
+At the pre-`836f116` frozen APK checkpoint `0bdbe98`, that gate passed all 31 Python unit tests,
+`py_compile`, resource XML validation, browser JavaScript syntax validation, and 132 Gradle tasks:
+129 executed and three up-to-date. This historical count belongs only to the frozen artifact gate;
+the broader local command produces the release AAB, while CI deliberately retains its existing
+APK-focused command.
+
+At test-only repository checkpoint `836f116`, `:server:test` depends on
+`:server:dashboardBrowserTest` and requires Node 22. It executes six journeys against JavaScript
+extracted from shipped `index.html`: stale-token prompt/retry; URL-filter
+hydrate/apply/error/reset; deep-linked reviewed detail; successful revisioned diary save and
+aggregate refresh; HTTP 409 reload/conflict replacement; and archive-restore success/error. This
+proves client state/request contracts, not responsive layout or real-browser rendering. No current
+aggregate Gradle task total is inferred from the earlier artifact run.
 
 The failure-recovery regression is intentionally end-to-end at the controller boundary: its
 sensor flow emits one valid sample and then throws, verifies the journal survives Dismiss,
@@ -456,55 +515,76 @@ capture/ID, persists it once, enqueues sync only after durable success, and orde
 cleanup through serialized service commands. This covers the branch where “try again” means retry
 the file write—not silently restart sensor collection.
 
-The device gate installs the resulting target-SDK-36 debug APK on a Pixel Watch 4 running Android
-17 / API 37, verifies
-start/stop/save with HR permission denied, process-kill recovery, ambient/manual-match/training
-flows, French and enlarged-text rendering, and runs:
+The physical ledger combines separately source-scoped runs on a Pixel Watch 4 running Android 17 /
+API 37. The frozen final APK verifies byte identity, start/recover/save, hour-plus Summary and
+History at normal/`1.30` text, and the recovered Summary notice/composition. Earlier candidates
+retain permission, ambient, manual-match, training, French, and broader enlarged-text evidence;
+they are not relabelled as final-APK captures. Final-build Home, Progress, Tile rendering/gap
+marker, recovered-History marker, and Live details were not physically recaptured and have
+automated regression coverage only. The lifecycle/recovery tooling runs:
 
 ```bash
 python3 tooling/wear_session_probe.py \
   --duration-minutes 180 --sample-seconds 60 \
+  --suppress-system-wakes \
   --output build/wear-session-probe
 
 python3 tooling/wear_recovery_probe.py \
   --output build/wear-recovery-probe
 ```
 
-The frozen app checkpoint is `6f6f6cd9531040072bc153b365c0c515b0a40781`; its installed debug
-APK SHA-256 is `28076fc03319ca15df92760a8d20b993af2f8ae8e129ffe61e021876eed0169d`.
-The device's installed `base.apk` matched that hash byte-for-byte and verified with an APK
-Signature Scheme v2 signer. The same build produced unsigned release APK
-`e23febe396dba1c3b8f34fcda4243ae5a598187ec4b9d8cb7d2b902243da5642` and unsigned AAB
-`f3335a55b28cddb4ed202fc3d929ef72524b44d3507d56f192836a3fb796557f`.
-The frozen app checkpoint's clean gate passed five Python unit tests, `py_compile`, `xmllint`, and
-Gradle clean/test/lint/debug/release APK/release bundle with all 132 Gradle tasks executed. Probe
-tooling revision `6a6c568` adds three selector regressions, bringing the current Python suite to
-eight passing tests. Dense-metric, live-HUD, match, and shadow large-text thresholds have JVM
-layout regressions.
-The 180-minute runner uses probe tooling checkpoint
-`6a6c568e0e156fd551ae1388b9502d261b61b796`. It locates the compact live Finish/Finir control
-through the full localized Stop-and-save accessibility name, with a regression for that contract.
-The evidence ledger separates earlier candidate
-artifacts from final-APK retests so that a visually convincing screenshot is never allowed to
-hide source drift.
+The frozen app/APK checkpoint is `0bdbe985756d962e73b47dfc5ca098a709a9a86f`. Its debug APK
+SHA-256 is `5d637e2d0c7fad57f15503c140d9cb11e25f4b94df1732256e88f2ca2a0046fb`; the device's installed
+`base.apk` matched byte-for-byte and verified with an APK Signature Scheme v2 debug signer. The
+same build produced unsigned release APK
+`f46405c1a9ee9d420d61b8e997da27ca75090665801279549eb734c4777fa6d8` and unsigned AAB
+`70d3c1816612565187d27f299ff69ca7060e978f717fd5698bcb5ae812fe58dc`.
+The installed package reported version `0.3.0` (`versionCode=300`) and last update
+`2026-07-26 14:08:34`.
+
+The current session probe includes exact post-stop diary/settled-recap classification, bounded
+error cleanup, and transactional wake restoration. It locates the compact Finish/Finir control
+through the full localized Stop-and-save accessibility name. The recovery probe validates schema-2
+process-absence provenance rather than inferring it from a frozen sample count. System-wake
+suppression does not modify battery telemetry or turn a powered run into a battery measurement.
+The evidence ledger separates earlier candidate artifacts from final-APK retests so that a
+visually convincing screenshot is never allowed to hide source drift.
 
 The endurance probe requires the foreground service and health type to remain present, the screen
 to stay asleep/dozing, sensor checkpoints to advance at every interval, exactly one new durable
-session, and saved duration within five seconds of observed wall time. The recovery probe also
-requires a frozen checkpoint during process absence and explicitly reports that elapsed duration
-includes the interruption while sensor coverage does not. Battery percentage is reported only
-when every sample says the watch was unpowered; a charging run is lifecycle evidence, not a
-battery-drain claim.
+session, saved duration within five seconds of observed wall time, a captured optional post-stop
+diary when shown, and a separately classified settled Summary. The recovery probe additionally
+requires valid ordered process-absence intervals, an exact recovered-checkpoint/final-session
+match, coverage from the last durable journal boundary through the restart request, and overlap
+with the forced stop. Battery percentage is reported only when every sample says the watch was
+unpowered; a charging run is lifecycle evidence, not a battery-drain claim.
+
+The final schema-2 [recovery report](evidence/v0.3-pixel-watch-4/recovery-final/20260726T121444Z/report.json)
+retains session `5fde6181-2421-4919-ac3b-6a16d0360b59`, stable identity/start, a frozen 1,185-sample
+checkpoint, 2,375 samples after restoration, one `Partial` export, and a 42,607 ms wall duration.
+Its immutable interval `1785068100751..1785068112485` is 11,734 ms: a conservative durable
+evidence boundary that covers journal-to-restart and overlaps the narrower 3,626 ms host-observed
+forced-stop interval. Interval validity, checkpoint exact match, coverage, overlap, and overall
+provenance booleans all pass.
+
+The older [180-minute report](evidence/v0.3-pixel-watch-4/endurance/20260726T071128Z/report.json)
+remains useful pre-final lifecycle/tooling evidence, but it ran on checkpoint `6f6f6cd` before the
+long-session, sync, and process-absence work above. It cannot close the frozen-final-APK gate. The
+definitive retained result and exact measurements will replace `FINAL_ENDURANCE_PENDING` after the
+in-progress run completes. Because that run is powered, it will not substantiate battery drain.
 
 The target-36 granted/denied-HR proof and observed journal sample counts are retained in
 [accessibility-localization.md](accessibility-localization.md#target-sdk-36-heart-rate-permission-evidence-2026-07-26).
 The current v0.3 screenshot, platform-surface, and recovery artifacts are indexed in the
-[Pixel Watch 4 evidence ledger](evidence/v0.3-pixel-watch-4/README.md). Remaining physical gates
-are explicit in [device-validation.md](device-validation.md): only the powered 180-minute report
-remains. Generated artifacts without a matching ledger entry do not count as evidence.
+[Pixel Watch 4 evidence ledger](evidence/v0.3-pixel-watch-4/README.md). The only open blocking v0.3
+lifecycle gate in [device-validation.md](device-validation.md) is `FINAL_ENDURANCE_PENDING`; that
+does not imply final-build visual recapture of Home, Progress, Tile, recovered History, or Live.
+Its separate unpowered battery row remains explicitly unclaimed and is not a v0.3 release blocker.
+Generated artifacts without a matching ledger entry do not count as evidence.
 
-CI runs the same software gate on every `master` push and release tag. A release workflow also
-verifies package ID, version, APK signature, and checksums before publication.
+CI runs the same software gate, including the six Node 22 browser journeys, on every `master` push
+and release tag. A release workflow also verifies package ID, version, APK signature, and
+checksums before publication.
 
 ---
 
