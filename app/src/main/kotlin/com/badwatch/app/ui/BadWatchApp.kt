@@ -412,7 +412,7 @@ fun BadWatchApp(
 
                             RecapPage.Summary -> SummaryScreen(
                                 stored = target.session.export,
-                                insights = emptyList(),
+                                insights = viewModel.storedSessionInsights(target.session.export),
                                 onDone = { screen = Screen.History },
                                 onEditDiary = {
                                     saveError = null

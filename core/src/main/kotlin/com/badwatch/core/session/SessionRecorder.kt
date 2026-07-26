@@ -71,7 +71,18 @@ class SessionRecorder(
 
     /** Live rally structure, recomputed on demand. Cheap: rallies are tens of items. */
     fun rallyProfile(nowMillis: Long): RallyProfile =
-        rallySegmenter.segment(shots, sessionEndMillis = nowMillis)
+        rallySegmenter.segment(
+            shots = shots,
+            sessionEndMillis = nowMillis,
+            processAbsenceGaps = aggregator.processAbsenceGaps()
+        )
+
+    /** Adds durable provenance for one process absence while retaining the original wall bounds. */
+    fun markProcessAbsence(startedAtMillis: Long, endedAtMillis: Long) {
+        if (!running) return
+        aggregator.markProcessAbsence(startedAtMillis, endedAtMillis)
+        pipeline.beginNewObservedSegment()
+    }
 
     /** Immutable compact state suitable for an atomic active-session journal. */
     fun checkpoint(): SessionRecorderCheckpoint? {
@@ -97,7 +108,11 @@ class SessionRecorder(
         val session = aggregator.buildSession(nowMillis, sessionId = sessionId)
         return RecordedSession(
             session = session,
-            rallyProfile = rallySegmenter.segment(shots, sessionEndMillis = nowMillis),
+            rallyProfile = rallySegmenter.segment(
+                shots = shots,
+                sessionEndMillis = nowMillis,
+                processAbsenceGaps = session.processAbsenceGaps
+            ),
             profile = profile
         )
     }

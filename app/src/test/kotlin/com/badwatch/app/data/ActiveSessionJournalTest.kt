@@ -7,6 +7,8 @@ import com.badwatch.core.sync.BadWatchJson
 import com.google.common.truth.Truth.assertThat
 import java.io.File
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -75,6 +77,35 @@ class ActiveSessionJournalTest {
 
         assertThat(ActiveSessionJournal(file).load()).isNull()
         assertThat(file.exists()).isFalse()
+    }
+
+    @Test
+    fun schemaOneJournalWithoutProcessGapProvenanceLoadsConservatively() = runTest {
+        val file = journalFile("pre-gap-provenance")
+        val currentJson = BadWatchJson.parseToJsonElement(
+            BadWatchJson.encodeToString(ActiveSessionJournalEntry.serializer(), entry())
+        ).jsonObject
+        val checkpoint = currentJson.getValue("checkpoint").jsonObject
+        val legacyAggregator = checkpoint.getValue("aggregator").jsonObject
+            .toMutableMap()
+            .apply { remove("processAbsenceGaps") }
+        val legacyCheckpoint = JsonObject(
+            checkpoint.toMutableMap().apply {
+                put("aggregator", JsonObject(legacyAggregator))
+            }
+        )
+        file.writeText(
+            JsonObject(
+                currentJson.toMutableMap().apply { put("checkpoint", legacyCheckpoint) }
+            ).toString()
+        )
+
+        val loaded = ActiveSessionJournal(file).load()
+
+        assertThat(loaded).isNotNull()
+        assertThat(loaded!!.checkpoint.sessionId).isEqualTo("session-1")
+        assertThat(loaded.checkpoint.aggregator.processAbsenceGaps).isEmpty()
+        assertThat(File(file.parentFile, "${file.name}.invalid").exists()).isFalse()
     }
 
     @Test

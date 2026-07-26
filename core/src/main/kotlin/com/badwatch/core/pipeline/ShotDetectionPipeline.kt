@@ -36,6 +36,11 @@ class ShotDetectionPipeline(
         lastEmittedAt = checkpoint.lastEmittedAtMillis
     }
 
+    /** A process gap is a hard evidence boundary; never classify across its rolling window. */
+    fun beginNewObservedSegment() {
+        buffer.clear()
+    }
+
     fun addSample(sample: SensorSample): ShotEvent? {
         buffer.addLast(sample)
         buffer.trimBefore(sample.timestampMillis - windowDurationMillis)

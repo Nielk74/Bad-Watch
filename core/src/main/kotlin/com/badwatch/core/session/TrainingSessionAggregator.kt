@@ -3,6 +3,7 @@ package com.badwatch.core.session
 import com.badwatch.core.model.HeartRateZone
 import com.badwatch.core.model.HeartRatePoint
 import com.badwatch.core.model.MINIMUM_CARDIOVASCULAR_LOAD_COVERAGE
+import com.badwatch.core.model.ProcessAbsenceGap
 import com.badwatch.core.model.SensorSample
 import com.badwatch.core.model.ShotEvent
 import com.badwatch.core.model.ShotType
@@ -26,6 +27,7 @@ class TrainingSessionAggregator(
     private val heartRates = mutableListOf<HeartRatePoint>()
     private val shots = mutableListOf<ShotEvent>()
     private val zoneHistogram = mutableMapOf<HeartRateZone, Int>()
+    private val processAbsenceGaps = mutableListOf<ProcessAbsenceGap>()
     private var startTimeMillis: Long = 0L
     private var lastSample: SensorSample? = null
     private var accumulatedHeartRate = 0.0
@@ -35,6 +37,7 @@ class TrainingSessionAggregator(
         heartRates.clear()
         shots.clear()
         zoneHistogram.clear()
+        processAbsenceGaps.clear()
         startTimeMillis = startMillis
         lastSample = null
         accumulatedHeartRate = 0.0
@@ -46,7 +49,8 @@ class TrainingSessionAggregator(
             startedAtMillis = startTimeMillis,
             heartRateTrace = heartRates.toList(),
             shots = shots.toList(),
-            lastSample = lastSample
+            lastSample = lastSample,
+            processAbsenceGaps = processAbsenceGaps.toList()
         )
 
     fun restore(checkpoint: TrainingSessionAggregatorCheckpoint) {
@@ -54,6 +58,8 @@ class TrainingSessionAggregator(
         heartRates += checkpoint.heartRateTrace
         shots.clear()
         shots += checkpoint.shots
+        processAbsenceGaps.clear()
+        processAbsenceGaps += checkpoint.processAbsenceGaps
         zoneHistogram.clear()
         if (maxHeartRateConfigured) {
             checkpoint.heartRateTrace.forEach { point ->
@@ -67,6 +73,20 @@ class TrainingSessionAggregator(
             .sumOf { it.beatsPerMinute.toDouble() }
         lastHeartRateSourceMillis = checkpoint.heartRateTrace.lastOrNull()?.timestampMillis
     }
+
+    /** Records a known unobserved process interval without changing whole-session elapsed time. */
+    fun markProcessAbsence(startedAtMillis: Long, endedAtMillis: Long) {
+        val boundedStart = maxOf(startTimeMillis, startedAtMillis)
+        if (endedAtMillis <= boundedStart) return
+        processAbsenceGaps += ProcessAbsenceGap(
+            startedAtMillis = boundedStart,
+            endedAtMillis = endedAtMillis
+        )
+        // A pre-death value is not a truthful "current" sensor reading after recovery.
+        lastSample = null
+    }
+
+    fun processAbsenceGaps(): List<ProcessAbsenceGap> = processAbsenceGaps.toList()
 
     fun onSample(sample: SensorSample) {
         if (startTimeMillis == 0L) {
@@ -169,7 +189,8 @@ class TrainingSessionAggregator(
             endedAtMillis = nowMillis,
             summary = summary,
             shots = shots.toList(),
-            heartRateTrace = heartRates.toList()
+            heartRateTrace = heartRates.toList(),
+            processAbsenceGaps = processAbsenceGaps.toList()
         )
     }
 

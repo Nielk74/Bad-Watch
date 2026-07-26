@@ -1,5 +1,6 @@
 package com.badwatch.core.session
 
+import com.badwatch.core.model.ProcessAbsenceGap
 import com.badwatch.core.model.ShotEvent
 import com.badwatch.core.model.ShotType
 import com.google.common.truth.Truth.assertThat
@@ -58,6 +59,31 @@ class RallySegmenterTest {
         assertThat(profile.totalRestMillis).isEqualTo(14_000L)
         assertThat(profile.restRatio).isWithin(0.01f).of(2.33f)
         assertThat(profile.workDensity).isWithin(0.01f).of(0.3f)
+    }
+
+    @Test
+    fun processAbsenceIsAHardBoundaryAndNeverCountsAsDetectedRest() {
+        // The 1.5 s hit gap would normally remain one exchange. The watch process was absent
+        // for 0.5 s inside it, so continuity is unknown and must split at that boundary.
+        val shots = listOf(shot(0L), shot(1_000L), shot(2_500L), shot(3_500L))
+        val gaps = listOf(
+            ProcessAbsenceGap(1_500L, 2_000L),
+            ProcessAbsenceGap(4_000L, 4_800L)
+        )
+
+        val profile = segmenter.segment(
+            shots = shots,
+            sessionEndMillis = 5_000L,
+            processAbsenceGaps = gaps
+        )
+
+        assertThat(profile.rallyCount).isEqualTo(2)
+        assertThat(profile.rallies.map { it.shotCount }).containsExactly(2, 2).inOrder()
+        // 1.5 s wall gap minus 0.5 s unobserved process time.
+        assertThat(profile.rallies[1].restBeforeMillis).isEqualTo(1_000L)
+        // 1.5 s trailing wall time minus the later 0.8 s process absence.
+        assertThat(profile.totalRestMillis).isEqualTo(1_700L)
+        assertThat(profile.totalWorkMillis).isEqualTo(2_000L)
     }
 
     @Test

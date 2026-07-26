@@ -1,11 +1,15 @@
 package com.badwatch.core.session
 
 import com.badwatch.core.model.PlayerProfile
+import com.badwatch.core.model.ProcessAbsenceGap
 import com.badwatch.core.model.SensorSample
 import com.badwatch.core.model.ShotType
+import com.badwatch.core.model.TrainingSession
 import com.badwatch.core.model.Vector3
 import com.badwatch.core.sync.BadWatchJson
 import com.google.common.truth.Truth.assertThat
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import org.junit.Test
 
 /**
@@ -32,6 +36,8 @@ class SessionRecorderTest {
         assertThat(recorded.session.summary.totalShots).isEqualTo(recorded.session.shots.size)
         assertThat(recorded.session.shots.map { it.type }).contains(ShotType.Smash)
         assertThat(recorded.session.endedAtMillis).isEqualTo(clock)
+        assertThat(recorded.session.summary.durationMillis).isEqualTo(clock - START)
+        assertThat(recorded.session.processAbsenceGaps).isEmpty()
     }
 
     @Test
@@ -128,6 +134,95 @@ class SessionRecorderTest {
         assertThat(recorded.session.shots.size).isGreaterThan(before.aggregator.shots.size)
         assertThat(restored.samplesProcessed).isGreaterThan(before.samplesProcessed)
     }
+
+    @Test
+    fun repeatedProcessAbsencesSurviveCheckpointsWithoutChangingWallDurationOrCoverage() {
+        val original = SessionRecorder(
+            profile = PlayerProfile(),
+            sessionId = "recovered-session"
+        )
+        original.start(START)
+        original.onSample(sample(START + 1_000L, heartRate = 120f))
+        original.markProcessAbsence(START + 2_000L, START + 12_000L)
+
+        val firstCheckpoint = roundTrip(original.checkpoint()!!)
+        assertThat(firstCheckpoint.aggregator.processAbsenceGaps).containsExactly(
+            ProcessAbsenceGap(START + 2_000L, START + 12_000L)
+        )
+
+        val restored = SessionRecorder.restore(firstCheckpoint)
+        restored.markProcessAbsence(START + 14_000L, START + 20_000L)
+        restored.onSample(sample(START + 21_000L, heartRate = 150f))
+
+        val secondCheckpoint = roundTrip(restored.checkpoint()!!)
+        val twiceRestored = SessionRecorder.restore(secondCheckpoint)
+        val snapshot = twiceRestored.snapshot(START + 25_000L)
+        val recorded = twiceRestored.finish(START + 30_000L)!!
+
+        assertThat(snapshot.durationMillis).isEqualTo(25_000L)
+        assertThat(recorded.session.id).isEqualTo("recovered-session")
+        assertThat(recorded.session.startedAtMillis).isEqualTo(START)
+        assertThat(recorded.session.endedAtMillis).isEqualTo(START + 30_000L)
+        assertThat(recorded.session.summary.durationMillis).isEqualTo(30_000L)
+        assertThat(recorded.session.processAbsenceGaps).containsExactly(
+            ProcessAbsenceGap(START + 2_000L, START + 12_000L),
+            ProcessAbsenceGap(START + 14_000L, START + 20_000L)
+        ).inOrder()
+        assertThat(recorded.session.summary.heartRateSampleCount).isEqualTo(2)
+        // Coverage deliberately exposes the whole wall interval, including both missing gaps.
+        assertThat(recorded.session.summary.heartRateCoverage)
+            .isWithin(0.0001f)
+            .of(2f / 30f)
+
+        val encodedSession = BadWatchJson.encodeToString(
+            TrainingSession.serializer(),
+            recorded.session
+        )
+        assertThat(
+            BadWatchJson.decodeFromString(TrainingSession.serializer(), encodedSession)
+        ).isEqualTo(recorded.session)
+    }
+
+    @Test
+    fun checkpointWrittenBeforeGapProvenanceDefaultsToNoKnownProcessAbsence() {
+        val recorder = SessionRecorder(sessionId = "legacy-checkpoint")
+        recorder.start(START)
+        recorder.onSample(sample(START + 1_000L, heartRate = 130f))
+        val current = recorder.checkpoint()!!
+        val currentJson = BadWatchJson.parseToJsonElement(
+            BadWatchJson.encodeToString(SessionRecorderCheckpoint.serializer(), current)
+        ).jsonObject
+        val legacyAggregator = currentJson.getValue("aggregator").jsonObject
+            .toMutableMap()
+            .apply { remove("processAbsenceGaps") }
+        val legacyJson = JsonObject(
+            currentJson.toMutableMap().apply {
+                put("aggregator", JsonObject(legacyAggregator))
+            }
+        ).toString()
+
+        val decoded = BadWatchJson.decodeFromString(
+            SessionRecorderCheckpoint.serializer(),
+            legacyJson
+        )
+
+        assertThat(decoded.schemaVersion).isEqualTo(SessionRecorderCheckpoint.SCHEMA_VERSION)
+        assertThat(decoded.aggregator.processAbsenceGaps).isEmpty()
+        assertThat(SessionRecorder.restore(decoded).snapshot(START + 5_000L).durationMillis)
+            .isEqualTo(5_000L)
+    }
+
+    private fun roundTrip(checkpoint: SessionRecorderCheckpoint): SessionRecorderCheckpoint {
+        val encoded = BadWatchJson.encodeToString(SessionRecorderCheckpoint.serializer(), checkpoint)
+        return BadWatchJson.decodeFromString(SessionRecorderCheckpoint.serializer(), encoded)
+    }
+
+    private fun sample(timestampMillis: Long, heartRate: Float): SensorSample = SensorSample(
+        timestampMillis = timestampMillis,
+        gyro = Vector3.ZERO,
+        heartRateBpm = heartRate,
+        heartRateSampleTimestampMillis = timestampMillis
+    )
 
     /** Feeds one smash-shaped swing; returns the clock after the swing. */
     private fun feedSmash(recorder: SessionRecorder, startMillis: Long): Long {

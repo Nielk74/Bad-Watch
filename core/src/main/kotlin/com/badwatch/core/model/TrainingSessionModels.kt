@@ -52,7 +52,9 @@ data class TrainingSession(
     val summary: TrainingSummary,
     val shots: List<ShotEvent>,
     /** Low-rate trace (normally ~1 Hz), deduplicated from the fused motion stream. */
-    val heartRateTrace: List<HeartRatePoint> = emptyList()
+    val heartRateTrace: List<HeartRatePoint> = emptyList(),
+    /** Process-absence provenance; never subtracted from whole-session elapsed duration. */
+    val processAbsenceGaps: List<ProcessAbsenceGap> = emptyList()
 )
 
 data class TrainingSessionSnapshot(

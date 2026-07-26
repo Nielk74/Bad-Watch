@@ -154,6 +154,7 @@ class SerializationTest {
         assertThat(decoded.profile.hasConfiguredHeartRateReserve).isFalse()
         assertThat(decoded.diaryRevision).isEqualTo(0L)
         assertThat(decoded.diaryBaseRevision).isNull()
+        assertThat(decoded.session.processAbsenceGaps).isEmpty()
         val roundTripped = BadWatchJson.decodeFromString(
             SessionExport.serializer(),
             BadWatchJson.encodeToString(SessionExport.serializer(), decoded)

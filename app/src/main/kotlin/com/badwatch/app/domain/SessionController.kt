@@ -97,6 +97,7 @@ class SessionController(
             val recovered = journalEntry != null
             val session: SessionRecorder
             val activeIdentity: ActiveSessionIdentity
+            val initialJournalAt: Long
 
             if (journalEntry != null) {
                 val alreadySaved = sessionStore.findById(journalEntry.checkpoint.sessionId)
@@ -105,7 +106,12 @@ class SessionController(
                     publishCompleted(alreadySaved.export)
                     return@withLock SessionStartResult.AlreadySaved(alreadySaved.export)
                 }
+                initialJournalAt = now()
                 session = SessionRecorder.restore(journalEntry.checkpoint)
+                session.markProcessAbsence(
+                    startedAtMillis = journalEntry.updatedAtMillis,
+                    endedAtMillis = initialJournalAt
+                )
                 activeIdentity = ActiveSessionIdentity(
                     deviceId = journalEntry.deviceId,
                     appVersion = journalEntry.appVersion,
@@ -113,7 +119,8 @@ class SessionController(
                 )
             } else {
                 val profile = runtimeSettings.currentProfile()
-                session = SessionRecorder(profile = profile).also { it.start(now()) }
+                initialJournalAt = now()
+                session = SessionRecorder(profile = profile).also { it.start(initialJournalAt) }
                 activeIdentity = ActiveSessionIdentity(
                     deviceId = runtimeSettings.stableDeviceId(),
                     appVersion = appVersion,
@@ -124,7 +131,6 @@ class SessionController(
             recorder = session
             identity = activeIdentity
             val startedAt = session.checkpoint()!!.aggregator.startedAtMillis
-            val initialJournalAt = now()
             check(persistCheckpoint(session, activeIdentity, initialJournalAt)) {
                 "Could not create the session recovery checkpoint"
             }
@@ -324,13 +330,19 @@ class SessionController(
         val history = sessionStore.sessions.value.map { it.export }
         val analysis = export.reviewedAnalysis()
         val baseline = export.reviewedInsightBaseline(history)
-        _state.value = SessionState.Completed(
-            export = export,
-            insights = insightEngine.generate(
+        val insights = when (export.context.recordingQuality) {
+            RecordingQuality.Partial,
+            RecordingQuality.Unusable -> emptyList()
+            RecordingQuality.Unreviewed,
+            RecordingQuality.Complete -> insightEngine.generate(
                 session = analysis.session,
                 rallyProfile = analysis.rallyProfile,
                 baseline = baseline
             )
+        }
+        _state.value = SessionState.Completed(
+            export = export,
+            insights = insights
         )
     }
 

@@ -3,6 +3,7 @@ package com.badwatch.core.sync
 import com.badwatch.core.insight.SessionInsightEngine
 import com.badwatch.core.model.HeartRateZone
 import com.badwatch.core.model.PlayerProfile
+import com.badwatch.core.model.ProcessAbsenceGap
 import com.badwatch.core.model.ShotEvent
 import com.badwatch.core.model.ShotType
 import com.badwatch.core.model.TrainingSession
@@ -93,7 +94,28 @@ class ReviewedSessionAnalysisTest {
     }
 
     @Test
-    fun baselineUsesOnlyPriorNonUnusableSessionsWithTheSameEligibleContext() {
+    fun reviewedRalliesKeepProcessAbsenceAsABoundaryWithoutCallingItQuietTime() {
+        val gap = ProcessAbsenceGap(startedAtMillis = 2_500L, endedAtMillis = 8_500L)
+        val raw = export(
+            start = 0L,
+            end = 12_000L,
+            shotTimes = listOf(1_000L, 2_000L, 9_000L, 10_000L),
+            processAbsenceGaps = listOf(gap)
+        )
+
+        val analysis = raw.reviewedAnalysis()
+
+        assertThat(analysis.session.processAbsenceGaps).containsExactly(gap)
+        assertThat(analysis.session.summary.durationMillis).isEqualTo(12_000L)
+        assertThat(analysis.rallyProfile.rallyCount).isEqualTo(2)
+        // 7 s between exchanges includes 6 s of unknown process absence, leaving 1 s quiet.
+        // The final 2 s to the session end is observed quiet time.
+        assertThat(analysis.rallyProfile.totalRestMillis).isEqualTo(3_000L)
+        assertThat(analysis.rallyProfile).isEqualTo(raw.rallyProfile)
+    }
+
+    @Test
+    fun baselineUsesOnlyPriorCompleteOrUnreviewedSessionsWithTheSameEligibleContext() {
         val current = exchangeExport(1_000_000L).withContext(ActivityMode.SinglesMatch)
         val eligible = listOf(
             exchangeExport(100_000L).withContext(ActivityMode.SinglesMatch),
@@ -119,8 +141,8 @@ class ReviewedSessionAnalysisTest {
 
         val baseline = current.reviewedInsightBaseline(eligible + excluded + current)
 
-        assertThat(baseline.sessionCount).isEqualTo(3)
-        assertThat(baseline.hasEnoughHistory).isTrue()
+        assertThat(baseline.sessionCount).isEqualTo(2)
+        assertThat(baseline.hasEnoughHistory).isFalse()
     }
 
     @Test
@@ -212,7 +234,8 @@ class ReviewedSessionAnalysisTest {
     private fun export(
         start: Long,
         end: Long,
-        shotTimes: List<Long>
+        shotTimes: List<Long>,
+        processAbsenceGaps: List<ProcessAbsenceGap> = emptyList()
     ): SessionExport {
         val shots = shotTimes.mapIndexed { index, timestamp ->
             ShotEvent(
@@ -240,14 +263,19 @@ class ReviewedSessionAnalysisTest {
                 effortScore = 0f,
                 heartRateZoneHistogram = emptyMap<HeartRateZone, Int>()
             ),
-            shots = shots
+            shots = shots,
+            processAbsenceGaps = processAbsenceGaps
         )
         return SessionExport(
             deviceId = "device",
             appVersion = "test",
             profile = PlayerProfile(),
             session = session,
-            rallyProfile = RallySegmenter().segment(shots, sessionEndMillis = end)
+            rallyProfile = RallySegmenter().segment(
+                shots = shots,
+                sessionEndMillis = end,
+                processAbsenceGaps = processAbsenceGaps
+            )
         )
     }
 

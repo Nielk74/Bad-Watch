@@ -58,7 +58,8 @@ fun SessionExport.reviewedAnalysis(): ReviewedSessionAnalysis {
         session = reviewedSession,
         rallyProfile = RallySegmenter().segment(
             shots = hits,
-            sessionEndMillis = window.endedAtMillis
+            sessionEndMillis = window.endedAtMillis,
+            processAbsenceGaps = session.processAbsenceGaps
         )
     )
 }
@@ -67,8 +68,8 @@ fun SessionExport.reviewedAnalysis(): ReviewedSessionAnalysis {
  * Builds a personal insight baseline from earlier, usable, like-for-like reviewed sessions.
  *
  * Centralising this filter keeps watch and server interpretations identical. Equal/future start
- * times are excluded, an Unusable recording can never teach the baseline, and comparison keys
- * must be explicitly eligible before any personal-history language is allowed.
+ * times are excluded, Partial/Unusable recordings can never teach the baseline, and comparison
+ * keys must be explicitly eligible before any personal-history language is allowed.
  */
 fun SessionExport.reviewedInsightBaseline(
     history: Iterable<SessionExport>
@@ -76,7 +77,10 @@ fun SessionExport.reviewedInsightBaseline(
     history
         .asSequence()
         .filter { candidate -> candidate.session.startedAtMillis < session.startedAtMillis }
-        .filter { candidate -> candidate.context.recordingQuality != RecordingQuality.Unusable }
+        .filter { candidate ->
+            candidate.context.recordingQuality != RecordingQuality.Partial &&
+                candidate.context.recordingQuality != RecordingQuality.Unusable
+        }
         .filter { candidate -> isComparableWith(candidate) }
         .map { candidate -> candidate.reviewedAnalysis().rallyProfile }
         .toList()

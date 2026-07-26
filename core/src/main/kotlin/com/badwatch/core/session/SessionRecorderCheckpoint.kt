@@ -2,6 +2,7 @@ package com.badwatch.core.session
 
 import com.badwatch.core.model.HeartRatePoint
 import com.badwatch.core.model.PlayerProfile
+import com.badwatch.core.model.ProcessAbsenceGap
 import com.badwatch.core.model.SensorSample
 import com.badwatch.core.model.ShotEvent
 import kotlinx.serialization.Serializable
@@ -12,7 +13,9 @@ data class TrainingSessionAggregatorCheckpoint(
     val startedAtMillis: Long,
     val heartRateTrace: List<HeartRatePoint>,
     val shots: List<ShotEvent>,
-    val lastSample: SensorSample?
+    val lastSample: SensorSample?,
+    /** Defaults empty so schema-1 journals written before gap provenance still decode. */
+    val processAbsenceGaps: List<ProcessAbsenceGap> = emptyList()
 ) {
     init {
         require(startedAtMillis >= 0L) { "Session start must not be negative" }

@@ -1,8 +1,11 @@
 package com.badwatch.core.session
 
+import com.badwatch.core.model.ProcessAbsenceGap
 import com.badwatch.core.model.Rally
 import com.badwatch.core.model.RallyProfile
 import com.badwatch.core.model.ShotEvent
+import com.badwatch.core.model.overlapDurationMillis
+import com.badwatch.core.model.overlapsInterval
 
 /**
  * Groups a session's shots into rallies.
@@ -22,7 +25,11 @@ class RallySegmenter(
     private val minimumShots: Int = 2
 ) {
 
-    fun segment(shots: List<ShotEvent>, sessionEndMillis: Long? = null): RallyProfile {
+    fun segment(
+        shots: List<ShotEvent>,
+        sessionEndMillis: Long? = null,
+        processAbsenceGaps: List<ProcessAbsenceGap> = emptyList()
+    ): RallyProfile {
         if (shots.isEmpty()) return RallyProfile.EMPTY
 
         val ordered = shots.sortedBy { it.timestampMillis }
@@ -31,7 +38,11 @@ class RallySegmenter(
 
         for (shot in ordered.drop(1)) {
             val gap = shot.timestampMillis - current.last().timestampMillis
-            if (gap > restThresholdMillis) {
+            val crossesProcessAbsence = processAbsenceGaps.overlapsInterval(
+                startMillis = current.last().timestampMillis,
+                endMillis = shot.timestampMillis
+            )
+            if (gap > restThresholdMillis || crossesProcessAbsence) {
                 groups += current
                 current = mutableListOf(shot)
             } else {
@@ -61,7 +72,10 @@ class RallySegmenter(
                     .takeIf { it.isNotEmpty() }
                     ?.average()
                     ?.toFloat(),
-                restBeforeMillis = previousEnd?.let { start - it } ?: 0L
+                restBeforeMillis = previousEnd?.let { previous ->
+                    val wallGap = (start - previous).coerceAtLeast(0L)
+                    wallGap - processAbsenceGaps.overlapDurationMillis(previous, start)
+                } ?: 0L
             )
             previousEnd = end
             rally
@@ -71,7 +85,11 @@ class RallySegmenter(
         // Rest is measured between rallies, plus any trailing time to the session end.
         val betweenRest = rallies.drop(1).sumOf { it.restBeforeMillis }
         val trailingRest = sessionEndMillis
-            ?.let { (it - rallies.last().endMillis).coerceAtLeast(0L) }
+            ?.let { sessionEnd ->
+                val lastRallyEnd = rallies.last().endMillis
+                val wallGap = (sessionEnd - lastRallyEnd).coerceAtLeast(0L)
+                wallGap - processAbsenceGaps.overlapDurationMillis(lastRallyEnd, sessionEnd)
+            }
             ?: 0L
 
         return RallyProfile(

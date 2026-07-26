@@ -11,12 +11,13 @@ import com.badwatch.app.domain.SessionController
 import com.badwatch.app.domain.SessionState
 import com.badwatch.app.domain.revisedDiary
 import com.badwatch.app.domain.ShadowControllerState
-import com.badwatch.core.model.Handedness
-import com.badwatch.core.model.ShotType
-import com.badwatch.core.model.PlayerProfile
-import com.badwatch.core.model.SelfReportedExperience
+import com.badwatch.core.insight.Insight
 import com.badwatch.core.match.MatchFormat
 import com.badwatch.core.match.MatchSide
+import com.badwatch.core.model.Handedness
+import com.badwatch.core.model.PlayerProfile
+import com.badwatch.core.model.SelfReportedExperience
+import com.badwatch.core.model.ShotType
 import com.badwatch.core.sync.CorrectionActor
 import com.badwatch.core.sync.CorrectionProvenance
 import com.badwatch.core.sync.DiaryReviewStatus
@@ -308,6 +309,12 @@ class BadWatchViewModel(
             onComplete = onComplete
         )
     }
+
+    /** Always derives a historical recap from the latest stored history, never a stale UI copy. */
+    fun storedSessionInsights(export: SessionExport): List<Insight> = buildStoredSessionInsights(
+        selected = export,
+        history = history.value.map { it.export }
+    )
 
     private fun revisedWithCorrections(
         export: SessionExport,

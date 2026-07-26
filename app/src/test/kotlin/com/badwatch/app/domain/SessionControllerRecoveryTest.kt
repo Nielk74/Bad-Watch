@@ -5,6 +5,7 @@ import com.badwatch.app.data.ActiveSessionJournalEntry
 import com.badwatch.app.data.SessionStore
 import com.badwatch.app.sensors.SensorStream
 import com.badwatch.core.model.PlayerProfile
+import com.badwatch.core.model.ProcessAbsenceGap
 import com.badwatch.core.model.SensorSample
 import com.badwatch.core.model.Vector3
 import com.badwatch.core.session.SessionRecorder
@@ -84,6 +85,8 @@ class SessionControllerRecoveryTest {
         val recording = recoveredController.state.value as SessionState.Recording
         assertThat(recording.snapshot.startedAtMillis).isEqualTo(1_000L)
         assertThat(recording.snapshot.durationMillis).isEqualTo(24_000L)
+        assertThat(ActiveSessionJournal(journalFile).load()!!.checkpoint.aggregator.processAbsenceGaps)
+            .containsExactly(ProcessAbsenceGap(13_500L, 25_000L))
 
         clock = 25_100L
         recoveredStream.emit(sample(clock, heartRate = 151f))
@@ -94,11 +97,112 @@ class SessionControllerRecoveryTest {
         assertThat(saved.session.id).isEqualTo(stableId)
         assertThat(saved.session.startedAtMillis).isEqualTo(1_000L)
         assertThat(saved.session.endedAtMillis).isEqualTo(30_000L)
+        assertThat(saved.session.summary.durationMillis).isEqualTo(29_000L)
+        assertThat(saved.session.processAbsenceGaps)
+            .containsExactly(ProcessAbsenceGap(13_500L, 25_000L))
         assertThat(saved.session.heartRateTrace).hasSize(2)
+        assertThat(saved.session.summary.heartRateCoverage)
+            .isWithin(0.0001f)
+            .of(2f / 29f)
         assertThat(saved.context.recordingQuality).isEqualTo(RecordingQuality.Partial)
+        assertThat((recoveredController.state.value as SessionState.Completed).insights).isEmpty()
         assertThat(store.refresh()).hasSize(1)
         assertThat(ActiveSessionJournal(journalFile).load()).isNull()
         recoveredScope.cancel()
+    }
+
+    @Test
+    fun repeatedProcessDeathsAccumulateDistinctDurableGaps() = runTest {
+        val root = temporaryFolder.newFolder("repeated-process-death")
+        val journalFile = File(root, "active/session.json")
+        val store = SessionStore(File(root, "sessions"))
+        var clock = 1_000L
+
+        val firstStream = FakeSensorStream()
+        val firstScope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        val first = controller(
+            stream = firstStream,
+            store = store,
+            journal = ActiveSessionJournal(journalFile),
+            scope = firstScope,
+            now = { clock }
+        )
+        assertThat(first.start())
+            .isEqualTo(SessionStartResult.Started(recovered = false, startedAtMillis = 1_000L))
+        runCurrent()
+        clock = 13_500L
+        firstStream.emit(sample(clock, heartRate = 140f))
+        runCurrent()
+        val stableId = ActiveSessionJournal(journalFile).load()!!.checkpoint.sessionId
+        firstScope.cancel()
+        runCurrent()
+
+        clock = 25_000L
+        val secondStream = FakeSensorStream()
+        val secondJournal = ActiveSessionJournal(journalFile)
+        val secondScope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        val second = controller(
+            stream = secondStream,
+            store = store,
+            journal = secondJournal,
+            scope = secondScope,
+            now = { clock }
+        )
+        assertThat(second.start())
+            .isEqualTo(SessionStartResult.Started(recovered = true, startedAtMillis = 1_000L))
+        runCurrent()
+        assertThat(secondJournal.load()!!.checkpoint.aggregator.processAbsenceGaps)
+            .containsExactly(ProcessAbsenceGap(13_500L, 25_000L))
+        clock = 40_000L
+        secondStream.emit(sample(clock, heartRate = 145f))
+        runCurrent()
+        assertThat(secondJournal.load()!!.updatedAtMillis).isEqualTo(40_000L)
+        secondScope.cancel()
+        runCurrent()
+
+        clock = 50_000L
+        val thirdStream = FakeSensorStream()
+        val thirdJournal = ActiveSessionJournal(journalFile)
+        val thirdScope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        val third = controller(
+            stream = thirdStream,
+            store = store,
+            journal = thirdJournal,
+            scope = thirdScope,
+            now = { clock }
+        )
+        assertThat(third.start())
+            .isEqualTo(SessionStartResult.Started(recovered = true, startedAtMillis = 1_000L))
+        runCurrent()
+        val recoveredCheckpoint = thirdJournal.load()!!
+        assertThat(recoveredCheckpoint.checkpoint.sessionId).isEqualTo(stableId)
+        assertThat(recoveredCheckpoint.recoveryCount).isEqualTo(2)
+        assertThat(recoveredCheckpoint.checkpoint.aggregator.processAbsenceGaps).containsExactly(
+            ProcessAbsenceGap(13_500L, 25_000L),
+            ProcessAbsenceGap(40_000L, 50_000L)
+        ).inOrder()
+
+        clock = 50_100L
+        thirdStream.emit(sample(clock, heartRate = 150f))
+        runCurrent()
+        clock = 55_000L
+        val saved = third.stopAndSave()!!
+
+        assertThat(saved.session.id).isEqualTo(stableId)
+        assertThat(saved.session.startedAtMillis).isEqualTo(1_000L)
+        assertThat(saved.session.endedAtMillis).isEqualTo(55_000L)
+        assertThat(saved.session.summary.durationMillis).isEqualTo(54_000L)
+        assertThat(saved.session.summary.heartRateSampleCount).isEqualTo(3)
+        assertThat(saved.session.summary.heartRateCoverage)
+            .isWithin(0.0001f)
+            .of(3f / 54f)
+        assertThat(saved.session.processAbsenceGaps).containsExactly(
+            ProcessAbsenceGap(13_500L, 25_000L),
+            ProcessAbsenceGap(40_000L, 50_000L)
+        ).inOrder()
+        assertThat(saved.context.recordingQuality).isEqualTo(RecordingQuality.Partial)
+        assertThat(thirdJournal.load()).isNull()
+        thirdScope.cancel()
     }
 
     @Test
