@@ -235,9 +235,12 @@
                    color-mix(in srgb, var(--series-1) 42%, var(--border)); border-radius: 12px;
                    background: color-mix(in srgb, var(--series-1) 9%, var(--surface-1)); }
   .review-banner.clean { border-color: var(--border); background: var(--surface-1); }
+  .review-banner.process-gap { border-color: color-mix(in srgb, var(--status-warning) 55%, var(--border));
+                               background: color-mix(in srgb, var(--status-warning) 10%, var(--surface-1)); }
   .review-banner .kicker { color: var(--series-1); font-size: 11.5px; font-weight: 700;
                            letter-spacing: .06em; text-transform: uppercase; }
   .review-banner.clean .kicker { color: var(--text-muted); }
+  .review-banner.process-gap .kicker { color: var(--status-warning); }
   .review-banner strong { display: block; margin-top: 3px; font-size: 14px; }
   .review-banner p { margin: 5px 0 0; color: var(--text-secondary); font-size: 12.5px;
                      line-height: 1.45; }
@@ -252,6 +255,12 @@
                  line-height: 1.5; }
   tr.rowlink { cursor: pointer; }
   tr.rowlink:focus-visible { outline: 2px solid var(--series-1); outline-offset: -2px; }
+  .coverage-pill { display: inline-flex; align-items: center; white-space: nowrap; padding: 3px 8px;
+                   border: 1px solid var(--border); border-radius: 999px; color: var(--text-secondary);
+                   background: var(--surface-2); font-size: 11.5px; font-weight: 620; }
+  .coverage-pill.gap { border-color: color-mix(in srgb, var(--status-warning) 48%, var(--border));
+                       color: var(--text-primary);
+                       background: color-mix(in srgb, var(--status-warning) 10%, var(--surface-1)); }
 
   .diary-card { padding-bottom: 20px; }
   .diary-title-row { display: flex; justify-content: space-between; align-items: flex-start;
@@ -772,6 +781,19 @@ function fmtDuration(ms) {
   const h = Math.floor(ms / 3600000), m = Math.round((ms % 3600000) / 60000);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
+function fmtCoverageDuration(ms) {
+  if (ms < 60000) return `${Math.max(0, Math.round(ms / 1000))}s`;
+  return fmtDuration(ms);
+}
+function processAbsenceCoverageHtml(session) {
+  const count = Number(session.processAbsenceCount || 0);
+  const unobserved = Number(session.unobservedMillis || 0);
+  if (!count) return `<span class="coverage-pill">No known gap</span>`;
+  if (unobserved > 0) {
+    return `<span class="coverage-pill gap">Known gap · ${fmtCoverageDuration(unobserved)}</span>`;
+  }
+  return `<span class="coverage-pill">Raw gap outside review</span>`;
+}
 function fmtDate(ms) {
   return new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
@@ -959,18 +981,20 @@ function volumeChart(host, points) {
 /**
  * One session on a clock. Each inferred exchange is a band spanning its first to its last
  * detected hit, taller the more hits it held, with one tick per hit inside, coloured by
- * provisional type. Empty space is quiet time, not a claim about official rally boundaries.
+ * provisional type. Known process-absence intervals are shaded; other empty space is estimated
+ * quiet time, not a claim about official rally boundaries.
  *
  * Note: `Rally.durationMillis` is a server-side derived getter and is not on the wire;
  * a rally's span is `startMillis`..`endMillis`, and single-shot rallies have both equal.
  */
-function rallyTimelineChart(host, exportData) {
+function rallyTimelineChart(host, exportData, processAbsenceGaps = []) {
   const rallies = (exportData.rallyProfile && exportData.rallyProfile.rallies) || [];
   const shots = (exportData.session && exportData.session.shots) || [];
   const t0 = exportData.session.startedAtMillis;
   let t1 = exportData.session.endedAtMillis || t0;
   for (const r of rallies) t1 = Math.max(t1, r.endMillis);
   for (const s of shots) t1 = Math.max(t1, s.timestampMillis);
+  const reviewedEnd = t1;
   if (t1 - t0 < 60000) t1 = t0 + 60000; // pad sub-minute sessions so the axis stays readable
   const span = t1 - t0;
 
@@ -978,8 +1002,13 @@ function rallyTimelineChart(host, exportData) {
   const H = 200;
   const M = { top: 14, right: 14, bottom: 30, left: 10 };
   const iw = W - M.left - M.right, ih = H - M.top - M.bottom;
+  const hasVisibleProcessGap = processAbsenceGaps.some(gap =>
+    gap.endedAtMillis > t0 && gap.startedAtMillis < reviewedEnd
+  );
   const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: "img",
-    "aria-label": "Detected exchange timeline" }, host);
+    "aria-label": hasVisibleProcessGap
+      ? "Detected exchange timeline with known unobserved time shaded"
+      : "Detected exchange timeline" }, host);
   const g = el("g", { transform: `translate(${M.left},${M.top})` }, svg);
   const x = t => ((t - t0) / span) * iw;
 
@@ -991,6 +1020,23 @@ function rallyTimelineChart(host, exportData) {
       fill: "var(--text-muted)", "font-size": 11 }, g);
     lab.textContent = `${m * stepMin}:00`;
   }
+
+  processAbsenceGaps.forEach(gap => {
+    const start = Math.max(t0, gap.startedAtMillis);
+    const end = Math.min(reviewedEnd, gap.endedAtMillis);
+    if (end <= start) return;
+    const band = el("rect", {
+      x: x(start), y: 0, width: Math.max(2, x(end) - x(start)), height: ih,
+      fill: "var(--status-warning)", "fill-opacity": 0.14,
+      stroke: "var(--status-warning)", "stroke-opacity": 0.45,
+      "stroke-dasharray": "4 3"
+    }, g);
+    band.addEventListener("mousemove", e => showTip(e,
+      `<div class="t-title">Known unobserved interval</div>
+       <div class="t-row"><span>From</span><b>${fmtClock(start - t0)}</b></div>
+       <div class="t-row"><span>Duration</span><b>${fmtCoverageDuration(end - start)}</b></div>`));
+    band.addEventListener("mouseleave", hideTip);
+  });
 
   const maxShots = Math.max(1, ...rallies.map(r => r.shotCount));
   rallies.forEach(r => {
@@ -1193,6 +1239,7 @@ function render(data) {
   table.innerHTML = `
       <div class="card-head"><h2>Sessions</h2>
       <p class="card-note">Estimated active:quiet comes from gaps between your detected hits.
+      Known unobserved time is shown separately and is never counted as quiet.
       HR load is elapsed minutes x mean heart-rate reserve and appears only with measured optical HR
       plus configured resting and maximum heart rate.
       Open a row for the full detected-exchange timeline.</p></div>
@@ -1200,7 +1247,7 @@ function render(data) {
       <table>
         <thead><tr>
           <th>Date</th><th>Duration</th><th>Hits</th><th>Exchanges</th>
-          <th>Avg exchange</th><th>Active : quiet</th><th>Est. active</th>
+          <th>Avg exchange</th><th>Active : quiet</th><th>Est. active</th><th>Coverage</th>
           <th>Avg HR</th><th>Peak HR</th><th>HRR-min</th>
         </tr></thead>
         <tbody>${data.sessions.map(s => `
@@ -1213,6 +1260,7 @@ function render(data) {
             <td>${fmt1(s.averageRallyShots)}</td>
             <td>${s.restRatio > 0 ? "1:" + fmt1(s.restRatio) : "—"}</td>
             <td>${Math.round(s.workDensity * 100)}%</td>
+            <td>${processAbsenceCoverageHtml(s)}</td>
             <td>${s.averageHeartRate > 0 ? fmtInt(s.averageHeartRate) : "—"}</td>
             <td>${s.maxHeartRate > 0 ? fmtInt(s.maxHeartRate) : "—"}</td>
             <td>${s.cardiovascularLoad != null && s.heartRateCoverage >= 0.6
@@ -1600,6 +1648,10 @@ function renderSession(data) {
   const rawProfile = raw.rallyProfile || {};
   const rallies = (rp && rp.rallies) || [];
   const rawRallies = rawProfile.rallies || [];
+  const rawProcessGaps = rawSession.processAbsenceGaps || [];
+  const rawProcessGapMillis = rawProcessGaps.reduce((total, gap) =>
+    total + Math.max(0, gap.endedAtMillis - gap.startedAtMillis), 0
+  );
   const shots = session.shots || [];
   const work = (rp && rp.totalWorkMillis) || 0;
   const activeShare = sum.durationMillis > 0 ? work / sum.durationMillis : null;
@@ -1662,6 +1714,22 @@ function renderSession(data) {
     <p>No trim, false-hit, or missed-hit revision is applied. Raw evidence is still retained
     in the audit section below.</p>`;
   content.appendChild(banner);
+
+  if (reviewed.processAbsenceCount > 0) {
+    const processGapBanner = document.createElement("div");
+    processGapBanner.className = "review-banner process-gap";
+    processGapBanner.innerHTML = reviewed.unobservedMillis > 0 ? `
+      <div class="kicker">Known unobserved time</div>
+      <strong>${fmtCoverageDuration(reviewed.unobservedMillis)} has no sensor evidence inside this reviewed window.</strong>
+      <p>${fmtCoverageDuration(reviewed.observedMillis)} of ${fmtCoverageDuration(sum.durationMillis)} reviewed wall time
+      was observed. Diary quality does not change this immutable recovery boundary, and the missing interval
+      is not counted as quiet time.</p>` : `
+      <div class="kicker">Recovery provenance retained</div>
+      <strong>${fmtInt(reviewed.processAbsenceCount)} raw recovery ${reviewed.processAbsenceCount === 1 ? "gap exists" : "gaps exist"}, outside this reviewed window.</strong>
+      <p>Edge trims exclude the known unobserved time from current metrics. The immutable raw intervals remain
+      auditable below, independent of editable diary quality.</p>`;
+    content.appendChild(processGapBanner);
+  }
 
   const tiles = document.createElement("div");
   tiles.className = "tiles";
@@ -1740,11 +1808,14 @@ function renderSession(data) {
   }
 
   if (rallies.length) {
+    const timelineCoverageNote = reviewed.unobservedMillis > 0
+      ? " Shaded bands are known unobserved time; other empty gaps are estimated quiet."
+      : " Empty gaps are estimated quiet time.";
     const timelineCard = card(
       "Detected exchange timeline",
       "Each band is a burst inferred from your racket-wrist hits. Ticks are detected hits, " +
-        "coloured by provisional type; empty gaps are quiet time.",
-      host => rallyTimelineChart(host, reviewed)
+        "coloured by provisional type." + timelineCoverageNote,
+      host => rallyTimelineChart(host, reviewed, rawProcessGaps)
     );
     timelineCard.classList.add("full");
     const types = [...new Set(shots.map(s => s.type))]
@@ -1753,6 +1824,9 @@ function renderSession(data) {
     legend.className = "legend";
     legend.innerHTML =
       `<span class="key"><span class="swatch" style="background:var(--series-1);opacity:0.4"></span>Exchange band</span>` +
+      (reviewed.unobservedMillis > 0
+        ? `<span class="key"><span class="swatch" style="background:var(--status-warning);opacity:0.5"></span>Known unobserved</span>`
+        : "") +
       types.map(t => `<span class="key"><span class="swatch" style="background:var(--series-${SHOT_SLOT[t] || 6})"></span>${escapeHtml(provisionalShotLabel(t))}</span>`).join("");
     timelineCard.appendChild(legend);
     grid.appendChild(timelineCard);
@@ -1785,6 +1859,12 @@ function renderSession(data) {
     ? ` The stored raw summary reports ${fmtInt(rawSum.totalShots)} hits while the immutable event list contains ` +
       `${fmtInt(rawEvents.length)}; reviewed analysis uses timestamped event records.`
     : "";
+  const processGapAudit = rawProcessGaps.length
+    ? ` Immutable process-absence intervals, relative to raw start: ${rawProcessGaps.map(gap =>
+        `${fmtClock(Math.max(0, gap.startedAtMillis - rawSession.startedAtMillis))}–` +
+        `${fmtClock(Math.max(0, gap.endedAtMillis - rawSession.startedAtMillis))}`
+      ).join("; ")}.`
+    : " No process-absence intervals are stored on the raw session.";
   const audit = document.createElement("div");
   audit.className = "card full audit-card";
   audit.innerHTML = `
@@ -1800,6 +1880,8 @@ function renderSession(data) {
         <div class="v">${fmtDuration(rawSum.durationMillis)}</div></div>
       <div class="audit-stat"><div class="k">Raw estimated active</div>
         <div class="v">${fmtDuration(rawProfile.totalWorkMillis || 0)}</div></div>
+      <div class="audit-stat"><div class="k">Raw recovery gaps</div>
+        <div class="v">${fmtInt(rawProcessGaps.length)} · ${fmtCoverageDuration(rawProcessGapMillis)}</div></div>
       <div class="audit-stat"><div class="k">Correction revisions</div>
         <div class="v">${fmtInt(correctionRevisionCount)}</div></div>
     </div>
@@ -1810,7 +1892,7 @@ function renderSession(data) {
       ${fmtInt(metrics.reportedMissedHitCount)} reported missed ${metrics.reportedMissedHitCount === 1 ? "hit" : "hits"}.
       ${unknownFalseIds.length
         ? `Unresolved false-hit references retained for audit: ${escapeHtml(unknownFalseIds.join(", "))}.`
-        : "All current false-hit references resolve to raw event IDs."}${rawSummaryMismatch}
+        : "All current false-hit references resolve to raw event IDs."}${rawSummaryMismatch}${processGapAudit}
     </p>`;
   grid.appendChild(audit);
 }

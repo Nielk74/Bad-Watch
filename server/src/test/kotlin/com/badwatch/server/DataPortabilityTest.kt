@@ -3,6 +3,7 @@ package com.badwatch.server
 import com.badwatch.core.model.CaptureSession
 import com.badwatch.core.model.HeartRateZone
 import com.badwatch.core.model.PlayerProfile
+import com.badwatch.core.model.ProcessAbsenceGap
 import com.badwatch.core.model.Rally
 import com.badwatch.core.model.RallyProfile
 import com.badwatch.core.model.ShotEvent
@@ -232,6 +233,30 @@ class DataPortabilityTest {
         assertThat(csv.replace("\r\n", "\n")).isEqualTo(golden)
         assertThat(csv).contains("\r\n")
         assertThat(csv).endsWith("\r\n")
+    }
+
+    @Test
+    fun reviewedCsvExportsImmutableRecoveryCoverageWithDeterministicSeconds() {
+        val base = sessionExport()
+        val recovered = base.copy(
+            session = base.session.copy(
+                processAbsenceGaps = listOf(
+                    ProcessAbsenceGap(
+                        startedAtMillis = base.session.startedAtMillis + 30_000L,
+                        endedAtMillis = base.session.startedAtMillis + 40_000L
+                    )
+                )
+            )
+        )
+
+        val csv = SessionCsvExporter.encode(listOf(recovered))
+
+        assertThat(csv).contains(
+            "effective_duration_seconds,process_absence_count,unobserved_seconds," +
+                "observed_seconds,model_detected_hits"
+        )
+        assertThat(csv).contains(",Light,65.5,64,1,10,54,2,2,")
+        assertThat(csv).contains(",Complete,")
     }
 
     @Test

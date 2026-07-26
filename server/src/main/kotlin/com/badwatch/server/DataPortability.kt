@@ -6,6 +6,7 @@ import com.badwatch.core.sync.CaptureDataUse
 import com.badwatch.core.sync.SessionExport
 import com.badwatch.core.sync.effectiveMetrics
 import com.badwatch.core.sync.isEligibleForModelTrainingUpload
+import com.badwatch.core.sync.knownProcessAbsenceMillisInEffectiveWindow
 import com.badwatch.core.sync.reviewedAnalysis
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
@@ -224,6 +225,9 @@ object SessionCsvExporter {
         "draft",
         "raw_duration_seconds",
         "effective_duration_seconds",
+        "process_absence_count",
+        "unobserved_seconds",
+        "observed_seconds",
         "model_detected_hits",
         "raw_event_count",
         "corrected_detected_hits",
@@ -264,6 +268,8 @@ object SessionCsvExporter {
         val context = export.context
         val report = export.report
         val effective = export.effectiveMetrics()
+        val unobservedMillis = export.knownProcessAbsenceMillisInEffectiveWindow
+        val observedMillis = (effective.window.durationMillis - unobservedMillis).coerceAtLeast(0L)
         val soreness = report.soreness.joinToString("; ") { item ->
             val side = item.side.name.takeUnless { it == "Unspecified" }
                 ?.let { humanize(it) + " " }
@@ -293,6 +299,9 @@ object SessionCsvExporter {
             context.conditions.draft.name,
             seconds(rawSummary.durationMillis),
             seconds(effective.window.durationMillis),
+            session.processAbsenceGaps.size.toString(),
+            seconds(unobservedMillis),
+            seconds(observedMillis),
             rawSummary.totalShots.toString(),
             effective.rawDetectedHitCount.toString(),
             effective.correctedDetectedHitCount.toString(),

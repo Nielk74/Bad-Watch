@@ -134,6 +134,26 @@ class ServerAuthenticationTest {
     }
 
     @Test
+    fun dashboardShellKeepsRecoveryGapsVisibleIndependentOfDiaryQuality() = runBlocking {
+        val repository = SessionRepository(temporaryFolder.newFolder("recovery-shell-sessions"))
+
+        testApplication {
+            application { badWatchModule(repository, token = null) }
+
+            val shell = client.get("/").bodyAsText()
+
+            assertThat(shell).contains("processAbsenceCoverageHtml(s)")
+            assertThat(shell).contains("Known unobserved time")
+            assertThat(shell).contains("reviewed.processAbsenceCount")
+            assertThat(shell).contains("reviewed.unobservedMillis")
+            assertThat(shell).contains("rawSession.processAbsenceGaps")
+            assertThat(shell).contains("Known unobserved interval")
+            assertThat(shell).contains("Diary quality does not change this immutable recovery boundary")
+            assertThat(shell).contains("Shaded bands are known unobserved time")
+        }
+    }
+
+    @Test
     fun dataApisDoNotOptInToCrossOriginBrowserReads() = runBlocking {
         val repository = SessionRepository(temporaryFolder.newFolder("cors-sessions"))
 

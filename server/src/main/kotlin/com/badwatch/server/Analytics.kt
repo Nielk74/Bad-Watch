@@ -18,6 +18,7 @@ import com.badwatch.core.sync.SessionContext
 import com.badwatch.core.sync.SessionExport
 import com.badwatch.core.sync.comparisonKey
 import com.badwatch.core.sync.isPlayerInferenceEligible
+import com.badwatch.core.sync.knownProcessAbsenceMillisInEffectiveWindow
 import com.badwatch.core.sync.reviewedAnalysis
 import com.badwatch.core.sync.reviewedInsightBaseline
 import kotlinx.serialization.Serializable
@@ -92,6 +93,12 @@ data class SessionCard(
     val maxHeartRate: Float?,
     /** Time between the first and last detected hit in each inferred exchange. */
     val estimatedActiveMillis: Long,
+    /** Immutable recovery boundaries retained on the raw session, including gaps later trimmed out. */
+    val processAbsenceCount: Int,
+    /** Known process-absence overlap inside the reviewed wall-clock window. */
+    val unobservedMillis: Long,
+    /** Reviewed wall-clock duration for which the process was present. */
+    val observedMillis: Long,
     /** Share of elapsed seconds represented by a distinct optical heart-rate reading. */
     val heartRateCoverage: Float,
     /**
@@ -129,7 +136,10 @@ data class ReviewedSessionDetail(
     val session: TrainingSession,
     val rallyProfile: RallyProfile,
     val effectiveMetrics: EffectiveSessionMetrics,
-    val insights: List<Insight>
+    val insights: List<Insight>,
+    val processAbsenceCount: Int,
+    val unobservedMillis: Long,
+    val observedMillis: Long
 )
 
 /**
@@ -226,13 +236,18 @@ object Analytics {
     fun detail(export: SessionExport, history: List<SessionExport>): SessionDetailData {
         val analysis = export.reviewedAnalysis()
         val baseline = export.reviewedInsightBaseline(history)
+        val unobservedMillis = export.knownProcessAbsenceMillisInEffectiveWindow
         return SessionDetailData(
             raw = export,
             reviewed = ReviewedSessionDetail(
                 session = analysis.session,
                 rallyProfile = analysis.rallyProfile,
                 effectiveMetrics = analysis.metrics,
-                insights = insightsFor(export, analysis, baseline)
+                insights = insightsFor(export, analysis, baseline),
+                processAbsenceCount = export.session.processAbsenceGaps.size,
+                unobservedMillis = unobservedMillis,
+                observedMillis = (analysis.metrics.window.durationMillis - unobservedMillis)
+                    .coerceAtLeast(0L)
             )
         )
     }
@@ -257,6 +272,7 @@ object Analytics {
         val rallies = analysis.rallyProfile
         val baseline = export.reviewedInsightBaseline(history)
         val effectiveMetrics = analysis.metrics
+        val unobservedMillis = export.knownProcessAbsenceMillisInEffectiveWindow
         return SessionCard(
             id = export.session.id,
             startedAtMillis = export.session.startedAtMillis,
@@ -265,10 +281,19 @@ object Analytics {
             rallyCount = rallies.rallyCount,
             averageRallyShots = rallies.averageShotsPerRally,
             restRatio = rallies.restRatio,
-            workDensity = rallies.workDensity,
+            // Keep the list and detail denominator identical: reviewed wall time includes known
+            // unobserved time, which must never be relabelled as either activity or quiet.
+            workDensity = if (summary.durationMillis > 0L) {
+                (rallies.totalWorkMillis.toFloat() / summary.durationMillis).coerceIn(0f, 1f)
+            } else {
+                0f
+            },
             averageHeartRate = summary.averageHeartRate,
             maxHeartRate = summary.maxHeartRate,
             estimatedActiveMillis = rallies.totalWorkMillis,
+            processAbsenceCount = export.session.processAbsenceGaps.size,
+            unobservedMillis = unobservedMillis,
+            observedMillis = (summary.durationMillis - unobservedMillis).coerceAtLeast(0L),
             heartRateCoverage = summary.heartRateCoverage.coerceIn(0f, 1f),
             // Old sessions can contain contact-time HR values but no distinct optical-sensor
             // record. Numeric profile defaults also used to look configured. Only expose

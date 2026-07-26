@@ -285,13 +285,23 @@ class AnalyticsTest {
         )
 
         val dashboard = Analytics.build(listOf(gapBearing))
+        val card = dashboard.sessions.single()
+        val detail = Analytics.detail(gapBearing, listOf(gapBearing)).reviewed
 
         assertThat(dashboard.sessionCount).isEqualTo(1)
         assertThat(dashboard.totalElapsedMillis).isEqualTo(60_000L)
         assertThat(dashboard.totalShots).isEqualTo(complete.session.shots.size)
-        assertThat(dashboard.sessions.single().insights).isEmpty()
+        assertThat(card.insights).isEmpty()
+        assertThat(card.processAbsenceCount).isEqualTo(1)
+        assertThat(card.unobservedMillis).isEqualTo(1_000L)
+        assertThat(card.observedMillis).isEqualTo(59_000L)
+        assertThat(card.workDensity).isWithin(0.0001f)
+            .of(card.estimatedActiveMillis.toFloat() / card.durationMillis)
+        assertThat(detail.processAbsenceCount).isEqualTo(1)
+        assertThat(detail.unobservedMillis).isEqualTo(1_000L)
+        assertThat(detail.observedMillis).isEqualTo(59_000L)
         assertThat(dashboard.comparisonGroups).isEmpty()
-        assertThat(Analytics.detail(gapBearing, listOf(gapBearing)).reviewed.insights).isEmpty()
+        assertThat(detail.insights).isEmpty()
 
         val trimmed = gapBearing.copy(
             corrections = SessionCorrections(
@@ -308,9 +318,17 @@ class AnalyticsTest {
             )
         )
         val reviewedDashboard = Analytics.build(listOf(trimmed))
+        val trimmedCard = reviewedDashboard.sessions.single()
+        val trimmedDetail = Analytics.detail(trimmed, listOf(trimmed)).reviewed
 
         assertThat(reviewedDashboard.comparisonGroups).hasSize(1)
-        assertThat(Analytics.detail(trimmed, listOf(trimmed)).reviewed.insights).isNotEmpty()
+        assertThat(trimmedCard.processAbsenceCount).isEqualTo(1)
+        assertThat(trimmedCard.unobservedMillis).isEqualTo(0L)
+        assertThat(trimmedCard.observedMillis).isEqualTo(59_000L)
+        assertThat(trimmedDetail.processAbsenceCount).isEqualTo(1)
+        assertThat(trimmedDetail.unobservedMillis).isEqualTo(0L)
+        assertThat(trimmedDetail.observedMillis).isEqualTo(59_000L)
+        assertThat(trimmedDetail.insights).isNotEmpty()
         assertThat(trimmed.session.processAbsenceGaps).containsExactly(gap)
     }
 
