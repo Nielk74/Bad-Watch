@@ -25,6 +25,22 @@ val ShotType.displayNameResource: Int
         ShotType.Unknown -> R.string.shot_unclassified
     }
 
+/**
+ * Names for classifier output. These stay separate from [displayNameResource] because capture
+ * drills show a stroke the player deliberately selected, while session labels are automatic
+ * and must never read as established fact.
+ */
+@get:StringRes
+val ShotType.provisionalDisplayNameResource: Int
+    get() = when (this) {
+        ShotType.Smash -> R.string.shot_smash_provisional
+        ShotType.Clear -> R.string.shot_clear_provisional
+        ShotType.Drop -> R.string.shot_drop_provisional
+        ShotType.Drive -> R.string.shot_drive_provisional
+        ShotType.BackhandDrive -> R.string.shot_backhand_drive_provisional
+        ShotType.Unknown -> R.string.shot_unclassified_provisional
+    }
+
 @get:StringRes
 val SelfReportedExperience.displayNameResource: Int
     get() = when (this) {

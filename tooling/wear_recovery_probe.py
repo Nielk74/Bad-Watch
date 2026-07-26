@@ -66,7 +66,17 @@ def main() -> int:
         "the forced process and service to stop",
     )
     time.sleep(3)
+    stopped = device.read_active_journal()
+    if stopped is None:
+        raise ProbeError("active-session journal disappeared while the process was stopped")
+    stopped_checkpoint_unchanged = (
+        checkpoint(stopped, "sessionId") == checkpoint(before, "sessionId")
+        and checkpoint(stopped, "aggregator").get("startedAtMillis")
+        == checkpoint(before, "aggregator").get("startedAtMillis")
+        and checkpoint(stopped, "samplesProcessed") == checkpoint(before, "samplesProcessed")
+    )
 
+    restart_requested_at = int(time.time() * 1000)
     device.start_session()
     wait_until(device.is_session_service_running, 15, "the recovered foreground service")
     time.sleep(args.settle_seconds)
@@ -85,6 +95,7 @@ def main() -> int:
         raise ProbeError(f"expected exactly one recovered session, found {new_files}")
     export = device.read_session(new_files[0])
     session = export.get("session", {})
+    summary = session.get("summary", {})
 
     same_id = checkpoint(before, "sessionId") == checkpoint(after, "sessionId") == session.get("id")
     same_start = (
@@ -97,7 +108,23 @@ def main() -> int:
     )
     recovery_count = int(after.get("recoveryCount", -1))
     partial = export.get("context", {}).get("recordingQuality") == "Partial"
-    passed = same_id and same_start and samples_advanced and recovery_count >= 1 and partial
+    saved_duration = int(summary.get("durationMillis", -1))
+    elapsed_span = int(session.get("endedAtMillis", -1)) - int(session.get("startedAtMillis", -1))
+    elapsed_span_includes_gap = (
+        elapsed_span >= 0
+        and saved_duration == elapsed_span
+        and int(session.get("startedAtMillis", -1)) < killed_at
+        and int(session.get("endedAtMillis", -1)) > restart_requested_at
+    )
+    passed = (
+        same_id
+        and same_start
+        and stopped_checkpoint_unchanged
+        and samples_advanced
+        and recovery_count >= 1
+        and partial
+        and elapsed_span_includes_gap
+    )
 
     report = {
         "schemaVersion": 1,
@@ -109,16 +136,30 @@ def main() -> int:
         "stableSessionId": same_id,
         "stableStartedAtMillis": same_start,
         "samplesBeforeDeath": checkpoint(before, "samplesProcessed"),
+        "samplesWhileStopped": checkpoint(stopped, "samplesProcessed"),
+        "stoppedCheckpointUnchanged": stopped_checkpoint_unchanged,
         "samplesAfterRecovery": checkpoint(after, "samplesProcessed"),
         "samplesAdvancedAfterRecovery": samples_advanced,
         "recoveryCount": recovery_count,
         "recordingQuality": export.get("context", {}).get("recordingQuality"),
         "forcedStopAtEpochMillis": killed_at,
+        "restartRequestedAtEpochMillis": restart_requested_at,
+        "observedForcedStopGapMillis": restart_requested_at - killed_at,
+        "savedDurationMillis": saved_duration,
+        "savedElapsedSpanMillis": elapsed_span,
+        "savedElapsedSpanIncludesForcedStopGap": elapsed_span_includes_gap,
+        "gapSemantics": (
+            "Elapsed session duration spans the interruption; the frozen sample checkpoint proves "
+            "that no sensor samples were invented while the process was stopped."
+        ),
     }
     (output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2))
     if not passed:
-        raise ProbeError("stable identity, resumed samples, recovery count, or Partial gate failed")
+        raise ProbeError(
+            "stable identity, frozen stopped checkpoint, resumed samples, elapsed-span semantics, "
+            "recovery count, or Partial gate failed"
+        )
     print(f"Evidence written to {output}")
     return 0
 

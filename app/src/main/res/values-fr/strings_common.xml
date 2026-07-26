@@ -90,6 +90,13 @@
     <string name="shot_drive">Drive</string>
     <string name="shot_backhand_drive">Drive revers</string>
     <string name="shot_unclassified">Non classée</string>
+    <!-- Sortie automatique du classifieur, distincte des exercices étiquetés par le joueur. -->
+    <string name="shot_smash_provisional">Smash · provisoire</string>
+    <string name="shot_clear_provisional">Dégagement · provisoire</string>
+    <string name="shot_drop_provisional">Amorti · provisoire</string>
+    <string name="shot_drive_provisional">Drive · provisoire</string>
+    <string name="shot_backhand_drive_provisional">Drive revers · provisoire</string>
+    <string name="shot_unclassified_provisional">Non classée · provisoire</string>
 
     <string name="activity_not_specified">Non précisée</string>
     <string name="activity_singles_match">Match en simple</string>

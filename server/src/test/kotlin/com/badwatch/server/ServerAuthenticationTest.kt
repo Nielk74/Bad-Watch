@@ -83,6 +83,31 @@ class ServerAuthenticationTest {
     }
 
     @Test
+    fun dashboardQualifiesAutomaticStrokeFamiliesButNotPlayerLabels() = runBlocking {
+        val repository = SessionRepository(temporaryFolder.newFolder("label-truth-sessions"))
+
+        testApplication {
+            application { badWatchModule(repository, token = null) }
+
+            val shell = client.get("/").bodyAsText()
+            assertThat(shell).contains(
+                "const provisionalShotLabel = type => `${'$'}{shotLabel(type)} · provisional`;"
+            )
+            assertThat(shell).contains("label.textContent = provisionalShotLabel(s.type);")
+            assertThat(shell).contains("escapeHtml(provisionalShotLabel(s.type))")
+            assertThat(shell).contains("escapeHtml(provisionalShotLabel(t))")
+            assertThat(shell).doesNotContain("SHOT_LABELS[s.type]")
+
+            // Capture drills and accuracy support are labels the player chose, not automatic
+            // session classifications, so qualifying those would misstate their provenance.
+            assertThat(shell).contains(
+                "`${'$'}{shotLabel(l.label)}: ${'$'}{l.swings}`"
+            )
+            assertThat(shell).contains("<td>${'$'}{shotLabel(c.label)}</td>")
+        }
+    }
+
+    @Test
     fun dataApisDoNotOptInToCrossOriginBrowserReads() = runBlocking {
         val repository = SessionRepository(temporaryFolder.newFolder("cors-sessions"))
 

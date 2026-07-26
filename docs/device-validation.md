@@ -47,7 +47,9 @@ Three-hour release gate:
 The probe refuses to overlap an active session, captures device/app metadata, starts through the
 Tile-compatible Activity extra, samples service and battery state with the display free to sleep,
 then stops through the visible **Stop & save** action. It requires exactly one new valid session
-and a saved duration within five seconds of the recorder's start-to-stop wall interval. Each run
+and a saved duration within five seconds of the recorder's start-to-stop wall interval. Every
+monitored reading must remain asleep/dozing, foreground with the health service type, and show a
+strictly advancing sensor checkpoint. Each run
 writes `start.png`, `recap.png`, and `report.json` in a timestamped directory without clearing app
 data or deleting the resulting session.
 
@@ -65,9 +67,12 @@ Process-death recovery probe:
   --output build/wear-recovery-probe
 ```
 
-This probe requires one stable session identity and start time across a forced process stop,
-advancing motion samples after restoration, an incremented recovery count, one saved `Partial`
-session, and retained before/after/recap screenshots.
+This probe requires one stable session identity and start time across a forced process stop, a
+frozen checkpoint while the process is absent, advancing motion samples after restoration, an
+incremented recovery count, one saved `Partial` session, and retained before/after/recap
+screenshots. The saved elapsed span intentionally includes the interruption, while the frozen
+sample count proves that the app does not invent sensor coverage during it; the report quantifies
+both semantics.
 
 ## Physical-watch release matrix
 

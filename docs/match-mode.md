@@ -13,6 +13,12 @@ taps **You** or **Them** after each point; everything after that tap is determin
 - The extra change of ends at 11 in the deciding game.
 - A static, high-contrast ambient score when the watch enters always-on mode.
 
+The standard format above was verified on 2026-07-26 against the official
+[BWF Laws of Badminton](https://system.bwfbadminton.com/documents/folder_1_81/Statutes/CHAPTER-4---RULES-OF-THE-GAME/SECTION%204.1-%20Laws%20of%20Badminton.pdf).
+Bad Watch does not currently implement BWF alternative competition formats; if governing rules
+change, the reducer and its tests must be reviewed deliberately rather than assuming this copy is
+self-updating.
+
 For doubles, the screen says **your side** or **their side** and shows the service court. It does
 not name a server or infer partner rotation; doing that correctly requires the four-player
 line-up and explicit rotation state.

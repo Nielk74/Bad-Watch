@@ -384,7 +384,7 @@ better product than a precise-looking fiction.
 | Cross-user generalization | [IEEE Big Data](https://doi.org/10.1109/BigData55660.2022.10020984) | Personalization/generalization deserve testing | Permission to overfit one player |
 | Wrist IMU + audio | [BadminSense](https://doi.org/10.1145/3772318.3790998) | Multimodal on-watch approach is promising | Transfer of reported accuracy to this app |
 | Level-related features | [study](https://pubmed.ncbi.nlm.nih.gov/32546052/) | Research signal for multidimensional profiles | A one-session consumer skill badge |
-| Whole-body skill differences | [seven-sensor study](https://doi.org/10.1186/s13102-025-01163-w) | Skill groups can differ kinematically | One-wrist equivalence |
+| Whole-body skill differences | [multi-segment 17-IMU study](https://doi.org/10.1186/s13102-025-01163-w) | Skill groups can differ kinematically | One-wrist equivalence |
 | Video footwork | [Frontiers study](https://doi.org/10.3389/fspor.2026.1753118) | Footwork is measurable with suitable observation | Wrist-only court geometry |
 | Training-load monitoring | [IOC consensus](https://pubmed.ncbi.nlm.nih.gov/27535989/) | Combine work, response, reports, and context | A single readiness truth |
 | Badminton injuries | [2025 systematic review](https://bmjopensem.bmj.com/content/11/1/e002127) | Injury patterns and evidence uncertainty | Personal injury prediction |

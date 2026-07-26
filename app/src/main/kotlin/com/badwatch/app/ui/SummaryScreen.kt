@@ -34,11 +34,11 @@ import com.badwatch.app.ui.components.Stat
 import com.badwatch.app.ui.components.StatRow
 import com.badwatch.app.ui.components.WatchScreen
 import com.badwatch.app.ui.components.color
-import com.badwatch.app.ui.components.displayName
 import com.badwatch.app.ui.components.formatDuration
 import com.badwatch.app.ui.components.formatHeartRate
 import com.badwatch.app.ui.components.formatRestRatio
 import com.badwatch.app.ui.components.hrZoneLabel
+import com.badwatch.app.ui.components.provisionalDisplayName
 import com.badwatch.core.insight.Insight
 import com.badwatch.core.model.HeartRateZone
 import com.badwatch.core.physiology.PostBurstHeartRateBuilder
@@ -95,7 +95,13 @@ fun SummaryScreen(
                     ),
                     effective.correctedDetectedHitCount.toString()
                 ),
-                Stat(stringResource(R.string.label_exchanges), rallies.rallyCount.toString()),
+                Stat(
+                    label = stringResource(R.string.label_exchanges),
+                    value = rallies.rallyCount.toString(),
+                    // The full, truthful French qualifier must survive a 480 px round screen
+                    // and enlarged text; the neighbouring time label needs much less room.
+                    weight = 1.35f
+                ),
                 Stat(
                     stringResource(
                         if (effective.hasCorrections) {
@@ -104,7 +110,8 @@ fun SummaryScreen(
                             R.string.label_time
                         }
                     ),
-                    formatDuration(effective.window.durationMillis)
+                    formatDuration(effective.window.durationMillis),
+                    weight = 0.65f
                 )
             )
         }
@@ -301,7 +308,10 @@ fun SummaryScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            LegendDot(color = type.color(), label = type.displayName())
+                            LegendDot(
+                                color = type.color(),
+                                label = type.provisionalDisplayName()
+                            )
                             Spacer(modifier = Modifier.weight(1f))
                             Text(
                                 text = count.toString(),

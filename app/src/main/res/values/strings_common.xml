@@ -84,6 +84,13 @@
     <string name="shot_drive">Drive</string>
     <string name="shot_backhand_drive">Backhand drive</string>
     <string name="shot_unclassified">Unclassified</string>
+    <!-- Automatic classifier output. Keep distinct from player-labelled capture drills. -->
+    <string name="shot_smash_provisional">Smash · provisional</string>
+    <string name="shot_clear_provisional">Clear · provisional</string>
+    <string name="shot_drop_provisional">Drop · provisional</string>
+    <string name="shot_drive_provisional">Drive · provisional</string>
+    <string name="shot_backhand_drive_provisional">Backhand drive · provisional</string>
+    <string name="shot_unclassified_provisional">Unclassified · provisional</string>
 
     <string name="activity_not_specified">Not specified</string>
     <string name="activity_singles_match">Singles match</string>

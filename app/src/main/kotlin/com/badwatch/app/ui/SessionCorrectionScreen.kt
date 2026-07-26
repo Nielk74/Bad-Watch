@@ -33,8 +33,8 @@ import com.badwatch.app.ui.components.InfoCard
 import com.badwatch.app.R
 import com.badwatch.app.ui.components.ScreenHeader
 import com.badwatch.app.ui.components.WatchScreen
-import com.badwatch.app.ui.components.displayName
 import com.badwatch.app.ui.components.formatDuration
+import com.badwatch.app.ui.components.provisionalDisplayName
 import com.badwatch.core.sync.SessionExport
 
 /** Player review of detector events and recording edges; raw output is never overwritten. */
@@ -204,7 +204,7 @@ fun SessionCorrectionScreen(
                             if (markedFalse) {
                                 stringResource(R.string.correction_marked_false)
                             } else {
-                                hit.type.displayName()
+                                hit.type.provisionalDisplayName()
                             }
                         )
                     },

@@ -85,7 +85,8 @@ the [BWF Level 1 manual](https://badminton.lv/faili/bwf_coach_education_coaches_
 
 Research can distinguish groups under controlled protocols, but the sensor setup matters. A
 40-player study found useful temporal and acceleration features, while later novice/experienced
-work used seven inertial sensors. Video footwork studies use information a wrist does not contain.
+work used a 17-IMU whole-body system and analysed seven body segments. Video footwork studies use
+information a wrist does not contain.
 None validates a global level badge from this product's single racket-wrist stream.
 
 **Decision:** keep two truths separate:
@@ -100,7 +101,7 @@ them into “good,” “advanced,” or a single score. Different matches and d
 against each other.
 
 Sources: [temporal/acceleration study](https://pubmed.ncbi.nlm.nih.gov/32546052/),
-[seven-sensor study](https://doi.org/10.1186/s13102-025-01163-w), and
+[multi-segment 17-IMU study](https://doi.org/10.1186/s13102-025-01163-w), and
 [video footwork study](https://doi.org/10.3389/fspor.2026.1753118).
 
 ### Match demands, exertion, and injury language
@@ -188,6 +189,9 @@ record motion.
 The standalone match scoreboard supports singles and doubles, rally-point games to 21, two-point
 winning margin capped at 30, best of three, interval-at-11, change-of-ends prompts, service side,
 undo, and ambient display. The player taps the rally winner; the watch never invents one.
+This standard format was checked on 2026-07-26 against the official
+[BWF Laws of Badminton](https://system.bwfbadminton.com/documents/folder_1_81/Statutes/CHAPTER-4---RULES-OF-THE-GAME/SECTION%204.1-%20Laws%20of%20Badminton.pdf);
+alternative competition formats are not silently inferred or supported.
 
 The active match and its undo history are atomically checkpointed and restored after process
 death. It is deliberately a durable live utility rather than a second, incompatible session
@@ -431,8 +435,11 @@ python3 tooling/wear_recovery_probe.py \
   --output build/wear-recovery-probe
 ```
 
-The probe requires the foreground service to remain present, exactly one new durable session,
-and saved duration within five seconds of observed wall time. Battery percentage is reported only
+The endurance probe requires the foreground service and health type to remain present, the screen
+to stay asleep/dozing, sensor checkpoints to advance at every interval, exactly one new durable
+session, and saved duration within five seconds of observed wall time. The recovery probe also
+requires a frozen checkpoint during process absence and explicitly reports that elapsed duration
+includes the interruption while sensor coverage does not. Battery percentage is reported only
 when every sample says the watch was unpowered; a charging run is lifecycle evidence, not a
 battery-drain claim.
 

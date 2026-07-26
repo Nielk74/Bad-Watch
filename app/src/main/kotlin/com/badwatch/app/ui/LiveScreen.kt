@@ -61,12 +61,12 @@ import com.badwatch.app.ui.components.InfoCard
 import com.badwatch.app.ui.components.MeterRow
 import com.badwatch.app.ui.components.WatchScreen
 import com.badwatch.app.ui.components.color
-import com.badwatch.app.ui.components.displayName
 import com.badwatch.app.ui.components.formatDuration
 import com.badwatch.app.ui.components.formatHeartRate
 import com.badwatch.app.ui.components.formatRestRatio
 import com.badwatch.app.ui.components.hrZoneColor
 import com.badwatch.app.ui.components.hrZoneLabel
+import com.badwatch.app.ui.components.provisionalDisplayName
 import com.badwatch.core.model.ShotEvent
 import java.util.Locale
 
@@ -321,7 +321,7 @@ private fun LastShotBadge(shot: ShotEvent) {
                     .background(type.color())
             )
             Text(
-                text = type.displayName(),
+                text = type.provisionalDisplayName(),
                 style = MaterialTheme.typography.labelMedium,
                 color = type.color()
             )
@@ -423,7 +423,7 @@ private fun HudDetailsPage(
                 } else {
                     DetailRow(
                         label = stringResource(R.string.label_type),
-                        value = last.type.displayName(),
+                        value = last.type.provisionalDisplayName(),
                         valueColor = last.type.color()
                     )
                     DetailRow(

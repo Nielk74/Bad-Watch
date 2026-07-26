@@ -107,6 +107,10 @@
   and requires exactly one duration-correct persisted session.
 - Added a process-death probe that proves stable session identity, resumed motion collection,
   explicit `Partial` quality, and exactly one saved export after forced app termination.
+- Qualified every automatic stroke-family label as provisional, including dashboard charts, and
+  widened the recap metric layout so the French detection qualifier remains visible.
+- Tightened the three-hour gate to require continuous screen sleep and sensor progress at every
+  interval; recovery evidence now proves that sample counts freeze during process absence.
 - Replaced the speculative product/UI roadmaps with a completed product contract, measurement
   vocabulary, current architecture, operating guides, and explicit research/exclusion decisions.
 

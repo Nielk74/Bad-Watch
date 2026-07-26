@@ -43,6 +43,7 @@ import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import com.badwatch.app.R
 import com.badwatch.app.localization.displayNameResource
+import com.badwatch.app.localization.provisionalDisplayNameResource
 import com.badwatch.app.ui.theme.CourtColors
 import com.badwatch.core.insight.Insight
 import com.badwatch.core.insight.InsightSeverity
@@ -127,7 +128,12 @@ fun InfoCard(
 }
 
 /** One glanceable number: label above, numeral below. */
-data class Stat(val label: String, val value: String, val color: Color = Color.Unspecified)
+data class Stat(
+    val label: String,
+    val value: String,
+    val color: Color = Color.Unspecified,
+    val weight: Float = 1f
+)
 
 @Composable
 fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
@@ -139,7 +145,7 @@ fun StatRow(vararg stats: Stat, modifier: Modifier = Modifier) {
         stats.forEach { stat ->
             Column(
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(stat.weight)
                     .semantics(mergeDescendants = true) {},
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -546,6 +552,10 @@ fun hrZoneLabel(bpm: Float?, maxHeartRate: Float): String =
 
 @Composable
 fun ShotType.displayName(): String = stringResource(displayNameResource)
+
+/** Use for automatic classifier output; labelled capture drills intentionally use [displayName]. */
+@Composable
+fun ShotType.provisionalDisplayName(): String = stringResource(provisionalDisplayNameResource)
 
 fun ShotType.color(): Color = when (this) {
     ShotType.Smash -> CourtColors.Smash

@@ -306,6 +306,10 @@ const SHOT_LABELS = {
   Smash: "Smash", Clear: "Clear", Drop: "Drop",
   Drive: "Drive", BackhandDrive: "Backhand drive", Unknown: "Unclassified"
 };
+const shotLabel = type => SHOT_LABELS[type] || type;
+// Session families are automatic classifier output. Capture/evaluation labels are instead
+// chosen by the player, so those deliberately keep the unqualified shotLabel form.
+const provisionalShotLabel = type => `${shotLabel(type)} · provisional`;
 // Fixed slot order — a shot type keeps its hue no matter which types appear.
 const SHOT_SLOT = {
   Smash: 1, Clear: 2, Drop: 3, Drive: 4, BackhandDrive: 5, Unknown: 6
@@ -633,7 +637,7 @@ function shotMixChart(host, slices) {
     const label = el("text", { class: "axis", x: 0, y: y + 15, "text-anchor": "start" }, svg);
     label.setAttribute("fill", "var(--text-secondary)");
     label.setAttribute("font-size", "12.5");
-    label.textContent = SHOT_LABELS[s.type] || s.type;
+    label.textContent = provisionalShotLabel(s.type);
 
     const w = Math.max(3, (s.count / max) * trackW);
     const bar = el("path", {
@@ -641,7 +645,7 @@ function shotMixChart(host, slices) {
       fill: `var(--series-${SHOT_SLOT[s.type] || 6})`
     }, svg);
     bar.addEventListener("mousemove", e => showTip(e,
-      `<div class="t-title">${SHOT_LABELS[s.type] || s.type}</div>
+      `<div class="t-title">${escapeHtml(provisionalShotLabel(s.type))}</div>
        <div class="t-row"><span>Detected hits</span><b>${fmtInt(s.count)}</b></div>
        <div class="t-row"><span>Share</span><b>${Math.round(s.count / total * 100)}%</b></div>`));
     bar.addEventListener("mouseleave", hideTip);
@@ -794,7 +798,7 @@ function rallyTimelineChart(host, exportData) {
           "stroke-width": 3, "stroke-linecap": "round"
         }, g);
         tick.addEventListener("mousemove", e => showTip(e,
-          `<div class="t-title">${escapeHtml(SHOT_LABELS[s.type] || s.type)}</div>
+          `<div class="t-title">${escapeHtml(provisionalShotLabel(s.type))}</div>
            <div class="t-row"><span>At</span><b>${fmtClock(s.timestampMillis - t0)}</b></div>
            ${s.heartRateBpm > 0 ? `<div class="t-row"><span>Heart rate</span><b>${fmtInt(s.heartRateBpm)} bpm</b></div>` : ""}`));
         tick.addEventListener("mouseleave", hideTip);
@@ -1510,7 +1514,7 @@ function renderSession(data) {
     legend.className = "legend";
     legend.innerHTML =
       `<span class="key"><span class="swatch" style="background:var(--series-1);opacity:0.4"></span>Exchange band</span>` +
-      types.map(t => `<span class="key"><span class="swatch" style="background:var(--series-${SHOT_SLOT[t] || 6})"></span>${escapeHtml(SHOT_LABELS[t] || t)}</span>`).join("");
+      types.map(t => `<span class="key"><span class="swatch" style="background:var(--series-${SHOT_SLOT[t] || 6})"></span>${escapeHtml(provisionalShotLabel(t))}</span>`).join("");
     timelineCard.appendChild(legend);
     grid.appendChild(timelineCard);
   } else {
@@ -1599,7 +1603,7 @@ function renderClassifier(evaluation, summary) {
         measure anything yet. Record drills on the watch under <b>Detection lab</b>.
       </p>
       ${perLabel.length ? `<div class="caveat">${perLabel
-        .map(l => `${SHOT_LABELS[l.label] || l.label}: ${l.swings}`).join(" · ")}</div>` : ""}`;
+        .map(l => `${shotLabel(l.label)}: ${l.swings}`).join(" · ")}</div>` : ""}`;
     content.appendChild(card);
     return;
   }
@@ -1623,7 +1627,7 @@ function renderClassifier(evaluation, summary) {
         <tbody>${evaluation.perClass
           .slice().sort((a, b) => b.support - a.support)
           .map(c => `<tr>
-            <td>${SHOT_LABELS[c.label] || c.label}</td>
+            <td>${shotLabel(c.label)}</td>
             <td>${c.support}</td>
             <td>${pct(c.recall)}</td>
             <td>${pct(c.precision)}</td>

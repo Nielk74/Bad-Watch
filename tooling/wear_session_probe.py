@@ -333,7 +333,7 @@ def main() -> int:
     start_battery = readings[0].level_percent
     end_battery = readings[-1].level_percent
     battery_measurement_valid = all(reading.powered is False for reading in readings)
-    display_sleep_observed = any(
+    display_sleep_observed = all(
         reading.wakefulness in {"Asleep", "Dozing"} for reading in readings
     )
     foreground_observed = all(
@@ -358,8 +358,7 @@ def main() -> int:
         len(journal_samples) == len(readings)
         and len(journal_session_ids) == 1
         and journal_session_ids == {session.get("id")}
-        and all(later >= earlier for earlier, later in zip(journal_samples, journal_samples[1:]))
-        and journal_samples[-1] > journal_samples[0]
+        and all(later > earlier for earlier, later in zip(journal_samples, journal_samples[1:]))
     )
     lifecycle_pass = (
         duration_error <= 5_000
@@ -395,7 +394,7 @@ def main() -> int:
             else ["Battery delta withheld because the watch was powered or charger state was unknown."]
         ),
         "batteryReadings": [asdict(reading) for reading in readings],
-        "displaySleepObserved": display_sleep_observed,
+        "displayStayedAsleepThroughout": display_sleep_observed,
         "foregroundServiceObservedThroughout": foreground_observed,
         "healthForegroundTypeObservedThroughout": health_type_observed,
         "sensorJournalProgressObservedThroughout": sensor_progress_observed,
@@ -406,7 +405,7 @@ def main() -> int:
     print(json.dumps(report, indent=2))
     if report["result"] != "pass":
         raise ProbeError(
-            "duration, display-sleep, health-foreground, or sensor-journal lifecycle gate failed"
+            "duration, continuous display-sleep, health-foreground, or per-interval sensor-progress gate failed"
         )
     print(f"Evidence written to {output}")
     return 0
