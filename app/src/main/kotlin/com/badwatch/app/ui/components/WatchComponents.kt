@@ -235,9 +235,9 @@ internal enum class DurationStatRowLayout {
 /**
  * Three related metrics where the final value is an exact elapsed duration.
  *
- * Sub-hour values retain the glanceable three-up layout. Once [formatDuration] adds an hours
- * field, the exact value receives a full-width row instead of competing for a narrow third of a
- * round display. Enlarged text uses [StatRow]'s existing label/value accessibility stack.
+ * Single-digit-minute values retain the glanceable three-up layout. At ten minutes the formatted
+ * value gains a fifth character and no longer fits the outer third of a 480 px round display, so
+ * it receives a full-width row. Enlarged text uses [StatRow]'s existing accessibility stack.
  */
 @Composable
 fun DurationStatRow(
@@ -276,7 +276,7 @@ internal fun durationStatRowLayout(
 ): DurationStatRowLayout = when {
     shouldStackStats(statCount = 3, fontScale = fontScale) ->
         DurationStatRowLayout.AccessibilityStack
-    durationMillis.coerceAtLeast(0L) >= TimeUnit.HOURS.toMillis(1L) ->
+    durationMillis.coerceAtLeast(0L) >= TimeUnit.MINUTES.toMillis(10L) ->
         DurationStatRowLayout.WideDuration
     else -> DurationStatRowLayout.ThreeUp
 }

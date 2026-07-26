@@ -19,16 +19,18 @@ class WatchComponentsLayoutTest {
     }
 
     @Test
-    fun subHourDurationsKeepTheGlanceableThreeUpRow() {
+    fun singleDigitMinuteDurationsKeepTheGlanceableThreeUpRow() {
         assertThat(durationStatRowLayout(durationMillis = 0L, fontScale = 1f))
             .isEqualTo(DurationStatRowLayout.ThreeUp)
-        assertThat(durationStatRowLayout(durationMillis = 3_599_999L, fontScale = 1.19f))
+        assertThat(durationStatRowLayout(durationMillis = 599_999L, fontScale = 1.19f))
             .isEqualTo(DurationStatRowLayout.ThreeUp)
     }
 
     @Test
-    fun hourAndMultiHourDurationsGetAFullWidthRow() {
-        assertThat(durationStatRowLayout(durationMillis = 3_600_000L, fontScale = 1f))
+    fun doubleDigitMinuteAndLongerDurationsGetAFullWidthRow() {
+        assertThat(durationStatRowLayout(durationMillis = 600_000L, fontScale = 1f))
+            .isEqualTo(DurationStatRowLayout.WideDuration)
+        assertThat(durationStatRowLayout(durationMillis = 3_599_999L, fontScale = 1.19f))
             .isEqualTo(DurationStatRowLayout.WideDuration)
         assertThat(durationStatRowLayout(durationMillis = 10L * 60L * 60L * 1_000L, fontScale = 1f))
             .isEqualTo(DurationStatRowLayout.WideDuration)
