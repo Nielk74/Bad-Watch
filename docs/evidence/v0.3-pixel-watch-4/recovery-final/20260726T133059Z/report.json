@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 2,
+  "result": "fail",
+  "deviceTransportHash": "298a475b9dfd",
+  "device": {
+    "manufacturer": "Google",
+    "model": "Pixel Watch 4",
+    "device": "kenari_btwifi",
+    "android_release": "17",
+    "api_level": "37",
+    "build_fingerprint": "google/kenari_btwifi/kenari_btwifi:17/CP2A.260603.001.S1/15396605:user/release-keys",
+    "app_version": "0.3.0",
+    "app_last_update": "2026-07-26 15:30:35"
+  },
+  "sessionFile": "1785072662209-1efd9b3c-3172-4185-91e3-dc486eb4e5f9.json",
+  "sessionId": "1efd9b3c-3172-4185-91e3-dc486eb4e5f9",
+  "stableSessionId": true,
+  "stableStartedAtMillis": true,
+  "samplesBeforeDeath": 1102,
+  "samplesWhileStopped": 1102,
+  "stoppedCheckpointUnchanged": true,
+  "samplesAfterRecovery": 1102,
+  "samplesAdvancedAfterRecovery": false,
+  "recoveryCount": 1,
+  "recordingQuality": "Partial",
+  "forcedStopAtEpochMillis": 1785072677823,
+  "restartRequestedAtEpochMillis": 1785072681428,
+  "observedForcedStopGapMillis": 3605,
+  "stoppedJournalUpdatedAtEpochMillis": 1785072674218,
+  "savedDurationMillis": 43101,
+  "savedElapsedSpanMillis": 43101,
+  "savedElapsedSpanIncludesForcedStopGap": true,
+  "gapSemantics": "Elapsed session duration spans the interruption; immutable process-absence intervals mark the unobserved boundary and exactly match the recovered checkpoint.",
+  "processAbsenceGaps": [
+    {
+      "startedAtMillis": 1785072674218,
+      "endedAtMillis": 1785072687102
+    }
+  ],
+  "afterRecoveryCheckpointProcessAbsenceGaps": [
+    {
+      "startedAtMillis": 1785072674218,
+      "endedAtMillis": 1785072687102
+    }
+  ],
+  "processAbsenceGapCount": 1,
+  "processAbsenceGapTotalMillis": 12884,
+  "processAbsenceIntervalsValid": true,
+  "processAbsenceCheckpointExactMatch": true,
+  "processAbsenceCoversJournalToRestart": true,
+  "processAbsenceOverlapsForcedStop": true,
+  "matchedProcessAbsenceGap": {
+    "startedAtMillis": 1785072674218,
+    "endedAtMillis": 1785072687102
+  },
+  "processAbsenceValidationErrors": [],
+  "processAbsenceEvidenceValid": true
+}

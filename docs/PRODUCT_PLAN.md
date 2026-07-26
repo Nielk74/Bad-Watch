@@ -1,11 +1,13 @@
 # Bad Watch product plan — v0.3 completion record
 
 **Status:** implementation complete for the v0.3 product contract. Platform surfaces and exact
-existing-task Tile launch have scoped retained hardware evidence. Final-APK device retests cover
-start/recover/save, hour-plus Summary and History at normal/`1.30` text, and the recovered Summary
-notice/composition. Final-build Home, Progress, Tile rendering/gap marker, recovered-History
-marker, and Live details were not physically recaptured; those paths have automated regression
-coverage only. The definitive powered 180-minute screen-off lifecycle rerun is still in progress:
+existing-task Tile launch have scoped retained hardware evidence. The final Wear source
+`48d101f` has byte-matched install evidence, start/recover/save proof, and truthful recovered
+Summary notice/composition captures. Hour-plus Summary and History at normal/`1.30` text remain
+physical evidence from the immediate `0bdbe98` precursor and are not relabelled as `48d101f`
+captures. Final-source Home, Progress, Tile rendering/gap marker, recovered-History marker, and
+Live details were not physically recaptured; those paths have automated regression coverage only.
+The definitive powered 180-minute screen-off lifecycle rerun is still in progress:
 `FINAL_ENDURANCE_PENDING`. Battery drain remains deliberately unclaimed because this lifecycle
 gate is powered.
 
@@ -322,7 +324,7 @@ The delivered design and screen inventory are recorded in
 | Required gyro, optional accelerometer | Delivered | `FusedSensorCollector` capability/failure paths |
 | Health Services optical HR | Delivered | `ExerciseHeartRateSession`, coverage and timestamp tests |
 | Screen-off recording | Delivered; final lifecycle rerun pending | health FGS `SessionService`, active journal, Detection Lab doze proof, ambient callback proof, scoped short smokes, and a [passing pre-final 180-minute run](evidence/v0.3-pixel-watch-4/endurance/20260726T071128Z/report.json); definitive final report: `FINAL_ENDURANCE_PENDING` |
-| Process-death session recovery | Delivered | `ActiveSessionJournal`, immutable `ProcessAbsenceGap` provenance, repeated-recovery/controller regressions, and the [passing final schema-2 watch probe](evidence/v0.3-pixel-watch-4/recovery-final/20260726T121444Z/report.json) |
+| Process-death session recovery | Delivered | `ActiveSessionJournal`, immutable `ProcessAbsenceGap` provenance, repeated-recovery/controller regressions, and the [passing final-source schema-2 watch probe](evidence/v0.3-pixel-watch-4/recovery-final/20260726T133307Z/report.json) |
 | Failed-session recovery decision | Delivered | explicit preserve/discard UI, EN/FR copy, and throwing-flow regression |
 | Detection Lab terminal recovery | Delivered | serialized cancel/retry-save commands, stable capture ID, cleanup-order regressions |
 | Zero-copy detector window | Delivered | `SampleWindow` and pipeline tests |
@@ -345,7 +347,7 @@ The delivered design and screen inventory are recorded in
 | Consent-bound Detection Lab | Delivered | immutable consent/protocol/participant metadata |
 | Player-independent ML tooling | Delivered as research infrastructure | grouped ingestion/training/evaluation and acceptance gate |
 | Automatic learned classifier | Research-gated | no model is accepted without section 7 evidence |
-| English/French resources and accessibility semantics | Delivered | resource checks and semantics; a source-scoped earlier normal/`1.30` matrix and French spot checks; final-APK Summary/History/recovery checks, with final Home, Progress, Tile, recovered-History, and Live visuals covered only by regressions |
+| English/French resources and accessibility semantics | Delivered | resource checks and semantics; a source-scoped earlier normal/`1.30` matrix and French spot checks; `0bdbe98` hour-plus Summary/History checks and final-source truthful recovery labels, with final Home, Progress, Tile, recovered-History, and Live visuals covered only by regressions |
 | Android platform / target SDK 36 | Delivered | granular HR permission and denied-path proof on Android 17 / API 37 hardware |
 | CI and release-tag automation | Delivered | Python, JVM, lint, debug and release assemblies plus the Node 22 six-journey browser gate |
 
@@ -460,7 +462,7 @@ v0.3 is done only when all of these are true:
 | Acceptance condition | Result |
 | --- | --- |
 | The full app can be used offline with no account/dashboard | Complete |
-| Session and Detection Lab capture survive screen-off under the health FGS | Scoped Detection Lab/short-smoke checks and a pre-final powered 180-minute run pass; definitive frozen-final-APK run is `FINAL_ENDURANCE_PENDING` |
+| Session and Detection Lab capture survive screen-off under the health FGS | Scoped Detection Lab/short-smoke checks and a pre-final powered 180-minute run pass; definitive `48d101f` run is `FINAL_ENDURANCE_PENDING` |
 | Optional HR failure/denial leaves a truthful motion-only session | Device-verified |
 | Process death restores stable identity and preserves a durable unobserved evidence boundary without fabricating sensor samples or inferred quiet time | Device-verified by the final schema-2 recovery report |
 | A failed sensor flow can be preserved or deliberately discarded without trapping the next start | Complete; confirmed-discard UI and a real throwing-flow regression prove journal removal and a fresh next ID |
@@ -468,9 +470,9 @@ v0.3 is done only when all of these are true:
 | Match and shadow utilities checkpoint every command and restore safely | Complete; physical reports retain match identity/action log and shadow seed/cue timing across process death |
 | Sync acceptance/rejection is durable, visible, and payload-specific | Complete; physical offline-retry and authenticated acceptance verified |
 | Browser backup/CSV/restore is authenticated and loss-safe | Complete; six Node 22 journeys include revisioned save/conflict behavior and archive-restore success/error |
-| English/French, accessibility, lint, JVM tests, debug and release builds pass | Complete; a source-scoped earlier `1.30` matrix covers navigation, permission, live/review/recap, safe failure, match/interval, and EN/FR practice/shadow. Final-APK physical retests cover only Summary/History/recovered-Summary paths; final Home, Progress, Tile, recovered History, and Live visuals have automated regression coverage only |
-| A target-36 Pixel Watch run proves the final APK's core flow | Complete for the physically exercised final subset: final APK identity/byte match, start/recover/save, hour-plus Summary/History, recovered Summary notice/composition, and cleanup. Home, Progress, Tile rendering/gap marker, recovered-History marker, and Live details were not recaptured on the final build; older platform evidence is source-scoped and final-source coverage for those paths is automated |
-| A three-hour screen-off probe produces exactly one duration-correct session | `FINAL_ENDURANCE_PENDING`; the older passing run is retained as pre-final evidence and does not close this final-APK gate |
+| English/French, accessibility, lint, JVM tests, debug and release builds pass | Complete; a source-scoped earlier `1.30` matrix covers navigation, permission, live/review/recap, safe failure, match/interval, and EN/FR practice/shadow. `0bdbe98` physically covers hour-plus Summary/History, while final `48d101f` physically covers the truthful English recovered-Summary label. Its French counterpart is resource/test-covered but was not physically recaptured on `48d101f`. Final Home, Progress, Tile, recovered History, and Live visuals have automated regression coverage only |
+| A target-36 Pixel Watch run proves the final Wear APK's core flow | Complete for the physically exercised `48d101f` subset: APK identity/byte match, start/recover/save, exact process-gap provenance, and truthful recovered Summary notice/composition. Hour-plus Summary/History remain scoped to `0bdbe98`; Home, Progress, Tile rendering/gap marker, recovered-History marker, and Live details were not recaptured on `48d101f` and have automated final-source coverage |
+| A three-hour screen-off probe produces exactly one duration-correct session | `FINAL_ENDURANCE_PENDING`; the older passing run is retained as pre-final evidence and does not close the `48d101f` gate |
 | Documentation describes shipped behavior and rejected claims without stale roadmap text | Complete except for replacing `FINAL_ENDURANCE_PENDING` with the definitive retained endurance result |
 
 ### Validation and evidence
@@ -486,26 +488,30 @@ python3 -m py_compile tools/ingest.py tools/train.py \
   --stacktrace --no-daemon
 ```
 
-The frozen local APK candidate additionally ran the broader artifact gate:
+The final local APK candidate additionally ran the broader artifact gate:
 
 ```bash
 ./gradlew clean test lint assembleDebug assembleRelease bundleRelease \
   --stacktrace --no-daemon
 ```
 
-At the pre-`836f116` frozen APK checkpoint `0bdbe98`, that gate passed all 31 Python unit tests,
-`py_compile`, resource XML validation, browser JavaScript syntax validation, and 132 Gradle tasks:
-129 executed and three up-to-date. This historical count belongs only to the frozen artifact gate;
-the broader local command produces the release AAB, while CI deliberately retains its existing
-APK-focused command.
+At precursor Wear checkpoint `0bdbe98`, before the browser task joined `:server:test`, that gate
+passed all 31 Python unit tests, `py_compile`, resource XML validation, browser JavaScript syntax
+validation, and 132 Gradle tasks: 129 executed and three up-to-date. This historical count belongs
+only to that precursor artifact run.
 
 At browser/server repository checkpoint `836f116`, with the Wear APK unchanged, `:server:test`
 depends on `:server:dashboardBrowserTest` and requires Node 22. It executes six journeys against
 JavaScript extracted from shipped `index.html`: stale-token prompt/retry; URL-filter
 hydrate/apply/error/reset; deep-linked reviewed detail; successful revisioned diary save and
 aggregate refresh; HTTP 409 reload/conflict replacement; and archive-restore success/error. This
-proves client state/request contracts, not responsive layout or real-browser rendering. No current
-aggregate Gradle task total is inferred from the earlier artifact run.
+proves client state/request contracts, not responsive layout or real-browser rendering.
+
+At final Wear source `48d101fbd55520c983e33979f5a7733a50fd73ca`, the broader artifact
+gate passed all 31 Python unit tests, `py_compile`, resource XML validation, browser JavaScript
+syntax validation, all six Node 22 browser journeys, and 133 Gradle tasks: 130 executed and three
+up-to-date. This is the current clean-gate total. The broader local command produces the release
+AAB, while CI deliberately retains its existing APK-focused command.
 
 The failure-recovery regression is intentionally end-to-end at the controller boundary: its
 sensor flow emits one valid sample and then throws, verifies the journal survives Dismiss,
@@ -519,12 +525,13 @@ cleanup through serialized service commands. This covers the branch where “try
 the file write—not silently restart sensor collection.
 
 The physical ledger combines separately source-scoped runs on a Pixel Watch 4 running Android 17 /
-API 37. The frozen final APK verifies byte identity, start/recover/save, hour-plus Summary and
-History at normal/`1.30` text, and the recovered Summary notice/composition. Earlier candidates
-retain permission, ambient, manual-match, training, French, and broader enlarged-text evidence;
-they are not relabelled as final-APK captures. Final-build Home, Progress, Tile rendering/gap
-marker, recovered-History marker, and Live details were not physically recaptured and have
-automated regression coverage only. The lifecycle/recovery tooling runs:
+API 37. Final Wear source `48d101f` verifies byte identity, start/recover/save, exact schema-2
+recovery provenance, and the truthful recovered Summary notice/composition. Immediate precursor
+`0bdbe98` supplies the hour-plus Summary and History captures at normal/`1.30` text. Earlier
+candidates retain permission, ambient, manual-match, training, French, and broader enlarged-text
+evidence; none are relabelled as `48d101f` captures. Final-source Home, Progress, Tile
+rendering/gap marker, recovered-History marker, and Live details were not physically recaptured and
+have automated regression coverage only. The lifecycle/recovery tooling runs:
 
 ```bash
 python3 tooling/wear_session_probe.py \
@@ -536,14 +543,14 @@ python3 tooling/wear_recovery_probe.py \
   --output build/wear-recovery-probe
 ```
 
-The frozen app/APK checkpoint is `0bdbe985756d962e73b47dfc5ca098a709a9a86f`. Its debug APK
-SHA-256 is `5d637e2d0c7fad57f15503c140d9cb11e25f4b94df1732256e88f2ca2a0046fb`; the device's installed
+The final app/APK source is `48d101fbd55520c983e33979f5a7733a50fd73ca`. Its debug APK
+SHA-256 is `d6e8ccf8b77b1c958916c2107b49e31e9f29a4b14eb69847ffc6318fae084ad7`; the device's installed
 `base.apk` matched byte-for-byte and verified with an APK Signature Scheme v2 debug signer. The
-same build produced unsigned release APK
-`f46405c1a9ee9d420d61b8e997da27ca75090665801279549eb734c4777fa6d8` and unsigned AAB
-`70d3c1816612565187d27f299ff69ca7060e978f717fd5698bcb5ae812fe58dc`.
-The installed package reported version `0.3.0` (`versionCode=300`) and last update
-`2026-07-26 14:08:34`.
+same source produced unsigned release APK
+`c32adc35bad96edddd54bb1a24224d4ce3b0f62cefc2cdc041e096a9b06245a4` and unsigned AAB
+`375f42e3864859c83b56442592029841b82fdba0183819fa9fbaaf3b172f795a`.
+The installed package `com.badwatch.badwatch` reported target SDK 36, version `0.3.0`
+(`versionCode=300`), and last update `2026-07-26 15:30:35`.
 
 The current session probe includes exact post-stop diary/settled-recap classification, bounded
 error cleanup, and transactional wake restoration. It locates the compact Finish/Finir control
@@ -562,17 +569,26 @@ match, coverage from the last durable journal boundary through the restart reque
 with the forced stop. Battery percentage is reported only when every sample says the watch was
 unpowered; a charging run is lifecycle evidence, not a battery-drain claim.
 
-The final schema-2 [recovery report](evidence/v0.3-pixel-watch-4/recovery-final/20260726T121444Z/report.json)
-retains session `5fde6181-2421-4919-ac3b-6a16d0360b59`, stable identity/start, a frozen 1,185-sample
-checkpoint, 2,375 samples after restoration, one `Partial` export, and a 42,607 ms wall duration.
-Its immutable interval `1785068100751..1785068112485` is 11,734 ms: a conservative durable
-evidence boundary that covers journal-to-restart and overlaps the narrower 3,626 ms host-observed
-forced-stop interval. Interval validity, checkpoint exact match, coverage, overlap, and overall
-provenance booleans all pass.
+The authoritative final-source schema-2
+[recovery report](evidence/v0.3-pixel-watch-4/recovery-final/20260726T133307Z/report.json) retains
+session `f59594fe-5c7d-4e6b-8421-4cfcdd145d11`, stable identity/start, a frozen 2,390-sample
+checkpoint, 4,782 samples after restoration, one `Partial` export, and matching 73,038 ms saved
+duration and elapsed wall span. Its immutable interval `1785072813435..1785072829742` is 16,307 ms:
+a conservative durable evidence boundary that covers journal-to-restart and overlaps the narrower
+3,707 ms host-observed forced-stop interval. Interval validity, checkpoint exact match, coverage,
+overlap, and overall provenance booleans all pass.
+
+The immediately preceding
+[recovery attempt](evidence/v0.3-pixel-watch-4/recovery-final/20260726T133059Z/report.json) records a
+failed release-gate result (`result=false`; the report field is `"result": "fail"`): the default
+post-restart settle window observed no sample progress. Stable identity and the schema-2 provenance
+checks still passed, but that run is disqualified by its failed sample-advance gate. The follow-up
+above used `--settle-seconds 30` and passed; this sequence is a probe settle-window finding, not an
+app failure.
 
 The older [180-minute report](evidence/v0.3-pixel-watch-4/endurance/20260726T071128Z/report.json)
 remains useful pre-final lifecycle/tooling evidence, but it ran on checkpoint `6f6f6cd` before the
-long-session, sync, and process-absence work above. It cannot close the frozen-final-APK gate. The
+long-session, sync, and process-absence work above. It cannot close the final `48d101f` gate. The
 definitive retained result and exact measurements will replace `FINAL_ENDURANCE_PENDING` after the
 in-progress run completes. Because that run is powered, it will not substantiate battery drain.
 

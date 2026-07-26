@@ -12,13 +12,13 @@ from one APK.
 | Field | Recorded value |
 | --- | --- |
 | Evidence date | 2026-07-26 UTC |
-| Final app/APK source revision | `0bdbe985756d962e73b47dfc5ca098a709a9a86f` |
-| Final recovery/screenshot retention checkpoint | `909bef8` (documentation/endurance follow) |
+| Final app/APK source revision | `48d101fbd55520c983e33979f5a7733a50fd73ca` |
+| Final recovery/screenshot evidence | `recovery-final/20260726T133307Z`, screenshots 67/68 |
 | Browser/server checkpoint | `836f116` (dashboard client, tests, and workflows; Wear APK unchanged) |
 | Session probe implementation | `e9719a57d6a44463ff554e596de55ee95de41ef6` |
 | Recovery probe implementation | `5318deb910ea3aae0f77d41e8c5e227ae77f39f8` |
 | Tested artifact | `app-debug.apk` |
-| Final debug APK SHA-256 | `5d637e2d0c7fad57f15503c140d9cb11e25f4b94df1732256e88f2ca2a0046fb` |
+| Final debug APK SHA-256 | `d6e8ccf8b77b1c958916c2107b49e31e9f29a4b14eb69847ffc6318fae084ad7` |
 | Package | `com.badwatch.badwatch` |
 | Version | `0.3.0` (`versionCode=300`) |
 | SDKs | minimum 30, target 36, compile 36 |
@@ -26,12 +26,12 @@ from one APK.
 | Watch | Google Pixel Watch 4, `kenari_btwifi`, 480 x 480 |
 | OS | Android 17 / API 37 |
 | Build fingerprint | `google/kenari_btwifi/kenari_btwifi:17/CP2A.260603.001.S1/15396605:user/release-keys` |
-| App last update reported by device | `2026-07-26 14:08:34` |
+| App last update reported by device | `2026-07-26 15:30:35` |
 | Device connection | Wireless ADB TLS transport |
 | Charger state | AC powered; no battery-drain claim |
-| Font / ambient matrix | Scoped active/ambient and broad normal/`1.30` evidence plus final-APK Summary/History/recovered-Summary retests |
+| Font / ambient matrix | Scoped active/ambient and broad normal/`1.30` evidence, `0bdbe98` hour-plus layouts, and final `48d101f` truthful recovery semantics |
 
-Ten traceable debug app checkpoints contribute to this ledger:
+Eleven traceable debug app checkpoints contribute to this ledger:
 
 | Scope | Source | APK SHA-256 |
 | --- | --- | --- |
@@ -44,7 +44,8 @@ Ten traceable debug app checkpoints contribute to this ledger:
 | Large-text dense-metric stacking | `402000cc870bff8b1922dff423bbb1b835cb3201` | `a22d24f46054c439f8abb6cfe1b92afc3a0e890e4849e80d3db28085f4ef0ec0` |
 | Large-text live action lane | `ea08bf21b79f73b16285378f310784f5af01abd4` | `a429ec043bf1d8ec033ac1e3415eaf4958ad4dbab99b98f816b1f2635f15c4e2` |
 | Safe-first recovery plus compact match/shadow and the pre-final endurance run | `6f6f6cd9531040072bc153b365c0c515b0a40781` | `28076fc03319ca15df92760a8d20b993af2f8ae8e129ffe61e021876eed0169d` |
-| Long-duration review, retry-safe sync, immutable recovery coverage, and frozen final APK | `0bdbe985756d962e73b47dfc5ca098a709a9a86f` | `5d637e2d0c7fad57f15503c140d9cb11e25f4b94df1732256e88f2ca2a0046fb` |
+| Long-duration review, retry-safe sync, and immutable recovery precursor | `0bdbe985756d962e73b47dfc5ca098a709a9a86f` | `5d637e2d0c7fad57f15503c140d9cb11e25f4b94df1732256e88f2ca2a0046fb` |
+| Truthful no-detected-play semantics and final Wear APK | `48d101fbd55520c983e33979f5a7733a50fd73ca` | `d6e8ccf8b77b1c958916c2107b49e31e9f29a4b14eb69847ffc6318fae084ad7` |
 
 The `008a4f4` app change is deliberately narrow: it makes `MainActivity` `singleTop`, consumes the
 Tile's one-shot start command through `onNewIntent`, and adds stable ambient lifecycle diagnostics.
@@ -61,26 +62,32 @@ visible **Finish** / **Finir** text, and retains the complete Stop-and-save acce
 `6f6f6cd` gives match/interval and shadow the same `1.20` responsive threshold and JVM regressions.
 It is the source of the retained pre-final endurance run, not the final APK.
 
-Checkpoint `0bdbe98` incorporates the subsequent hour-plus responsive review, bounded probe
-cleanup and settled-recap verification, retry-safe incomplete sync acknowledgements, immutable
-process-absence provenance, inference gating, exact Home/History/Tile recovery markers,
-observed-minute Progress records, dashboard filters and gap audit, CSV recovery columns, and the
-three-way Detected/No detected play/Unobserved activity composition. Earlier evidence remains representative
-only for the explicitly scoped behavior named in its section. Final-APK device retests cover
-start/recover/save, hour-plus Summary and History at normal/`1.30` text, and the recovered Summary
-notice/composition. Final-build Home, Progress, Tile rendering/gap marker, recovered-History
+Checkpoint `0bdbe98` incorporates the hour-plus responsive review, bounded probe cleanup and
+settled-recap verification, retry-safe incomplete sync acknowledgements, immutable process-absence
+provenance, inference gating, exact Home/History/Tile recovery markers, observed-minute Progress
+records, dashboard filters and gap audit, CSV recovery columns, and the three-state activity
+composition. Its retained 61–66 screenshots are precursor evidence; 65/66 predate the final
+semantic label and do not prove the new wording.
+
+Final Wear source `48d101f` changes the observed non-active composition label to the truthful
+**No detected play** / **Aucun jeu détecté**, while preserving the three-way wall-time contract.
+Its device retest covers byte-matched artifact identity, start/recover/save, exact schema-2
+provenance, and the recovered Summary notice/composition in screenshots 67/68. Earlier evidence
+remains representative only for the explicitly scoped behavior named in its section. Hour-plus
+Summary and History at normal/`1.30` text remain `0bdbe98` evidence and are not relabelled as
+`48d101f` captures. Final-source Home, Progress, Tile rendering/gap marker, recovered-History
 marker, and Live details were not physically recaptured; those paths have automated regression
 coverage only. The definitive endurance retest is `FINAL_ENDURANCE_PENDING`.
 
 The installed `base.apk` matched the final debug APK hash byte-for-byte and verified with APK
 Signature Scheme v2. The same source produced unsigned release APK SHA-256
-`f46405c1a9ee9d420d61b8e997da27ca75090665801279549eb734c4777fa6d8` and unsigned release
-AAB SHA-256 `70d3c1816612565187d27f299ff69ca7060e978f717fd5698bcb5ae812fe58dc`.
+`c32adc35bad96edddd54bb1a24224d4ce3b0f62cefc2cdc041e096a9b06245a4` and unsigned release
+AAB SHA-256 `375f42e3864859c83b56442592029841b82fdba0183819fa9fbaaf3b172f795a`.
 Those release artifacts were assembled and hashed, not installed on this debug-evidence watch.
-At the pre-`836f116` frozen app checkpoint `0bdbe98`, the clean software gate passed all 31 Python
-tests, `py_compile`, resource XML and browser JavaScript syntax validation, and Gradle
-clean/test/lint/debug/release-APK/release-bundle. Its historical result was 132 tasks: 129 executed
-and three up-to-date; no later aggregate task total is inferred from it.
+At precursor Wear checkpoint `0bdbe98`, before the browser task joined `:server:test`, the clean
+software gate passed all 31 Python tests, `py_compile`, resource XML and browser JavaScript syntax
+validation, and Gradle clean/test/lint/debug/release-APK/release-bundle. Its historical result was
+132 tasks: 129 executed and three up-to-date.
 
 At browser/server repository checkpoint `836f116`, with the Wear APK unchanged, `:server:test`
 depends on `:server:dashboardBrowserTest` and requires Node 22. It executes six journeys against
@@ -88,6 +95,11 @@ JavaScript extracted from shipped `index.html`: stale-token prompt/retry; URL-fi
 hydrate/apply/error/reset; deep-linked reviewed detail; successful revisioned diary save and
 aggregate refresh; HTTP 409 reload/conflict replacement; and archive-restore success/error. This
 proves client state/request contracts, not responsive layout or real-browser rendering.
+
+At final Wear source `48d101f`, the clean software gate passed all 31 Python tests, `py_compile`,
+resource XML and browser JavaScript syntax validation, all six Node 22 browser journeys, and
+Gradle clean/test/lint/debug/release-APK/release-bundle. It reported 133 tasks: 130 executed and
+three up-to-date.
 
 For a powered endurance run, current probe tooling snapshots, suppresses, reports, and restores
 plugged-in stay-awake, Theater Mode, and DND so charging UI/notifications cannot create a false
@@ -98,15 +110,16 @@ for a drain claim.
 All retained PNGs in this directory are native 480 x 480 captures. The watch moved between
 English and French during the recreation check and used both normal and `1.30` font scale during
 the visual passes. Screen-off acquisition was observed with the system in `Dozing`; the retained
-pre-final 180-minute run was powered, the frozen-final-APK run is `FINAL_ENDURANCE_PENDING`, and no
+pre-final 180-minute run was powered, the final-`48d101f` run is `FINAL_ENDURANCE_PENDING`, and no
 battery-drain conclusion is drawn from either lifecycle gate.
 
 ## Passed observations
 
 ### Install, onboarding, and optional permissions
 
-The tested APK opened at first-run onboarding, accepted racket-hand setup, requested optional
-heart-rate access, requested notification access, and reached the English home screen:
+On checkpoint `99b5f62`, the tested APK opened at first-run onboarding, accepted racket-hand
+setup, requested optional heart-rate access, requested notification access, and reached the
+English home screen:
 
 - [English onboarding](screenshots/00-onboarding-en.png)
 - [English home](screenshots/01-home-en-normal.png)
@@ -152,25 +165,39 @@ after the check.
 
 ### Process death and journal recovery
 
-The final schema-2 physical recovery run passed on checkpoint `0bdbe98`. Session
-`5fde6181-2421-4919-ac3b-6a16d0360b59` kept one ID and start time across a forced process stop. Its
-checkpoint stayed frozen at 1,185 samples, advanced to 2,375 after restoration, incremented
-`recoveryCount` to 1, and saved exactly one `Partial` session whose duration and elapsed span are
-both 42,607 ms.
+The authoritative final-source schema-2 physical recovery run passed on checkpoint `48d101f`.
+Session `f59594fe-5c7d-4e6b-8421-4cfcdd145d11` kept one ID and start time across a forced process
+stop. Its checkpoint stayed frozen at 2,390 samples, advanced to 4,782 after restoration,
+incremented `recoveryCount` to 1, and saved exactly one `Partial` session whose duration and elapsed
+wall span are both 73,038 ms.
 
-The host observed 3,626 ms between force-stop and restart request. The app conservatively retained
-the larger immutable interval `1785068100751..1785068112485` (11,734 ms), from its last durable
-journal boundary through controller restoration. It is valid and ordered, exactly matches the
-recovered checkpoint and final session, covers journal-to-restart, overlaps the forced stop, and
-passes `processAbsenceEvidenceValid`. Elapsed time includes it, but no sensor evidence is invented,
-detected exchanges cannot bridge it, and it is neither detected activity nor inferred quiet time.
+The host observed 3,707 ms between force-stop and restart request. The app conservatively retained
+the larger immutable interval `1785072813435..1785072829742` (16,307 ms), from its last durable
+journal boundary through controller restoration. The interval is valid and ordered, exactly
+matches the recovered checkpoint and final session, covers journal-to-restart, overlaps the forced
+stop, and passes every provenance boolean. Elapsed time includes it, but no sensor evidence is
+invented, detected exchanges cannot bridge it, and it is neither detected activity nor inferred
+quiet time.
 
-- [final machine-readable passing report](recovery-final/20260726T121444Z/report.json)
-- [before final process death](recovery-final/20260726T121444Z/before-process-death.png)
-- [after final recovery](recovery-final/20260726T121444Z/after-recovery.png)
-- [immediate optional diary after stop](recovery-final/20260726T121444Z/recap.png)
-- [settled Summary with exact known-unobserved notice](screenshots/65-final-recovery-gap-recap.png)
-- [three-way detected/no-detected-play/unobserved composition](screenshots/66-final-recovery-gap-composition.png)
+- [authoritative final-source passing report](recovery-final/20260726T133307Z/report.json)
+- [before final-source process death](recovery-final/20260726T133307Z/before-process-death.png)
+- [after final-source recovery](recovery-final/20260726T133307Z/after-recovery.png)
+- [immediate optional diary after stop](recovery-final/20260726T133307Z/recap.png)
+- [truthful known-unobserved Summary notice](screenshots/67-final-truthful-recovery-gap.png)
+- [truthful detected/no-detected-play/unobserved composition](screenshots/68-final-truthful-composition.png)
+
+The immediately preceding
+[default-settle attempt](recovery-final/20260726T133059Z/report.json) is retained with release-gate
+`result=false` (the report records `"result": "fail"`) because the default post-restart settle
+window observed no sample progress. Stable identity and every schema-2 provenance boolean passed,
+but `samplesAdvancedAfterRecovery` was false, so that attempt is disqualified. The authoritative
+follow-up used `--settle-seconds 30` and passed. This is a probe settle-window finding, not an app
+failure.
+
+The earlier `0bdbe98`
+[schema-2 recovery report](recovery-final/20260726T121444Z/report.json) remains historical precursor
+evidence for the long-layout and recovery work. Its screenshots 65/66 predate the final semantic
+label and are not used to prove the final wording.
 
 The earlier [schema-1 recovery report](recovery/20260726T020131Z/report.json) remains historical
 evidence for stable identity, a frozen checkpoint, and resumed sampling. It did not persist or
@@ -314,7 +341,7 @@ probe and from any battery measurement.
 ### Final visual inventory and enlarged text
 
 “Final visual inventory” is the retained release-ledger grouping, not a claim that every image was
-captured from final APK checkpoint `0bdbe98`. The broad navigation and language matrix below is
+captured from final Wear source `48d101f`. The broad navigation and language matrix below is
 source-scoped to the earlier checkpoints named in this ledger.
 
 The broad normal-size English pass on the scoped pre-final checkpoints retained the Tile, Home,
@@ -363,42 +390,51 @@ fluent French review or a physical TalkBack traversal.
 
 ### Final frozen-APK long session and recovery coverage
 
-Checkpoint `0bdbe98` was then installed and byte-matched for a focused final subset: saved Summary,
-hour-plus History, and recovered Summary/composition. At normal font scale and `1.30`, the saved
-Summary renders the exact three-hour value `3:00:12` without clipping: normal text gives the
-hour-plus duration its own full-width row, while enlarged text uses the established accessibility
-stack. History retains the same complete value and remains readable/reachable at both scales.
+Precursor checkpoint `0bdbe98` was installed and byte-matched for the hour-plus layout subset. At
+normal font scale and `1.30`, the saved Summary renders the exact three-hour value `3:00:12`
+without clipping: normal text gives the hour-plus duration its own full-width row, while enlarged
+text uses the established accessibility stack. History retains the same complete value and remains
+readable/reachable at both scales.
 
 - [three-hour Summary at normal font scale](screenshots/61-final-long-duration-recap.png)
 - [three-hour Summary at 1.30](screenshots/62-final-long-duration-recap-font-130.png)
 - [three-hour History row at normal font scale](screenshots/63-final-long-duration-history.png)
 - [three-hour History row at 1.30](screenshots/64-final-long-duration-history-font-130.png)
 
-The final recovered-session Summary shows `0:11` of known unobserved time, explains that elapsed
-time includes it, and explicitly says it is excluded from inferred quiet time and personal
-comparisons. The composition card uses three distinct states—Detected, No detected play, and
-Unobserved; the French labels are Détecté, Aucun jeu détecté, and Non observé. “No detected play”
+The `0bdbe98` recovered-session captures remain useful pre-label history for the notice layout and
+three-state composition structure. Screenshots 65/66 do not show or prove the final semantic
+wording:
+
+- [pre-label known-unobserved Summary](screenshots/65-final-recovery-gap-recap.png)
+- [pre-label three-state composition](screenshots/66-final-recovery-gap-composition.png)
+
+Final Wear source `48d101f` was then installed and byte-matched. Its authoritative recovered
+session shows `0:16` of known unobserved time, explains that elapsed time includes it, and says it
+is excluded from inferred quiet time and personal comparisons. The final English composition
+legend visibly says **Detected**, **No detected play**, and **Unobserved**. “No detected play”
 describes observed time outside detected active spans; it does not claim that no badminton
-occurred. Its active share uses reviewed wall time without relabelling the gap as activity or rest.
+occurred. The French counterpart **Détecté** / **Aucun jeu détecté** / **Non observé** is
+resource/test-covered but was not physically recaptured on `48d101f`.
 
-- [final known-unobserved Summary notice](screenshots/65-final-recovery-gap-recap.png)
-- [final three-way session composition](screenshots/66-final-recovery-gap-composition.png)
+- [final truthful known-unobserved Summary](screenshots/67-final-truthful-recovery-gap.png)
+- [final truthful three-way composition](screenshots/68-final-truthful-composition.png)
 
-All six frozen-APK captures are native 480 x 480 images. They complement rather than relabel the
-earlier full navigation/language matrix. Final-build Home, Progress, Tile rendering/gap marker,
-recovered-History marker, and Live details were not physically recaptured; those paths have
-automated regression coverage only.
+Screenshots 61–68 are native 480 x 480 images. The four hour-plus captures and two pre-label
+recovery captures remain scoped to `0bdbe98`; only screenshots 67/68 are current `48d101f` visual
+evidence. Final-source Home, Progress, Tile rendering/gap marker, recovered-History marker, Live
+details, and hour-plus layouts were not physically recaptured; those paths have automated
+regression coverage plus the explicitly scoped precursor evidence above.
 
 ## Final release-gate status
 
 | Gate | Status at this ledger revision |
 | --- | --- |
 | Physical match and shadow process-restoration checks | **Passed:** retained reports prove state identity, safe timing, and visible cleanup. |
-| Ongoing Activity, Tile rendering/cold start, complication, and ambient surfaces | **Passed on explicitly scoped earlier candidates:** system-rendered/tapped surfaces and a real ambient lifecycle are retained above; they were not repeated on final `0bdbe98`. |
+| Ongoing Activity, Tile rendering/cold start, complication, and ambient surfaces | **Passed on explicitly scoped earlier candidates:** system-rendered/tapped surfaces and a real ambient lifecycle are retained above; they were not repeated on final `48d101f`. |
 | Existing-task Tile Start | **Passed:** the scoped `6f6f6cd` report proves same-task/same-Activity/same-process delivery, one session, advancing samples, health FGS, and complete visible cleanup; final-source regressions retain the launch contract. |
-| Session process-restoration provenance | **Passed:** the frozen-APK schema-2 report proves stable identity, frozen/resumed samples, exact checkpoint/session intervals, `Partial` quality, and visible gap semantics. |
-| Normal-size screen inventory and English/French spot checks | **Passed as combined scoped evidence:** the broad navigation/language matrix is from earlier candidates; final `0bdbe98` adds only saved Summary, hour-plus History, and recovered Summary/composition. Final Home, Progress, Tile, recovered History, and Live were not recaptured. |
-| Enlarged-text inspection | **Passed as combined scoped evidence:** the earlier 26-image matrix covers the broad responsive inventory; final `0bdbe98` physically retests hour-plus Summary/History at `1.30`. Its recovered Summary/composition captures are separate final evidence, not part of the enlarged matrix. Other final-build visual paths have automated coverage only. |
+| Session process-restoration provenance | **Passed on final `48d101f`:** the authoritative schema-2 report proves stable identity, frozen/resumed samples, exact checkpoint/session intervals, `Partial` quality, every provenance boolean, and visible truthful gap semantics. The failed default-settle attempt is disclosed and is not treated as an app failure. |
+| Normal-size screen inventory and English/French spot checks | **Passed as combined scoped evidence:** the broad navigation/language matrix is from earlier candidates; `0bdbe98` adds hour-plus Summary/History and pre-label recovery structure; final `48d101f` adds only the truthful recovered Summary notice/composition. Final-source Home, Progress, Tile, recovered History, and Live were not recaptured. |
+| Enlarged-text inspection | **Passed as combined scoped evidence:** the earlier 26-image matrix covers the broad responsive inventory, and precursor `0bdbe98` physically retests hour-plus Summary/History at `1.30`. Final `48d101f` recovery captures are not part of the enlarged matrix. Other final-source visual paths have automated coverage only. |
 | 180-minute powered screen-off lifecycle probe | **Pending active final gate:** `FINAL_ENDURANCE_PENDING`; the older passing run below is pre-final. |
 | 180-minute unpowered battery measurement | **Not claimed** |
 
@@ -421,9 +457,9 @@ original `7/0/0`, active `0/1/2`, and restored `7/0/0`; both images are native 4
 Every reading was powered. Accordingly, `batteryMeasurementValid` is false,
 `batteryDeltaPercent` is null, and this passing lifecycle result does not substantiate battery
 drain. Because production and probe behavior changed afterward, this result does not close the
-frozen-final-APK release gate.
+final `48d101f` release gate.
 
-Definitive frozen-final-APK endurance result: `FINAL_ENDURANCE_PENDING`.
+Definitive final-`48d101f` endurance result: `FINAL_ENDURANCE_PENDING`.
 
 The final retained report must supply its exact path/source/tooling identity, duration figures,
 one-session identity, all-Dozing/health-FGS/sample-progress booleans, wake-control
